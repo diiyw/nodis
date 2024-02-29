@@ -19,7 +19,7 @@ func TestNodis_Sync(t *testing.T) {
 		SyncInterval: 10,
 	}
 	n := Open(opt)
-	n.Set("test", "test", 0)
+	n.Set("test", "test1", 0)
 	err := n.Sync()
 	if err != nil {
 		t.Errorf("Sync() = %v, want %v", err, nil)

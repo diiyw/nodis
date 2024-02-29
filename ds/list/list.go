@@ -7,7 +7,7 @@ import (
 )
 
 type Node struct {
-	data any
+	data string
 	next *Node
 	prev *Node
 }
@@ -23,7 +23,7 @@ func NewDoublyLinkedList() *DoublyLinkedList {
 }
 
 // LPush adds an element to the head of the list
-func (list *DoublyLinkedList) LPush(data any) {
+func (list *DoublyLinkedList) LPush(data string) {
 	newNode := &Node{data: data}
 	if list.head == nil {
 		list.head = newNode
@@ -36,7 +36,7 @@ func (list *DoublyLinkedList) LPush(data any) {
 }
 
 // RPush adds an element to the end of the list
-func (list *DoublyLinkedList) RPush(data any) {
+func (list *DoublyLinkedList) RPush(data string) {
 	newNode := &Node{data: data}
 	if list.head == nil {
 		list.head = newNode
@@ -138,7 +138,7 @@ func (list *DoublyLinkedList) LIndex(index int) (any, bool) {
 }
 
 // LInsert inserts the element before or after the pivot element
-func (list *DoublyLinkedList) LInsert(pivot, data any, before bool) int {
+func (list *DoublyLinkedList) LInsert(pivot, data string, before bool) int {
 	currentNode := list.head
 	for currentNode != nil {
 		if currentNode.data == pivot {
@@ -169,8 +169,8 @@ func (list *DoublyLinkedList) LInsert(pivot, data any, before bool) int {
 	return 0
 }
 
-// LPushx adds an element to the head of the list if the list exists
-func (list *DoublyLinkedList) LPushx(data any) int {
+// LPushX adds an element to the head of the list if the list exists
+func (list *DoublyLinkedList) LPushX(data string) int {
 	if list.head == nil {
 		return 0
 	}
@@ -178,8 +178,8 @@ func (list *DoublyLinkedList) LPushx(data any) int {
 	return list.LLen()
 }
 
-// RPushx adds an element to the end of the list if the list exists
-func (list *DoublyLinkedList) RPushx(data any) int {
+// RPushX adds an element to the end of the list if the list exists
+func (list *DoublyLinkedList) RPushX(data string) int {
 	if list.tail == nil {
 		return 0
 	}
@@ -214,7 +214,7 @@ func (list *DoublyLinkedList) LRem(count int, value any) int {
 }
 
 // LSet sets the list element at index to value
-func (list *DoublyLinkedList) LSet(index int, value any) bool {
+func (list *DoublyLinkedList) LSet(index int, value string) bool {
 	currentNode := list.head
 	currentIndex := 0
 	for currentNode != nil {

@@ -97,7 +97,7 @@ func TestList_LInsert(t *testing.T) {
 
 func TestList_LPushx(t *testing.T) {
 	l := NewDoublyLinkedList()
-	l.LPushx(100)
+	l.LPushX(100)
 	if l.LLen() != 0 {
 		t.Errorf("pushx error")
 	}
@@ -105,7 +105,7 @@ func TestList_LPushx(t *testing.T) {
 
 func TestList_RPushx(t *testing.T) {
 	l := NewDoublyLinkedList()
-	l.RPushx(100)
+	l.RPushX(100)
 	if l.LLen() != 0 {
 		t.Errorf("pushx error")
 	}

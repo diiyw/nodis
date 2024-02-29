@@ -3,6 +3,7 @@ package nodis
 import (
 	"bytes"
 	"errors"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -33,21 +34,23 @@ func Open(opt Options) *Nodis {
 		metaFile: filepath.Join(opt.Path, "nodis.meta"),
 	}
 	data, err := os.ReadFile(n.dbFile)
-	if err != nil && err.Error() != "open testdata/nodis.db: no such file or directory" {
-		panic(err)
-	}
-	for len(data) > 0 {
-		err := binary.Unmarshal(data, n)
-		if err != nil {
-			panic(err)
+	if err == nil {
+		if len(data) > 0 {
+			err := binary.Unmarshal(data, n)
+			if err != nil {
+				panic(err)
+			}
 		}
+		go func() {
+			for {
+				time.Sleep(opt.SyncInterval)
+				err = n.Sync()
+				if err != nil {
+					log.Println(err)
+				}
+			}
+		}()
 	}
-	go func() {
-		for {
-			time.Sleep(opt.SyncInterval)
-			n.Sync()
-		}
-	}()
 	return n
 }
 
@@ -166,13 +169,14 @@ func (n *Nodis) Tidy() (keys map[string]Key, store map[string][]byte) {
 			n.store.Delete(key)
 			n.keys.Delete(key)
 		}
-		ds, ok := n.store.Get(key)
+		v, ok := n.store.Get(key)
 		if !ok {
 			return true
 		}
 		keys[key] = k
-		data, err := ds.Marshal()
+		data, err := v.Marshal()
 		if err != nil {
+			log.Println("Tidy: ", err)
 			return true
 		}
 		store[key] = data
@@ -210,7 +214,7 @@ func (n *Nodis) Sync() error {
 }
 
 // Set a key with a value and a TTL
-func (n *Nodis) Set(key string, value any, ttl int64) {
+func (n *Nodis) Set(key string, value string, ttl int64) {
 	n.Lock()
 	n.store.Put(key, set.NewSet(value))
 	n.keys.Put(key, Key{TTL: ttl})

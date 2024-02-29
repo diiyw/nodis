@@ -3,10 +3,10 @@ package set
 import "github.com/kelindar/binary"
 
 type Set struct {
-	v any
+	v string
 }
 
-func NewSet(v any) *Set {
+func NewSet(v string) *Set {
 	return &Set{v: v}
 }
 
