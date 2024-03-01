@@ -2,8 +2,17 @@
 A Golang implemented Redis data structure. 
 It is a simple and easy to use in-memory key-value store.
 
+## Supported Data Types
+
+- String
+- List
+- Hash
+- Sorted Set
+
 ## Get Started
-``` go get github.com/diiyw/nodis ```
+```bash
+ go get github.com/diiyw/nodis 
+```
 ```go
 package main
 
