@@ -1,24 +1,23 @@
 package nodis
 
-import "github.com/diiyw/nodis/ds/set"
+import (
+	"github.com/diiyw/nodis/ds"
+	"github.com/diiyw/nodis/ds/set"
+)
 
-func (n *Nodis) newSet() *set.Set {
+func (n *Nodis) newSet() ds.DataStruct {
 	return set.NewSet()
 }
 
 // Set a key with a value and a TTL
 func (n *Nodis) Set(key string, value []byte, ttl int64) {
-	s := n.getDs(key)
-	if s == nil {
-		s = n.newSet()
-	}
+	s := n.getDs(key, n.newSet, ttl)
 	s.(*set.Set).Set(value)
-	n.saveDs(key, s, ttl)
 }
 
 // Get a key
 func (n *Nodis) Get(key string) []byte {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return nil
 	}

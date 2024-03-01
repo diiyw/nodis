@@ -1,26 +1,21 @@
 package nodis
 
 import (
+	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/hash"
 )
 
-func (n *Nodis) newHash(key string) *hash.HashMap {
-	h := hash.NewHashMap()
-	n.store.Put(key, h)
-	n.keys.Put(key, newKey("hash", 0))
-	return h
+func (n *Nodis) newHash() ds.DataStruct {
+	return hash.NewHashMap()
 }
 
 func (n *Nodis) HSet(key string, field string, value []byte) {
-	h := n.getDs(key)
-	if h == nil {
-		h = n.newHash(key)
-	}
+	h := n.getDs(key, n.newHash, 0)
 	h.(*hash.HashMap).HSet(field, value)
 }
 
 func (n *Nodis) HGet(key string, field string) ([]byte, bool) {
-	h := n.getDs(key)
+	h := n.getDs(key, nil, 0)
 	if h == nil {
 		return nil, false
 	}
@@ -28,7 +23,7 @@ func (n *Nodis) HGet(key string, field string) ([]byte, bool) {
 }
 
 func (n *Nodis) HDel(key string, field string) {
-	h := n.getDs(key)
+	h := n.getDs(key, nil, 0)
 	if h == nil {
 		return
 	}
@@ -40,7 +35,7 @@ func (n *Nodis) HDel(key string, field string) {
 }
 
 func (n *Nodis) HLen(key string) int {
-	h := n.getDs(key)
+	h := n.getDs(key, nil, 0)
 	if h == nil {
 		return 0
 	}
@@ -48,7 +43,7 @@ func (n *Nodis) HLen(key string) int {
 }
 
 func (n *Nodis) HKeys(key string) []string {
-	h := n.getDs(key)
+	h := n.getDs(key, nil, 0)
 	if h == nil {
 		return nil
 	}
@@ -56,7 +51,7 @@ func (n *Nodis) HKeys(key string) []string {
 }
 
 func (n *Nodis) HExists(key string, field string) bool {
-	h := n.getDs(key)
+	h := n.getDs(key, nil, 0)
 	if h == nil {
 		return false
 	}
@@ -64,7 +59,7 @@ func (n *Nodis) HExists(key string, field string) bool {
 }
 
 func (n *Nodis) HGetAll(key string) map[string][]byte {
-	h := n.getDs(key)
+	h := n.getDs(key, nil, 0)
 	if h == nil {
 		return nil
 	}
@@ -72,23 +67,17 @@ func (n *Nodis) HGetAll(key string) map[string][]byte {
 }
 
 func (n *Nodis) HIncrBy(key string, field string, value int64) int64 {
-	h := n.getDs(key)
-	if h == nil {
-		h = n.newHash(key)
-	}
+	h := n.getDs(key, n.newHash, 0)
 	return h.(*hash.HashMap).HIncrBy(field, value)
 }
 
 func (n *Nodis) HIncrByFloat(key string, field string, value float64) float64 {
-	h := n.getDs(key)
-	if h == nil {
-		h = n.newHash(key)
-	}
+	h := n.getDs(key, n.newHash, 0)
 	return h.(*hash.HashMap).HIncrByFloat(field, value)
 }
 
 func (n *Nodis) HSetNX(key string, field string, value []byte) bool {
-	h := n.getDs(key)
+	h := n.getDs(key, nil, 0)
 	if h != nil {
 		return false
 	}
@@ -97,18 +86,12 @@ func (n *Nodis) HSetNX(key string, field string, value []byte) bool {
 }
 
 func (n *Nodis) HMSet(key string, fields map[string][]byte) {
-	n.Lock()
-	defer n.Unlock()
-	n.exists(key)
-	h, ok := n.store.Get(key)
-	if !ok {
-		h = n.newHash(key)
-	}
+	h := n.getDs(key, n.newHash, 0)
 	h.(*hash.HashMap).HMSet(fields)
 }
 
 func (n *Nodis) HMGet(key string, fields ...string) [][]byte {
-	h := n.getDs(key)
+	h := n.getDs(key, nil, 0)
 	if h == nil {
 		return nil
 	}
@@ -116,17 +99,11 @@ func (n *Nodis) HMGet(key string, fields ...string) [][]byte {
 }
 
 func (n *Nodis) HClear(key string) {
-	n.Lock()
-	defer n.Unlock()
-	if !n.exists(key) {
-		return
-	}
-	n.store.Delete(key)
-	n.keys.Delete(key)
+	n.Clear(key)
 }
 
 func (n *Nodis) HScan(key string, cursor int, match string, count int) (int, map[string][]byte) {
-	h := n.getDs(key)
+	h := n.getDs(key, nil, 0)
 	if h == nil {
 		return 0, nil
 	}
@@ -134,7 +111,7 @@ func (n *Nodis) HScan(key string, cursor int, match string, count int) (int, map
 }
 
 func (n *Nodis) HVals(key string) [][]byte {
-	h := n.getDs(key)
+	h := n.getDs(key, nil, 0)
 	if h == nil {
 		return nil
 	}

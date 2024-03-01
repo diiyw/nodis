@@ -170,17 +170,22 @@ func (n *Nodis) Sync() error {
 	return nil
 }
 
-func (n *Nodis) getDs(key string) ds.DataStruct {
+func (n *Nodis) getDs(key string, newFn func() ds.DataStruct, ttl int64) ds.DataStruct {
 	n.Lock()
 	defer n.Unlock()
 	if !n.exists(key) {
 		return nil
 	}
-	l, ok := n.store.Get(key)
+	d, ok := n.store.Get(key)
 	if !ok {
+		if newFn != nil {
+			d = newFn()
+			n.saveDs(key, d, ttl)
+			return d
+		}
 		return nil
 	}
-	return l
+	return d
 }
 
 func (n *Nodis) saveDs(key string, ds ds.DataStruct, ttl int64) {
@@ -188,4 +193,15 @@ func (n *Nodis) saveDs(key string, ds ds.DataStruct, ttl int64) {
 	defer n.Unlock()
 	n.store.Put(key, ds)
 	n.keys.Put(key, newKey(ds.GetType(), ttl))
+}
+
+// Clear removes all keys from the store
+func (n *Nodis) Clear(key string) {
+	n.Lock()
+	defer n.Unlock()
+	if !n.exists(key) {
+		return
+	}
+	n.store.Delete(key)
+	n.keys.Delete(key)
 }

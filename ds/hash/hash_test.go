@@ -221,7 +221,7 @@ func TestHash_HScan(t *testing.T) {
 	if len(values) != 1 {
 		t.Errorf("HScan failed, expected 1 but got %d", len(values))
 	}
-	if bytes.Equal(values[key], value) {
+	if !bytes.Equal(values[key], value) {
 		t.Errorf("HScan failed, expected %s but got %s", value, values[key])
 	}
 }
@@ -245,5 +245,20 @@ func TestHash_HScan2(t *testing.T) {
 	_, v = hash.HScan(cursor, "*", 1)
 	if len(v) != 1 {
 		t.Errorf("HScan failed, expected 1 but got %d", len(v))
+	}
+}
+
+func BenchmarkHashMap_HMGet(b *testing.B) {
+	hash := NewHashMap()
+	values := map[string][]byte{
+		"testKey1": []byte("testValue1"),
+		"testKey2": []byte("testValue2"),
+		"testKey3": []byte("testValue3"),
+	}
+
+	hash.HMSet(values)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		hash.HMGet("testKey1", "testKey2", "testKey3")
 	}
 }

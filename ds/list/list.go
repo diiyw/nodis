@@ -32,6 +32,8 @@ func NewDoublyLinkedList() *DoublyLinkedList {
 
 // LPush adds an element to the head of the list
 func (l *DoublyLinkedList) LPush(data []byte) {
+	l.Lock()
+	defer l.Unlock()
 	newNode := &Node{data: data}
 	if l.head == nil {
 		l.head = newNode
@@ -45,6 +47,8 @@ func (l *DoublyLinkedList) LPush(data []byte) {
 
 // RPush adds an element to the end of the list
 func (l *DoublyLinkedList) RPush(data []byte) {
+	l.Lock()
+	defer l.Unlock()
 	newNode := &Node{data: data}
 	if l.head == nil {
 		l.head = newNode
@@ -58,6 +62,8 @@ func (l *DoublyLinkedList) RPush(data []byte) {
 
 // LPop returns the first element of the list
 func (l *DoublyLinkedList) LPop() []byte {
+	l.Lock()
+	defer l.Unlock()
 	if l.head == nil {
 		return nil // 链表为空
 	}
@@ -73,6 +79,8 @@ func (l *DoublyLinkedList) LPop() []byte {
 
 // RPop returns the last element of the list
 func (l *DoublyLinkedList) RPop() []byte {
+	l.Lock()
+	defer l.Unlock()
 	if l.tail == nil {
 		return nil // 链表为空
 	}
@@ -88,11 +96,13 @@ func (l *DoublyLinkedList) RPop() []byte {
 
 // LRange returns a range of elements from the list
 func (l *DoublyLinkedList) LRange(start, end int) [][]byte {
+	l.RLock()
+	defer l.RUnlock()
 	var result [][]byte
 	currentNode := l.head
 	index := 0
 	if end < 0 {
-		end = l.LLen() + end
+		end = l.size() + end
 	}
 	for currentNode != nil {
 		if index >= start && index <= end {
@@ -107,8 +117,7 @@ func (l *DoublyLinkedList) LRange(start, end int) [][]byte {
 	return result
 }
 
-// LLen returns the length of the list
-func (l *DoublyLinkedList) LLen() int {
+func (l *DoublyLinkedList) size() int {
 	currentNode := l.head
 	length := 0
 	for currentNode != nil {
@@ -116,6 +125,13 @@ func (l *DoublyLinkedList) LLen() int {
 		currentNode = currentNode.next
 	}
 	return length
+}
+
+// LLen returns the length of the list
+func (l *DoublyLinkedList) LLen() int {
+	l.RLock()
+	defer l.RUnlock()
+	return l.size()
 }
 
 // BLPop removes and returns the first element of the list
@@ -136,6 +152,8 @@ func (l *DoublyLinkedList) BRPop(timeout time.Duration) []byte {
 
 // LIndex returns the element at index in the list
 func (l *DoublyLinkedList) LIndex(index int) ([]byte, bool) {
+	l.RLock()
+	defer l.RUnlock()
 	currentNode := l.head
 	currentIndex := 0
 	for currentNode != nil {
@@ -150,6 +168,8 @@ func (l *DoublyLinkedList) LIndex(index int) ([]byte, bool) {
 
 // LInsert inserts the element before or after the pivot element
 func (l *DoublyLinkedList) LInsert(pivot, data []byte, before bool) int {
+	l.Lock()
+	defer l.Unlock()
 	currentNode := l.head
 	for currentNode != nil {
 		if bytes.Contains(currentNode.data, pivot) {
@@ -173,7 +193,7 @@ func (l *DoublyLinkedList) LInsert(pivot, data []byte, before bool) int {
 				}
 				currentNode.next = newNode
 			}
-			return l.LLen()
+			return l.size()
 		}
 		currentNode = currentNode.next
 	}
@@ -182,24 +202,30 @@ func (l *DoublyLinkedList) LInsert(pivot, data []byte, before bool) int {
 
 // LPushX adds an element to the head of the list if the list exists
 func (l *DoublyLinkedList) LPushX(data []byte) int {
+	l.Lock()
+	defer l.Unlock()
 	if l.head == nil {
 		return 0
 	}
 	l.LPush(data)
-	return l.LLen()
+	return l.size()
 }
 
 // RPushX adds an element to the end of the list if the list exists
 func (l *DoublyLinkedList) RPushX(data []byte) int {
+	l.Lock()
+	defer l.Unlock()
 	if l.tail == nil {
 		return 0
 	}
 	l.RPush(data)
-	return l.LLen()
+	return l.size()
 }
 
 // LRem removes the first count occurrences of elements equal to value from the list
 func (l *DoublyLinkedList) LRem(count int, value []byte) int {
+	l.Lock()
+	defer l.Unlock()
 	currentNode := l.head
 	removed := 0
 	for currentNode != nil {
@@ -226,6 +252,8 @@ func (l *DoublyLinkedList) LRem(count int, value []byte) int {
 
 // LSet sets the list element at index to value
 func (l *DoublyLinkedList) LSet(index int, value []byte) bool {
+	l.Lock()
+	defer l.Unlock()
 	currentNode := l.head
 	currentIndex := 0
 	for currentNode != nil {
@@ -241,6 +269,8 @@ func (l *DoublyLinkedList) LSet(index int, value []byte) bool {
 
 // LTrim trims an existing list so that it will contain only the specified range of elements specified
 func (l *DoublyLinkedList) LTrim(start, end int) {
+	l.Lock()
+	defer l.Unlock()
 	currentNode := l.head
 	index := 0
 	for currentNode != nil {

@@ -163,3 +163,22 @@ func TestList_LTrim(t *testing.T) {
 		t.Errorf("trim error")
 	}
 }
+
+func BenchmarkDoublyLinkedList_LPush(b *testing.B) {
+	l := NewDoublyLinkedList()
+	for i := 0; i < b.N; i++ {
+		is := strconv.Itoa(i)
+		l.LPush([]byte(is))
+	}
+}
+
+func BenchmarkDoublyLinkedList_LPop(b *testing.B) {
+	l := NewDoublyLinkedList()
+	for i := 0; i < b.N; i++ {
+		is := strconv.Itoa(i)
+		l.LPush([]byte(is))
+	}
+	for i := 0; i < b.N; i++ {
+		l.LPop()
+	}
+}

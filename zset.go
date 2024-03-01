@@ -1,26 +1,21 @@
 package nodis
 
 import (
+	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/zset"
 )
 
-func (n *Nodis) newZSet(key string) *zset.SortedSet {
-	s := zset.NewSortedSet()
-	n.store.Put(key, s)
-	n.keys.Put(key, newKey("zset", 0))
-	return s
+func (n *Nodis) newZSet() ds.DataStruct {
+	return zset.NewSortedSet()
 }
 
 func (n *Nodis) ZAdd(key string, member string, score float64) {
-	s := n.getDs(key)
-	if s == nil {
-		s = n.newZSet(key)
-	}
+	s := n.getDs(key, n.newZSet, 0)
 	s.(*zset.SortedSet).ZAdd(member, score)
 }
 
 func (n *Nodis) ZCard(key string) int64 {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return 0
 	}
@@ -28,7 +23,7 @@ func (n *Nodis) ZCard(key string) int64 {
 }
 
 func (n *Nodis) ZRank(key string, member string) int64 {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return 0
 	}
@@ -36,7 +31,7 @@ func (n *Nodis) ZRank(key string, member string) int64 {
 }
 
 func (n *Nodis) ZRevRank(key string, member string) int64 {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return 0
 	}
@@ -44,7 +39,7 @@ func (n *Nodis) ZRevRank(key string, member string) int64 {
 }
 
 func (n *Nodis) ZScore(key string, member string) float64 {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return 0
 	}
@@ -52,16 +47,12 @@ func (n *Nodis) ZScore(key string, member string) float64 {
 }
 
 func (n *Nodis) ZIncrBy(key string, score float64, member string) float64 {
-	s := n.getDs(key)
-	if s == nil {
-		s := n.newZSet(key)
-		return s.ZIncrBy(member, score)
-	}
+	s := n.getDs(key, n.newZSet, 0)
 	return s.(*zset.SortedSet).ZIncrBy(member, score)
 }
 
 func (n *Nodis) ZRange(key string, start int64, stop int64) []string {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return nil
 	}
@@ -74,7 +65,7 @@ func (n *Nodis) ZRange(key string, start int64, stop int64) []string {
 }
 
 func (n *Nodis) ZRangeWithScores(key string, start int64, stop int64) []*zset.Element {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return nil
 	}
@@ -82,7 +73,7 @@ func (n *Nodis) ZRangeWithScores(key string, start int64, stop int64) []*zset.El
 }
 
 func (n *Nodis) ZRevRange(key string, start int64, stop int64) []string {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return nil
 	}
@@ -95,7 +86,7 @@ func (n *Nodis) ZRevRange(key string, start int64, stop int64) []string {
 }
 
 func (n *Nodis) ZRevRangeWithScores(key string, start int64, stop int64) []*zset.Element {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return nil
 	}
@@ -103,7 +94,7 @@ func (n *Nodis) ZRevRangeWithScores(key string, start int64, stop int64) []*zset
 }
 
 func (n *Nodis) ZRangeByScore(key string, min float64, max float64) []string {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return nil
 	}
@@ -116,7 +107,7 @@ func (n *Nodis) ZRangeByScore(key string, min float64, max float64) []string {
 }
 
 func (n *Nodis) ZRangeByScoreWithScores(key string, min float64, max float64) []*zset.Element {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return nil
 	}
@@ -124,7 +115,7 @@ func (n *Nodis) ZRangeByScoreWithScores(key string, min float64, max float64) []
 }
 
 func (n *Nodis) ZRevRangeByScore(key string, min float64, max float64) []string {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return nil
 	}
@@ -137,7 +128,7 @@ func (n *Nodis) ZRevRangeByScore(key string, min float64, max float64) []string 
 }
 
 func (n *Nodis) ZRevRangeByScoreWithScores(key string, min float64, max float64) []*zset.Element {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return nil
 	}
@@ -145,7 +136,7 @@ func (n *Nodis) ZRevRangeByScoreWithScores(key string, min float64, max float64)
 }
 
 func (n *Nodis) ZRem(key string, members ...string) int64 {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return 0
 	}
@@ -159,7 +150,7 @@ func (n *Nodis) ZRem(key string, members ...string) int64 {
 }
 
 func (n *Nodis) ZRemRangeByRank(key string, start int64, stop int64) int64 {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return 0
 	}
@@ -167,7 +158,7 @@ func (n *Nodis) ZRemRangeByRank(key string, start int64, stop int64) int64 {
 }
 
 func (n *Nodis) ZRemRangeByScore(key string, min float64, max float64) int64 {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return 0
 	}
@@ -175,7 +166,7 @@ func (n *Nodis) ZRemRangeByScore(key string, min float64, max float64) int64 {
 }
 
 func (n *Nodis) ZPopMin(key string, count int) []*zset.Element {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return nil
 	}
@@ -183,7 +174,7 @@ func (n *Nodis) ZPopMin(key string, count int) []*zset.Element {
 }
 
 func (n *Nodis) ZPopMax(key string, count int) []*zset.Element {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return nil
 	}
@@ -191,7 +182,7 @@ func (n *Nodis) ZPopMax(key string, count int) []*zset.Element {
 }
 
 func (n *Nodis) ZExists(key string, member string) bool {
-	s := n.getDs(key)
+	s := n.getDs(key, nil, 0)
 	if s == nil {
 		return false
 	}
@@ -199,11 +190,5 @@ func (n *Nodis) ZExists(key string, member string) bool {
 }
 
 func (n *Nodis) ZClear(key string) {
-	n.Lock()
-	defer n.Unlock()
-	if !n.exists(key) {
-		return
-	}
-	n.store.Delete(key)
-	n.keys.Delete(key)
+	n.Clear(key)
 }

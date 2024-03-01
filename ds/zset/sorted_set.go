@@ -30,6 +30,8 @@ func (sortedSet *SortedSet) GetType() string {
 
 // ZAdd puts member into set,  and returns whether it has inserted new node
 func (sortedSet *SortedSet) ZAdd(member string, score float64) bool {
+	sortedSet.Lock()
+	defer sortedSet.Unlock()
 	element, ok := sortedSet.dict.Get(member)
 	sortedSet.dict.Put(member, &Element{
 		Member: member,
@@ -48,11 +50,15 @@ func (sortedSet *SortedSet) ZAdd(member string, score float64) bool {
 
 // ZCard returns number of members in set
 func (sortedSet *SortedSet) ZCard() int64 {
+	sortedSet.RLock()
+	defer sortedSet.RUnlock()
 	return int64(sortedSet.dict.Count())
 }
 
 // ZRem removes the given member from set
 func (sortedSet *SortedSet) ZRem(member string) bool {
+	sortedSet.Lock()
+	defer sortedSet.Unlock()
 	v, ok := sortedSet.dict.Get(member)
 	if ok {
 		sortedSet.skiplist.remove(member, v.Score)
@@ -79,16 +85,22 @@ func (sortedSet *SortedSet) getRank(member string, desc bool) (rank int64) {
 
 // ZRank returns the rank of the given member, sort by ascending order, rank starts from 0
 func (sortedSet *SortedSet) ZRank(member string) int64 {
+	sortedSet.RLock()
+	defer sortedSet.RUnlock()
 	return sortedSet.getRank(member, false)
 }
 
 // ZRevRank returns the rank of the given member, sort by descending order, rank starts from 0
 func (sortedSet *SortedSet) ZRevRank(member string) int64 {
+	sortedSet.RLock()
+	defer sortedSet.RUnlock()
 	return sortedSet.getRank(member, true)
 }
 
 // ZScore returns the score of the given member
 func (sortedSet *SortedSet) ZScore(member string) float64 {
+	sortedSet.RLock()
+	defer sortedSet.RUnlock()
 	element, ok := sortedSet.dict.Get(member)
 	if !ok {
 		return 0
@@ -146,13 +158,17 @@ func (sortedSet *SortedSet) rangeByRank(start int64, stop int64, desc bool) []*E
 	return slice
 }
 
-// ZRangeByRank returns members which rank within [start, stop), sort by ascending order, rank starts from 0
+// ZRange returns members which rank within [start, stop), sort by ascending order, rank starts from 0
 func (sortedSet *SortedSet) ZRange(start int64, stop int64) []*Element {
+	sortedSet.RLock()
+	defer sortedSet.RUnlock()
 	return sortedSet.rangeByRank(start, stop, false)
 }
 
-// ZRevRangeByRank returns members which rank within [start, stop), sort by descending order, rank starts from 0
+// ZRevRange returns members which rank within [start, stop), sort by descending order, rank starts from 0
 func (sortedSet *SortedSet) ZRevRange(start int64, stop int64) []*Element {
+	sortedSet.RLock()
+	defer sortedSet.RUnlock()
 	return sortedSet.rangeByRank(start, stop, true)
 }
 
@@ -180,6 +196,8 @@ func (sortedSet *SortedSet) rangeCount(min Border, max Border) int64 {
 
 // ZCount returns the number of  members which score or member within the given border
 func (sortedSet *SortedSet) ZCount(min float64, max float64) int64 {
+	sortedSet.RLock()
+	defer sortedSet.RUnlock()
 	return sortedSet.rangeCount(&ScoreBorder{Value: min, Exclude: false}, &ScoreBorder{Value: max, Exclude: false})
 }
 
@@ -223,9 +241,9 @@ func (sortedSet *SortedSet) forEach(min Border, max Border, offset int64, limit 
 	}
 }
 
-// zrange returns members which score or member within the given border
+// zRange returns members which score or member within the given border
 // param limit: <0 means no limit
-func (sortedSet *SortedSet) zrange(min Border, max Border, offset int64, limit int64, desc bool) []*Element {
+func (sortedSet *SortedSet) zRange(min Border, max Border, offset int64, limit int64, desc bool) []*Element {
 	if limit == 0 || offset < 0 {
 		return make([]*Element, 0)
 	}
@@ -248,12 +266,16 @@ func (sortedSet *SortedSet) removeRange(min Border, max Border) int64 {
 
 // ZRemRangeByScore removes members which score or member within the given border
 func (sortedSet *SortedSet) ZRemRangeByScore(min float64, max float64) int64 {
+	sortedSet.Lock()
+	defer sortedSet.Unlock()
 	return sortedSet.removeRange(&ScoreBorder{Value: min, Exclude: false}, &ScoreBorder{Value: max, Exclude: false})
 }
 
 // ZRemRangeByRank removes member ranking within [start, stop)
 // sort by ascending order and rank starts from 0
 func (sortedSet *SortedSet) ZRemRangeByRank(start int64, stop int64) int64 {
+	sortedSet.Lock()
+	defer sortedSet.Unlock()
 	removed := sortedSet.skiplist.removeRangeByRank(start+1, stop+1)
 	for _, element := range removed {
 		sortedSet.dict.Delete(element.Member)
@@ -262,6 +284,8 @@ func (sortedSet *SortedSet) ZRemRangeByRank(start int64, stop int64) int64 {
 }
 
 func (sortedSet *SortedSet) ZPopMin(count int) []*Element {
+	sortedSet.Lock()
+	defer sortedSet.Unlock()
 	first := sortedSet.skiplist.getFirstInRange(scoreNegativeInfBorder, scorePositiveInfBorder)
 	if first == nil {
 		return nil
@@ -278,6 +302,8 @@ func (sortedSet *SortedSet) ZPopMin(count int) []*Element {
 }
 
 func (sortedSet *SortedSet) ZPopMax(count int) []*Element {
+	sortedSet.Lock()
+	defer sortedSet.Unlock()
 	last := sortedSet.skiplist.getLastInRange(scoreNegativeInfBorder, scorePositiveInfBorder)
 	if last == nil {
 		return nil
@@ -295,22 +321,30 @@ func (sortedSet *SortedSet) ZPopMax(count int) []*Element {
 
 // ZExists returns whether the given member exists in set
 func (sortedSet *SortedSet) ZExists(member string) bool {
+	sortedSet.RLock()
+	defer sortedSet.RUnlock()
 	_, ok := sortedSet.dict.Get(member)
 	return ok
 }
 
 // ZRangeByScore returns members which score or member within the given border
 func (sortedSet *SortedSet) ZRangeByScore(min float64, max float64) []*Element {
-	return sortedSet.zrange(&ScoreBorder{Value: min, Exclude: false}, &ScoreBorder{Value: max, Exclude: false}, 0, -1, false)
+	sortedSet.RLock()
+	defer sortedSet.RUnlock()
+	return sortedSet.zRange(&ScoreBorder{Value: min, Exclude: false}, &ScoreBorder{Value: max, Exclude: false}, 0, -1, false)
 }
 
 // ZRevRangeByScore returns members which score or member within the given border
 func (sortedSet *SortedSet) ZRevRangeByScore(min float64, max float64) []*Element {
-	return sortedSet.zrange(&ScoreBorder{Value: min, Exclude: false}, &ScoreBorder{Value: max, Exclude: false}, 0, -1, true)
+	sortedSet.RLock()
+	defer sortedSet.RUnlock()
+	return sortedSet.zRange(&ScoreBorder{Value: min, Exclude: false}, &ScoreBorder{Value: max, Exclude: false}, 0, -1, true)
 }
 
 // ZIncrBy increases the score of the given member
 func (sortedSet *SortedSet) ZIncrBy(member string, score float64) float64 {
+	sortedSet.Lock()
+	defer sortedSet.Unlock()
 	element, ok := sortedSet.dict.Get(member)
 	if !ok {
 		return 0
