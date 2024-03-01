@@ -1,26 +1,30 @@
 package hash
 
-import "testing"
+import (
+	"bytes"
+	"strconv"
+	"testing"
+)
 
 func TestHash_HSet(t *testing.T) {
-	hash := NewHash()
+	hash := NewHashMap()
 	key := "testKey"
-	value := "testValue"
+	value := []byte("testValue")
 
 	hash.HSet(key, value)
 	v, ok := hash.HGet(key)
 	if !ok {
 		t.Errorf("HSet failed, expected %s but got nothing", value)
 	}
-	if v != value {
+	if !bytes.Equal(v, value) {
 		t.Errorf("HSet failed, expected %s but got %s", value, v)
 	}
 }
 
 func TestHash_HDel(t *testing.T) {
-	hash := NewHash()
+	hash := NewHashMap()
 	key := "testKey"
-	value := "testValue"
+	value := []byte("testValue")
 
 	hash.HSet(key, value)
 	hash.HDel(key)
@@ -31,9 +35,9 @@ func TestHash_HDel(t *testing.T) {
 }
 
 func TestHash_HLen(t *testing.T) {
-	hash := NewHash()
+	hash := NewHashMap()
 	key := "testKey"
-	value := "testValue"
+	value := []byte("testValue")
 
 	hash.HSet(key, value)
 	length := hash.HLen()
@@ -43,9 +47,9 @@ func TestHash_HLen(t *testing.T) {
 }
 
 func TestHash_HKeys(t *testing.T) {
-	hash := NewHash()
+	hash := NewHashMap()
 	key := "testKey"
-	value := "testValue"
+	value := []byte("testValue")
 
 	hash.HSet(key, value)
 	keys := hash.HKeys()
@@ -58,9 +62,9 @@ func TestHash_HKeys(t *testing.T) {
 }
 
 func TestHash_HExists(t *testing.T) {
-	hash := NewHash()
+	hash := NewHashMap()
 	key := "testKey"
-	value := "testValue"
+	value := []byte("testValue")
 
 	hash.HSet(key, value)
 	ok := hash.HExists(key)
@@ -70,39 +74,39 @@ func TestHash_HExists(t *testing.T) {
 }
 
 func TestHash_HGetAll(t *testing.T) {
-	hash := NewHash()
+	hash := NewHashMap()
 	key := "testKey"
-	value := "testValue"
+	value := []byte("testValue")
 
 	hash.HSet(key, value)
 	values := hash.HGetAll()
 	if len(values) != 1 {
 		t.Errorf("HGetAll failed, expected 1 but got %d", len(values))
 	}
-	if values[key] != value {
+	if bytes.Equal(values[key], value) {
 		t.Errorf("HGetAll failed, expected %s but got %s", value, values[key])
 	}
 }
 
 func TestHash_HIncrBy(t *testing.T) {
-	hash := NewHash()
+	hash := NewHashMap()
 	key := "testKey"
-	value := 1
+	var value int64 = 1
 
 	hash.HIncrBy(key, value)
 	v, ok := hash.HGet(key)
 	if !ok {
 		t.Errorf("HIncrBy failed, expected %d but got nothing", value)
 	}
-	if v != value {
+	if string(v) != strconv.FormatInt(value, 10) {
 		t.Errorf("HIncrBy failed, expected %d but got %d", value, v)
 	}
 }
 
 func TestHash_HIncrBy2(t *testing.T) {
-	hash := NewHash()
+	hash := NewHashMap()
 	key := "testKey"
-	value := 1
+	var value int64 = 1
 
 	hash.HIncrBy(key, value)
 	hash.HIncrBy(key, value)
@@ -110,13 +114,13 @@ func TestHash_HIncrBy2(t *testing.T) {
 	if !ok {
 		t.Errorf("HIncrBy failed, expected %d but got nothing", value*2)
 	}
-	if v != value*2 {
+	if string(v) != strconv.FormatInt(value*2, 10) {
 		t.Errorf("HIncrBy failed, expected %d but got %d", value*2, v)
 	}
 }
 
 func TestHash_HIncrByFloat(t *testing.T) {
-	hash := NewHash()
+	hash := NewHashMap()
 	key := "testKey"
 	value := 1.0
 
@@ -125,13 +129,13 @@ func TestHash_HIncrByFloat(t *testing.T) {
 	if !ok {
 		t.Errorf("HIncrByFloat failed, expected %f but got nothing", value)
 	}
-	if v != value {
-		t.Errorf("HIncrByFloat failed, expected %f but got %f", value, v)
+	if string(v) != strconv.FormatFloat(value, 'f', -1, 64) {
+		t.Errorf("HIncrByFloat failed, expected %f but got %s", value, string(v))
 	}
 }
 
 func TestHash_HIncrByFloat2(t *testing.T) {
-	hash := NewHash()
+	hash := NewHashMap()
 	key := "testKey"
 	value := 1.0
 
@@ -141,16 +145,16 @@ func TestHash_HIncrByFloat2(t *testing.T) {
 	if !ok {
 		t.Errorf("HIncrByFloat failed, expected %f but got nothing", value*2)
 	}
-	if v != value*2 {
-		t.Errorf("HIncrByFloat failed, expected %f but got %f", value*2, v)
+	if string(v) != strconv.FormatFloat(value*2, 'f', -1, 64) {
+		t.Errorf("HIncrByFloat failed, expected %f but got %s", value*2, string(v))
 	}
 }
 
 func TestHash_HMSet(t *testing.T) {
-	hash := NewHash()
-	values := map[string]any{
-		"testKey1": "testValue1",
-		"testKey2": "testValue2",
+	hash := NewHashMap()
+	values := map[string][]byte{
+		"testKey1": []byte("testValue1"),
+		"testKey2": []byte("testValue2"),
 	}
 
 	hash.HMSet(values)
@@ -158,22 +162,22 @@ func TestHash_HMSet(t *testing.T) {
 	if !ok {
 		t.Errorf("HMSet failed, expected %s but got nothing", "testValue1")
 	}
-	if v != "testValue1" {
+	if string(v) != "testValue1" {
 		t.Errorf("HMSet failed, expected %s but got %s", "testValue1", v)
 	}
 	v, ok = hash.HGet("testKey2")
 	if !ok {
 		t.Errorf("HMSet failed, expected %s but got nothing", "testValue2")
 	}
-	if v != "testValue2" {
+	if string(v) != "testValue2" {
 		t.Errorf("HMSet failed, expected %s but got %s", "testValue2", v)
 	}
 }
 
 func TestHash_HSetNX(t *testing.T) {
-	hash := NewHash()
+	hash := NewHashMap()
 	key := "testKey"
-	value := "testValue"
+	value := []byte("testValue")
 
 	ok := hash.HSetNX(key, value)
 	if !ok {
@@ -187,47 +191,47 @@ func TestHash_HSetNX(t *testing.T) {
 	if !ok {
 		t.Errorf("HMSet failed, expected %s but got nothing", "testValue2")
 	}
-	if v != "testValue" {
+	if string(v) != "testValue" {
 		t.Errorf("HMSet failed, expected %s but got %s", "testValue", v)
 	}
 }
 
 func TestHash_HVals(t *testing.T) {
-	hash := NewHash()
+	hash := NewHashMap()
 	key := "testKey"
-	value := "testValue"
+	value := []byte("testValue")
 
 	hash.HSet(key, value)
 	values := hash.HVals()
 	if len(values) != 1 {
 		t.Errorf("HVals failed, expected 1 but got %d", len(values))
 	}
-	if values[0] != value {
+	if string(values[0]) != string(value) {
 		t.Errorf("HVals failed, expected %s but got %s", value, values[0])
 	}
 }
 
 func TestHash_HScan(t *testing.T) {
-	hash := NewHash()
+	hash := NewHashMap()
 	key := "testKey"
-	value := "testValue"
+	value := []byte("testValue")
 
 	hash.HSet(key, value)
 	_, values := hash.HScan(0, "*", 1)
 	if len(values) != 1 {
 		t.Errorf("HScan failed, expected 1 but got %d", len(values))
 	}
-	if values[key] != value {
+	if bytes.Equal(values[key], value) {
 		t.Errorf("HScan failed, expected %s but got %s", value, values[key])
 	}
 }
 
 func TestHash_HScan2(t *testing.T) {
-	hash := NewHash()
-	values := map[string]any{
-		"testKey1": "testValue1",
-		"testKey2": "testValue2",
-		"testKey3": "testValue3",
+	hash := NewHashMap()
+	values := map[string][]byte{
+		"testKey1": []byte("testValue1"),
+		"testKey2": []byte("testValue2"),
+		"testKey3": []byte("testValue3"),
 	}
 
 	hash.HMSet(values)

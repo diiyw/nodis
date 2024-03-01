@@ -1,20 +1,28 @@
 package list
 
 import (
+	"bytes"
+	"sync"
 	"time"
 
 	"github.com/kelindar/binary"
 )
 
 type Node struct {
-	data string
+	data []byte
 	next *Node
 	prev *Node
 }
 
 type DoublyLinkedList struct {
+	sync.RWMutex
 	head *Node
 	tail *Node
+}
+
+// GetType returns the type of the data structure
+func (l *DoublyLinkedList) GetType() string {
+	return "list"
 }
 
 // NewDoublyLinkedList returns a new doubly linked list
@@ -23,66 +31,69 @@ func NewDoublyLinkedList() *DoublyLinkedList {
 }
 
 // LPush adds an element to the head of the list
-func (list *DoublyLinkedList) LPush(data string) {
+func (l *DoublyLinkedList) LPush(data []byte) {
 	newNode := &Node{data: data}
-	if list.head == nil {
-		list.head = newNode
-		list.tail = newNode
+	if l.head == nil {
+		l.head = newNode
+		l.tail = newNode
 	} else {
-		newNode.next = list.head
-		list.head.prev = newNode
-		list.head = newNode
+		newNode.next = l.head
+		l.head.prev = newNode
+		l.head = newNode
 	}
 }
 
 // RPush adds an element to the end of the list
-func (list *DoublyLinkedList) RPush(data string) {
+func (l *DoublyLinkedList) RPush(data []byte) {
 	newNode := &Node{data: data}
-	if list.head == nil {
-		list.head = newNode
-		list.tail = newNode
+	if l.head == nil {
+		l.head = newNode
+		l.tail = newNode
 	} else {
-		list.tail.next = newNode
-		newNode.prev = list.tail
-		list.tail = newNode
+		l.tail.next = newNode
+		newNode.prev = l.tail
+		l.tail = newNode
 	}
 }
 
 // LPop returns the first element of the list
-func (list *DoublyLinkedList) LPop() any {
-	if list.head == nil {
+func (l *DoublyLinkedList) LPop() []byte {
+	if l.head == nil {
 		return nil // 链表为空
 	}
-	data := list.head.data
-	list.head = list.head.next
-	if list.head != nil {
-		list.head.prev = nil
+	data := l.head.data
+	l.head = l.head.next
+	if l.head != nil {
+		l.head.prev = nil
 	} else {
-		list.tail = nil
+		l.tail = nil
 	}
 	return data
 }
 
 // RPop returns the last element of the list
-func (list *DoublyLinkedList) RPop() any {
-	if list.tail == nil {
-		return -1 // 链表为空
+func (l *DoublyLinkedList) RPop() []byte {
+	if l.tail == nil {
+		return nil // 链表为空
 	}
-	data := list.tail.data
-	list.tail = list.tail.prev
-	if list.tail != nil {
-		list.tail.next = nil
+	data := l.tail.data
+	l.tail = l.tail.prev
+	if l.tail != nil {
+		l.tail.next = nil
 	} else {
-		list.head = nil
+		l.head = nil
 	}
 	return data
 }
 
 // LRange returns a range of elements from the list
-func (list *DoublyLinkedList) LRange(start, end int) []any {
-	var result []any
-	currentNode := list.head
+func (l *DoublyLinkedList) LRange(start, end int) [][]byte {
+	var result [][]byte
+	currentNode := l.head
 	index := 0
+	if end < 0 {
+		end = l.LLen() + end
+	}
 	for currentNode != nil {
 		if index >= start && index <= end {
 			result = append(result, currentNode.data)
@@ -97,8 +108,8 @@ func (list *DoublyLinkedList) LRange(start, end int) []any {
 }
 
 // LLen returns the length of the list
-func (list *DoublyLinkedList) LLen() int {
-	currentNode := list.head
+func (l *DoublyLinkedList) LLen() int {
+	currentNode := l.head
 	length := 0
 	for currentNode != nil {
 		length++
@@ -108,24 +119,24 @@ func (list *DoublyLinkedList) LLen() int {
 }
 
 // BLPop removes and returns the first element of the list
-func (list *DoublyLinkedList) BLPop(timeout time.Duration) any {
-	if list.head == nil {
+func (l *DoublyLinkedList) BLPop(timeout time.Duration) []byte {
+	if l.head == nil {
 		time.Sleep(timeout)
 	}
-	return list.LPop()
+	return l.LPop()
 }
 
 // BRPop removes and returns the last element of the list
-func (list *DoublyLinkedList) BRPop(timeout time.Duration) any {
-	if list.tail == nil {
+func (l *DoublyLinkedList) BRPop(timeout time.Duration) []byte {
+	if l.tail == nil {
 		time.Sleep(timeout)
 	}
-	return list.RPop()
+	return l.RPop()
 }
 
 // LIndex returns the element at index in the list
-func (list *DoublyLinkedList) LIndex(index int) (any, bool) {
-	currentNode := list.head
+func (l *DoublyLinkedList) LIndex(index int) ([]byte, bool) {
+	currentNode := l.head
 	currentIndex := 0
 	for currentNode != nil {
 		if currentIndex == index {
@@ -134,14 +145,14 @@ func (list *DoublyLinkedList) LIndex(index int) (any, bool) {
 		currentNode = currentNode.next
 		currentIndex++
 	}
-	return 0, false
+	return nil, false
 }
 
 // LInsert inserts the element before or after the pivot element
-func (list *DoublyLinkedList) LInsert(pivot, data string, before bool) int {
-	currentNode := list.head
+func (l *DoublyLinkedList) LInsert(pivot, data []byte, before bool) int {
+	currentNode := l.head
 	for currentNode != nil {
-		if currentNode.data == pivot {
+		if bytes.Contains(currentNode.data, pivot) {
 			newNode := &Node{data: data}
 			if before {
 				newNode.next = currentNode
@@ -149,7 +160,7 @@ func (list *DoublyLinkedList) LInsert(pivot, data string, before bool) int {
 				if currentNode.prev != nil {
 					currentNode.prev.next = newNode
 				} else {
-					list.head = newNode
+					l.head = newNode
 				}
 				currentNode.prev = newNode
 			} else {
@@ -158,11 +169,11 @@ func (list *DoublyLinkedList) LInsert(pivot, data string, before bool) int {
 				if currentNode.next != nil {
 					currentNode.next.prev = newNode
 				} else {
-					list.tail = newNode
+					l.tail = newNode
 				}
 				currentNode.next = newNode
 			}
-			return list.LLen()
+			return l.LLen()
 		}
 		currentNode = currentNode.next
 	}
@@ -170,41 +181,41 @@ func (list *DoublyLinkedList) LInsert(pivot, data string, before bool) int {
 }
 
 // LPushX adds an element to the head of the list if the list exists
-func (list *DoublyLinkedList) LPushX(data string) int {
-	if list.head == nil {
+func (l *DoublyLinkedList) LPushX(data []byte) int {
+	if l.head == nil {
 		return 0
 	}
-	list.LPush(data)
-	return list.LLen()
+	l.LPush(data)
+	return l.LLen()
 }
 
 // RPushX adds an element to the end of the list if the list exists
-func (list *DoublyLinkedList) RPushX(data string) int {
-	if list.tail == nil {
+func (l *DoublyLinkedList) RPushX(data []byte) int {
+	if l.tail == nil {
 		return 0
 	}
-	list.RPush(data)
-	return list.LLen()
+	l.RPush(data)
+	return l.LLen()
 }
 
 // LRem removes the first count occurrences of elements equal to value from the list
-func (list *DoublyLinkedList) LRem(count int, value any) int {
-	currentNode := list.head
+func (l *DoublyLinkedList) LRem(count int, value []byte) int {
+	currentNode := l.head
 	removed := 0
 	for currentNode != nil {
-		if currentNode.data == value {
+		if bytes.Equal(currentNode.data, value) {
 			if count > 0 && removed == count {
 				break
 			}
 			if currentNode.prev != nil {
 				currentNode.prev.next = currentNode.next
 			} else {
-				list.head = currentNode.next
+				l.head = currentNode.next
 			}
 			if currentNode.next != nil {
 				currentNode.next.prev = currentNode.prev
 			} else {
-				list.tail = currentNode.prev
+				l.tail = currentNode.prev
 			}
 			removed++
 		}
@@ -214,8 +225,8 @@ func (list *DoublyLinkedList) LRem(count int, value any) int {
 }
 
 // LSet sets the list element at index to value
-func (list *DoublyLinkedList) LSet(index int, value string) bool {
-	currentNode := list.head
+func (l *DoublyLinkedList) LSet(index int, value []byte) bool {
+	currentNode := l.head
 	currentIndex := 0
 	for currentNode != nil {
 		if currentIndex == index {
@@ -229,20 +240,20 @@ func (list *DoublyLinkedList) LSet(index int, value string) bool {
 }
 
 // LTrim trims an existing list so that it will contain only the specified range of elements specified
-func (list *DoublyLinkedList) LTrim(start, end int) {
-	currentNode := list.head
+func (l *DoublyLinkedList) LTrim(start, end int) {
+	currentNode := l.head
 	index := 0
 	for currentNode != nil {
 		if index < start || index > end {
 			if currentNode.prev != nil {
 				currentNode.prev.next = currentNode.next
 			} else {
-				list.head = currentNode.next
+				l.head = currentNode.next
 			}
 			if currentNode.next != nil {
 				currentNode.next.prev = currentNode.prev
 			} else {
-				list.tail = currentNode.prev
+				l.tail = currentNode.prev
 			}
 		}
 		currentNode = currentNode.next
@@ -251,11 +262,18 @@ func (list *DoublyLinkedList) LTrim(start, end int) {
 }
 
 // Marshal returns the byte slice of the list
-func (list *DoublyLinkedList) Marshal() ([]byte, error) {
-	return binary.Marshal(list)
+func (l *DoublyLinkedList) Marshal() ([]byte, error) {
+	return binary.Marshal(l.LRange(0, -1))
 }
 
 // Unmarshal restores the list from the byte slice
-func (list *DoublyLinkedList) Unmarshal(data []byte) error {
-	return binary.Unmarshal(data, list)
+func (l *DoublyLinkedList) Unmarshal(data []byte) error {
+	var list [][]byte
+	if err := binary.Unmarshal(data, &list); err != nil {
+		return err
+	}
+	for _, item := range list {
+		l.RPush(item)
+	}
+	return nil
 }

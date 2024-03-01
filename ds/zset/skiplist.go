@@ -11,8 +11,8 @@ const (
 
 // Element is a key-score pair
 type Element struct {
-	member string
-	score  float64
+	Member string
+	Score  float64
 }
 
 // Level aspect of a node
@@ -37,8 +37,8 @@ type skiplist struct {
 func newNode(level int16, score float64, member string) *node {
 	n := &node{
 		Element: Element{
-			score:  score,
-			member: member,
+			Score:  score,
+			Member: member,
 		},
 		level: make([]*Level, level),
 	}
@@ -76,8 +76,8 @@ func (skiplist *skiplist) insert(member string, score float64) *node {
 		if node.level[i] != nil {
 			// traverse the skip list
 			for node.level[i].forward != nil &&
-				(node.level[i].forward.score < score ||
-					(node.level[i].forward.score == score && node.level[i].forward.member < member)) { // same score, different key
+				(node.level[i].forward.Score < score ||
+					(node.level[i].forward.Score == score && node.level[i].forward.Member < member)) { // same score, different key
 				rank[i] += node.level[i].span
 				node = node.level[i].forward
 			}
@@ -163,15 +163,15 @@ func (skiplist *skiplist) remove(member string, score float64) bool {
 	node := skiplist.header
 	for i := skiplist.level - 1; i >= 0; i-- {
 		for node.level[i].forward != nil &&
-			(node.level[i].forward.score < score ||
-				(node.level[i].forward.score == score &&
-					node.level[i].forward.member < member)) {
+			(node.level[i].forward.Score < score ||
+				(node.level[i].forward.Score == score &&
+					node.level[i].forward.Member < member)) {
 			node = node.level[i].forward
 		}
 		update[i] = node
 	}
 	node = node.level[0].forward
-	if node != nil && score == node.score && node.member == member {
+	if node != nil && score == node.Score && node.Member == member {
 		skiplist.removeNode(node, update)
 		// free x
 		return true
@@ -187,15 +187,15 @@ func (skiplist *skiplist) getRank(member string, score float64) int64 {
 	x := skiplist.header
 	for i := skiplist.level - 1; i >= 0; i-- {
 		for x.level[i].forward != nil &&
-			(x.level[i].forward.score < score ||
-				(x.level[i].forward.score == score &&
-					x.level[i].forward.member <= member)) {
+			(x.level[i].forward.Score < score ||
+				(x.level[i].forward.Score == score &&
+					x.level[i].forward.Member <= member)) {
 			rank += x.level[i].span
 			x = x.level[i].forward
 		}
 
 		/* x might be equal to zsl->header, so test if obj is non-NULL */
-		if x.member == member {
+		if x.Member == member {
 			return rank
 		}
 	}

@@ -2,46 +2,55 @@ package hash
 
 import (
 	"path/filepath"
+	"strconv"
+	"sync"
 
+	"github.com/diiyw/nodis/utils"
 	"github.com/dolthub/swiss"
 	"github.com/kelindar/binary"
 )
 
-type Hash struct {
-	data *swiss.Map[string, any]
+type HashMap struct {
+	sync.RWMutex
+	data *swiss.Map[string, []byte]
 }
 
-// NewHash creates a new hash
-func NewHash() *Hash {
-	return &Hash{
-		data: swiss.NewMap[string, any](32),
+// NewHashMap creates a new hash
+func NewHashMap() *HashMap {
+	return &HashMap{
+		data: swiss.NewMap[string, []byte](32),
 	}
 }
 
+// GetType returns the type of the data structure
+func (s *HashMap) GetType() string {
+	return "hash"
+}
+
 // HSet sets the value of a hash
-func (s *Hash) HSet(key string, value any) {
+func (s *HashMap) HSet(key string, value []byte) {
 	s.data.Put(key, value)
 }
 
 // HGet gets the value of a hash
-func (s *Hash) HGet(key string) (any, bool) {
+func (s *HashMap) HGet(key string) ([]byte, bool) {
 	return s.data.Get(key)
 }
 
 // HDel deletes the value of a hash
-func (s *Hash) HDel(key string) {
+func (s *HashMap) HDel(key string) {
 	s.data.Delete(key)
 }
 
 // HLen gets the length of a hash
-func (s *Hash) HLen() int {
+func (s *HashMap) HLen() int {
 	return s.data.Count()
 }
 
 // HKeys gets the keys of a hash
-func (s *Hash) HKeys() []string {
+func (s *HashMap) HKeys() []string {
 	keys := make([]string, 0, s.data.Count())
-	s.data.Iter(func(key string, _ any) bool {
+	s.data.Iter(func(key string, _ []byte) bool {
 		keys = append(keys, key)
 		return false
 	})
@@ -49,15 +58,15 @@ func (s *Hash) HKeys() []string {
 }
 
 // HExists checks if a key exists in a hash
-func (s *Hash) HExists(key string) bool {
+func (s *HashMap) HExists(key string) bool {
 	_, ok := s.data.Get(key)
 	return ok
 }
 
 // HGetAll gets all the values of a hash
-func (s *Hash) HGetAll() map[string]any {
-	values := make(map[string]any, s.data.Count())
-	s.data.Iter(func(key string, value any) bool {
+func (s *HashMap) HGetAll() map[string][]byte {
+	values := make(map[string][]byte, s.data.Count())
+	s.data.Iter(func(key string, value []byte) bool {
 		values[key] = value
 		return false
 	})
@@ -65,46 +74,54 @@ func (s *Hash) HGetAll() map[string]any {
 }
 
 // HIncrBy increments the value of a hash
-func (s *Hash) HIncrBy(key string, value int) {
+func (s *HashMap) HIncrBy(key string, value int64) int64 {
 	v, ok := s.data.Get(key)
 	if !ok {
-		s.data.Put(key, value)
-		return
+		s.data.Put(key, []byte(strconv.FormatInt(value, 10)))
+		return 0
 	}
-	s.data.Put(key, v.(int)+value)
+	vi, _ := strconv.ParseInt(utils.Byte2String(v), 10, 64)
+	i := vi + value
+	s.data.Put(key, []byte(strconv.FormatInt(i, 10)))
+	return i
 }
 
 // HIncByFloat increments the value of a hash
-func (s *Hash) HIncrByFloat(key string, value float64) {
+func (s *HashMap) HIncrByFloat(key string, value float64) float64 {
 	v, ok := s.data.Get(key)
 	if !ok {
-		s.data.Put(key, value)
-		return
+		s.data.Put(key, []byte(strconv.FormatFloat(value, 'f', -1, 64)))
+		return 0
 	}
-	s.data.Put(key, v.(float64)+value)
+	vf, _ := strconv.ParseFloat(utils.Byte2String(v), 64)
+	f := vf + value
+	s.data.Put(key, []byte(strconv.FormatFloat(f, 'f', -1, 64)))
+	return f
 }
 
 // HMSet sets the values of a hash
-func (s *Hash) HMSet(values map[string]any) {
+func (s *HashMap) HMSet(values map[string][]byte) {
 	for key, value := range values {
 		s.data.Put(key, value)
 	}
 }
 
 // HMGet gets the values of a hash
-func (s *Hash) HMGet(keys ...string) map[string]any {
-	values := make(map[string]any, len(keys))
+func (s *HashMap) HMGet(keys ...string) [][]byte {
+	values := make([][]byte, len(keys))
 	for _, key := range keys {
 		value, ok := s.data.Get(key)
 		if ok {
-			values[key] = value
+			values = append(values, value)
+		} else {
+			values = append(values, nil)
 		}
 	}
 	return values
 }
 
 // HSetNX sets the value of a hash if it does not exist
-func (s *Hash) HSetNX(key string, value any) bool {
+func (s *HashMap) HSetNX(key string, value []byte) bool {
 	_, ok := s.data.Get(key)
 	if ok {
 		return false
@@ -114,9 +131,9 @@ func (s *Hash) HSetNX(key string, value any) bool {
 }
 
 // HVals gets the values of a hash
-func (s *Hash) HVals() []any {
-	values := make([]any, 0, s.data.Count())
-	s.data.Iter(func(_ string, value any) bool {
+func (s *HashMap) HVals() [][]byte {
+	values := make([][]byte, 0, s.data.Count())
+	s.data.Iter(func(_ string, value []byte) bool {
 		values = append(values, value)
 		return false
 	})
@@ -124,10 +141,10 @@ func (s *Hash) HVals() []any {
 }
 
 // HScan scans the values of a hash
-func (s *Hash) HScan(cursor int, match string, count int) (int, map[string]any) {
-	values := make(map[string]any, s.data.Count())
+func (s *HashMap) HScan(cursor int, match string, count int) (int, map[string][]byte) {
+	values := make(map[string][]byte, s.data.Count())
 	i := 0
-	s.data.Iter(func(key string, value any) bool {
+	s.data.Iter(func(key string, value []byte) bool {
 		matched, _ := filepath.Match(match, key)
 		if matched && i >= cursor {
 			values[key] = value
@@ -139,11 +156,21 @@ func (s *Hash) HScan(cursor int, match string, count int) (int, map[string]any) 
 }
 
 // Marshal the set to bytes
-func (s *Hash) Marshal() ([]byte, error) {
-	return binary.Marshal(s.data)
+func (s *HashMap) Marshal() ([]byte, error) {
+	var data = s.HGetAll()
+	return binary.Marshal(data)
 }
 
 // Unmarshal the set from bytes
-func (s *Hash) Unmarshal(data []byte) error {
-	return binary.Unmarshal(data, &s.data)
+func (s *HashMap) Unmarshal(data []byte) error {
+	var values map[string][]byte
+	if err := binary.Unmarshal(data, &values); err != nil {
+		return err
+	}
+
+	s.data = swiss.NewMap[string, []byte](32)
+	for key, value := range values {
+		s.data.Put(key, value)
+	}
+	return nil
 }

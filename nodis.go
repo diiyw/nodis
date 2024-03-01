@@ -2,24 +2,26 @@ package nodis
 
 import (
 	"bytes"
-	"errors"
 	"log"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
+	"github.com/diiyw/nodis/ds/zset"
 	"github.com/kelindar/binary"
 
-	"github.com/diyyw/nodis/ds"
-	"github.com/diyyw/nodis/ds/set"
+	"github.com/diiyw/nodis/ds"
+	"github.com/diiyw/nodis/ds/hash"
+	"github.com/diiyw/nodis/ds/list"
+	"github.com/diiyw/nodis/ds/set"
 	"github.com/dolthub/swiss"
 )
 
 type Nodis struct {
 	sync.RWMutex
 	store    *swiss.Map[string, ds.DataStruct]
-	keys     *swiss.Map[string, Key]
+	keys     *swiss.Map[string, *Key]
 	options  Options
 	dbFile   string
 	metaFile string
@@ -28,144 +30,99 @@ type Nodis struct {
 func Open(opt Options) *Nodis {
 	n := &Nodis{
 		store:    swiss.NewMap[string, ds.DataStruct](16),
-		keys:     swiss.NewMap[string, Key](16),
+		keys:     swiss.NewMap[string, *Key](16),
 		options:  opt,
 		dbFile:   filepath.Join(opt.Path, "nodis.db"),
 		metaFile: filepath.Join(opt.Path, "nodis.meta"),
 	}
-	data, err := os.ReadFile(n.dbFile)
-	if err == nil {
-		if len(data) > 0 {
-			err := binary.Unmarshal(data, n)
+	loadData(n)
+	go func() {
+		for {
+			time.Sleep(opt.SyncInterval)
+			err := n.Sync()
 			if err != nil {
-				panic(err)
+				log.Println("Sync: ", err)
 			}
 		}
-		go func() {
-			for {
-				time.Sleep(opt.SyncInterval)
-				err = n.Sync()
-				if err != nil {
-					log.Println(err)
-				}
-			}
-		}()
-	}
+	}()
 	return n
 }
 
-// Del a key
-func (n *Nodis) Del(key string) {
-	n.Lock()
-	n.store.Delete(key)
-	n.keys.Delete(key)
-	n.Unlock()
-}
-
-// Exists checks if a key exists
-func (n *Nodis) Exists(key string) bool {
-	n.RLock()
-	k, ok := n.keys.Get(key)
-	n.RUnlock()
-	return ok && k.Valid()
-}
-
-// Expire the keys
-func (n *Nodis) Expire(key string, seconds time.Duration) {
-	n.Lock()
-	k, ok := n.keys.Get(key)
-	if !ok {
-		n.Unlock()
-		return
-	}
-	k.TTL = time.Now().Add(seconds).Unix()
-	n.Unlock()
-}
-
-// ExpireAt the keys
-func (n *Nodis) ExpireAt(key string, timestamp time.Time) {
-	n.Lock()
-	k, ok := n.keys.Get(key)
-	if !ok || !k.Valid() {
-		n.Unlock()
-		return
-	}
-	k.TTL = timestamp.Unix()
-	n.Unlock()
-}
-
-// Keys gets the keys
-func (n *Nodis) Keys(pattern string) []string {
-	n.RLock()
-	keys := make([]string, 0, n.keys.Count())
-	n.keys.Iter(func(key string, k Key) bool {
-		matched, _ := filepath.Match(pattern, key)
-		if matched && k.Valid() {
-			keys = append(keys, key)
+func loadData(n *Nodis) {
+	metadata, err := os.ReadFile(n.metaFile)
+	if err == nil {
+		if len(metadata) > 0 {
+			var keys = make(map[string]*Key)
+			err := binary.Unmarshal(metadata, &keys)
+			if err != nil {
+				panic(err)
+			}
+			for name, k := range keys {
+				n.keys.Put(name, k)
+			}
+			dbData, err := os.ReadFile(n.dbFile)
+			if err != nil {
+				panic(err)
+			}
+			if len(dbData) == 0 {
+				return
+			}
+			store := make(map[string][]byte, n.keys.Count())
+			err = binary.Unmarshal(dbData, &store)
+			if err != nil {
+				panic(err)
+			}
+			n.keys.Iter(func(key string, k *Key) bool {
+				data, ok := store[key]
+				if !ok {
+					return false
+				}
+				switch k.Type {
+				case "set":
+					s := set.NewSet()
+					err := s.Unmarshal(data)
+					if err != nil {
+						log.Println("SET: Unmarshal ", err)
+						return false
+					}
+					n.store.Put(key, s)
+				case "zset":
+					z := zset.NewSortedSet()
+					err := z.Unmarshal(data)
+					if err != nil {
+						log.Println("ZSET: Unmarshal ", err)
+						return false
+					}
+					n.store.Put(key, z)
+				case "list":
+					l := list.NewDoublyLinkedList()
+					err := l.Unmarshal(data)
+					if err != nil {
+						log.Println("LIST: Unmarshal ", err)
+						return false
+					}
+					n.store.Put(key, l)
+				case "hash":
+					h := hash.NewHashMap()
+					err := h.Unmarshal(data)
+					if err != nil {
+						log.Println("HASH: Unmarshal ", err)
+						return false
+					}
+				}
+				return false
+			})
 		}
-		return true
-	})
-	n.RUnlock()
-	return keys
-}
-
-// TTL gets the TTL
-func (n *Nodis) TTL(key string) time.Duration {
-	n.RLock()
-	k, ok := n.keys.Get(key)
-	if !ok || !k.Valid() {
-		n.RUnlock()
-		return -1
 	}
-	n.RUnlock()
-	return time.Duration(k.TTL - time.Now().Unix())
-}
-
-// Rename a key
-func (n *Nodis) Rename(key, newkey string) error {
-	n.Lock()
-	nk, ok := n.keys.Get(newkey)
-	if ok && nk.Valid() {
-		n.Unlock()
-		return errors.New("newkey exists")
-	}
-	k, ok := n.keys.Get(key)
-	if !ok || !k.Valid() {
-		n.Unlock()
-		return errors.New("key does not exist")
-	}
-	v, ok := n.store.Get(key)
-	if !ok {
-		n.Unlock()
-		return errors.New("key does not exist")
-	}
-	n.store.Delete(key)
-	n.store.Put(newkey, v)
-	n.keys.Delete(key)
-	n.keys.Put(newkey, k)
-	n.Unlock()
-	return nil
-}
-
-// Type gets the type of a key
-func (n *Nodis) Type(key string) string {
-	n.RLock()
-	k, ok := n.keys.Get(key)
-	if !ok || !k.Valid() {
-		n.RUnlock()
-		return "none"
-	}
-	n.RUnlock()
-	return k.Type
 }
 
 // Tidy removes expired keys
-func (n *Nodis) Tidy() (keys map[string]Key, store map[string][]byte) {
+func (n *Nodis) Tidy() (keys map[string]*Key, store map[string][]byte) {
 	n.Lock()
-	keys = make(map[string]Key, n.keys.Count())
+	keys = make(map[string]*Key, n.keys.Count())
 	store = make(map[string][]byte, n.store.Count())
-	n.keys.Iter(func(key string, k Key) bool {
-		if !k.Valid() {
+	n.keys.Iter(func(key string, k *Key) bool {
+		if k.expired() {
 			n.store.Delete(key)
 			n.keys.Delete(key)
 		}
@@ -213,28 +170,22 @@ func (n *Nodis) Sync() error {
 	return nil
 }
 
-// Set a key with a value and a TTL
-func (n *Nodis) Set(key string, value string, ttl int64) {
+func (n *Nodis) getDs(key string) ds.DataStruct {
 	n.Lock()
-	n.store.Put(key, set.NewSet(value))
-	n.keys.Put(key, Key{TTL: ttl})
-	n.Unlock()
+	defer n.Unlock()
+	if !n.exists(key) {
+		return nil
+	}
+	l, ok := n.store.Get(key)
+	if !ok {
+		return nil
+	}
+	return l
 }
 
-// Get a key
-func (n *Nodis) Get(key string) (any, bool) {
-	n.RLock()
-	k, ok := n.keys.Get(key)
-	if !ok {
-		return nil, false
-	}
-	if !k.Valid() {
-		return nil, false
-	}
-	v, ok := n.store.Get(key)
-	if !ok {
-		return nil, false
-	}
-	n.RUnlock()
-	return v, true
+func (n *Nodis) saveDs(key string, ds ds.DataStruct, ttl int64) {
+	n.Lock()
+	defer n.Unlock()
+	n.store.Put(key, ds)
+	n.keys.Put(key, newKey(ds.GetType(), ttl))
 }

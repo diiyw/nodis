@@ -2,6 +2,7 @@ package zset
 
 import (
 	"strconv"
+	"sync"
 
 	"github.com/dolthub/swiss"
 	"github.com/kelindar/binary"
@@ -9,6 +10,7 @@ import (
 
 // SortedSet is a set which keys sorted by bound score
 type SortedSet struct {
+	sync.RWMutex
 	dict     *swiss.Map[string, *Element]
 	skiplist *skiplist
 }
@@ -21,16 +23,21 @@ func NewSortedSet() *SortedSet {
 	}
 }
 
+// GetType returns the type of the data structure
+func (sortedSet *SortedSet) GetType() string {
+	return "zset"
+}
+
 // ZAdd puts member into set,  and returns whether it has inserted new node
 func (sortedSet *SortedSet) ZAdd(member string, score float64) bool {
 	element, ok := sortedSet.dict.Get(member)
 	sortedSet.dict.Put(member, &Element{
-		member: member,
-		score:  score,
+		Member: member,
+		Score:  score,
 	})
 	if ok {
-		if score != element.score {
-			sortedSet.skiplist.remove(member, element.score)
+		if score != element.Score {
+			sortedSet.skiplist.remove(member, element.Score)
 			sortedSet.skiplist.insert(member, score)
 		}
 		return false
@@ -48,7 +55,7 @@ func (sortedSet *SortedSet) ZCard() int64 {
 func (sortedSet *SortedSet) ZRem(member string) bool {
 	v, ok := sortedSet.dict.Get(member)
 	if ok {
-		sortedSet.skiplist.remove(member, v.score)
+		sortedSet.skiplist.remove(member, v.Score)
 		sortedSet.dict.Delete(member)
 		return true
 	}
@@ -61,7 +68,7 @@ func (sortedSet *SortedSet) getRank(member string, desc bool) (rank int64) {
 	if !ok {
 		return -1
 	}
-	r := sortedSet.skiplist.getRank(member, element.score)
+	r := sortedSet.skiplist.getRank(member, element.Score)
 	if desc {
 		r = sortedSet.skiplist.length - r
 	} else {
@@ -86,7 +93,7 @@ func (sortedSet *SortedSet) ZScore(member string) float64 {
 	if !ok {
 		return 0
 	}
-	return element.score
+	return element.Score
 }
 
 // forEachByRank visits each member which rank within [start, stop), sort by ascending order, rank starts from 0
@@ -140,12 +147,12 @@ func (sortedSet *SortedSet) rangeByRank(start int64, stop int64, desc bool) []*E
 }
 
 // ZRangeByRank returns members which rank within [start, stop), sort by ascending order, rank starts from 0
-func (sortedSet *SortedSet) ZRangeByRank(start int64, stop int64) []*Element {
+func (sortedSet *SortedSet) ZRange(start int64, stop int64) []*Element {
 	return sortedSet.rangeByRank(start, stop, false)
 }
 
 // ZRevRangeByRank returns members which rank within [start, stop), sort by descending order, rank starts from 0
-func (sortedSet *SortedSet) ZRevRangeByRank(start int64, stop int64) []*Element {
+func (sortedSet *SortedSet) ZRevRange(start int64, stop int64) []*Element {
 	return sortedSet.rangeByRank(start, stop, true)
 }
 
@@ -230,21 +237,11 @@ func (sortedSet *SortedSet) zrange(min Border, max Border, offset int64, limit i
 	return slice
 }
 
-// ZRange returns members which score or member within the given border
-func (sortedSet *SortedSet) ZRange(min float64, max float64, offset int64, limit int64) []*Element {
-	return sortedSet.zrange(&ScoreBorder{Value: min, Exclude: false}, &ScoreBorder{Value: max, Exclude: false}, offset, limit, false)
-}
-
-// ZRevRange returns members which score or member within the given border
-func (sortedSet *SortedSet) ZRevRange(min float64, max float64, offset int64, limit int64) []*Element {
-	return sortedSet.zrange(&ScoreBorder{Value: min, Exclude: false}, &ScoreBorder{Value: max, Exclude: false}, offset, limit, true)
-}
-
 // removeRange removes members which score or member within the given border
 func (sortedSet *SortedSet) removeRange(min Border, max Border) int64 {
 	removed := sortedSet.skiplist.removeRange(min, max, 0)
 	for _, element := range removed {
-		sortedSet.dict.Delete(element.member)
+		sortedSet.dict.Delete(element.Member)
 	}
 	return int64(len(removed))
 }
@@ -259,7 +256,7 @@ func (sortedSet *SortedSet) ZRemRangeByScore(min float64, max float64) int64 {
 func (sortedSet *SortedSet) ZRemRangeByRank(start int64, stop int64) int64 {
 	removed := sortedSet.skiplist.removeRangeByRank(start+1, stop+1)
 	for _, element := range removed {
-		sortedSet.dict.Delete(element.member)
+		sortedSet.dict.Delete(element.Member)
 	}
 	return int64(len(removed))
 }
@@ -270,12 +267,12 @@ func (sortedSet *SortedSet) ZPopMin(count int) []*Element {
 		return nil
 	}
 	border := &ScoreBorder{
-		Value:   first.score,
+		Value:   first.Score,
 		Exclude: false,
 	}
 	removed := sortedSet.skiplist.removeRange(border, scorePositiveInfBorder, count)
 	for _, element := range removed {
-		sortedSet.dict.Delete(element.member)
+		sortedSet.dict.Delete(element.Member)
 	}
 	return removed
 }
@@ -286,12 +283,12 @@ func (sortedSet *SortedSet) ZPopMax(count int) []*Element {
 		return nil
 	}
 	border := &ScoreBorder{
-		Value:   last.score,
+		Value:   last.Score,
 		Exclude: false,
 	}
 	removed := sortedSet.skiplist.removeRange(scoreNegativeInfBorder, border, count)
 	for _, element := range removed {
-		sortedSet.dict.Delete(element.member)
+		sortedSet.dict.Delete(element.Member)
 	}
 	return removed
 }
@@ -312,19 +309,35 @@ func (sortedSet *SortedSet) ZRevRangeByScore(min float64, max float64) []*Elemen
 	return sortedSet.zrange(&ScoreBorder{Value: min, Exclude: false}, &ScoreBorder{Value: max, Exclude: false}, 0, -1, true)
 }
 
+// ZIncrBy increases the score of the given member
+func (sortedSet *SortedSet) ZIncrBy(member string, score float64) float64 {
+	element, ok := sortedSet.dict.Get(member)
+	if !ok {
+		return 0
+	}
+	sortedSet.ZAdd(member, element.Score+score)
+	return element.Score + score
+}
+
 func (sortedSet *SortedSet) Marshal() ([]byte, error) {
-	return binary.Marshal(sortedSet.dict)
+	var m = make(map[string]*Element)
+	sortedSet.dict.Iter(func(key string, value *Element) bool {
+		m[key] = value
+		return false
+	})
+	return binary.Marshal(m)
 }
 
 func (sortedSet *SortedSet) Unmarshal(data []byte) error {
-	err := binary.Unmarshal(data, &sortedSet.dict)
+	var m = make(map[string]*Element)
+	err := binary.Unmarshal(data, &m)
 	if err != nil {
 		return err
 	}
 	sortedSet.skiplist = makeSkiplist()
-	sortedSet.dict.Iter(func(key string, value *Element) bool {
-		sortedSet.ZAdd(key, value.score)
-		return false
-	})
+	sortedSet.dict = swiss.NewMap[string, *Element](16)
+	for k, v := range m {
+		sortedSet.ZAdd(k, v.Score)
+	}
 	return nil
 }

@@ -73,7 +73,7 @@ func TestSortedSet_ZRange(t *testing.T) {
 	ss.ZAdd("member3", 0.5)
 
 	// Test if the range is correct
-	if len(ss.ZRange(0, 1, 0, -1)) != 1 {
+	if len(ss.ZRange(0, 1)) != 1 {
 		t.Errorf("Range error")
 	}
 }
@@ -169,11 +169,11 @@ func TestSortedSet_ZRevRange(t *testing.T) {
 	ss.ZAdd("member3", 0.5)
 
 	// Test if the range is correct
-	if len(ss.ZRevRange(0, 1, 0, -1)) != 1 {
-		t.Errorf("Range error expected 0 got %d", len(ss.ZRevRange(0, 1, 0, -1)))
+	if len(ss.ZRevRange(0, 1)) != 1 {
+		t.Errorf("Range error expected 0 got %d", len(ss.ZRevRange(0, 1)))
 	}
-	if len(ss.ZRevRange(0, 2, 0, -1)) != 2 {
-		t.Errorf("Range error expected 2 got %d", len(ss.ZRevRange(0, 2, 0, -1)))
+	if len(ss.ZRevRange(0, 2)) != 2 {
+		t.Errorf("Range error expected 2 got %d", len(ss.ZRevRange(0, 2)))
 	}
 }
 
@@ -204,18 +204,6 @@ func TestSortedSet_ZRevRank(t *testing.T) {
 	}
 	if ss.ZRank("member2") != 3 {
 		t.Errorf("Rank error expected 3 got %d", ss.ZRevRank("member2"))
-	}
-}
-
-func TestSortedSet_ZRangeByRank(t *testing.T) {
-	ss := NewSortedSet()
-	ss.ZAdd("member1", 1.5)
-	ss.ZAdd("member2", 2.5)
-	ss.ZAdd("member3", 0.5)
-
-	// Test if the range is correct
-	if len(ss.ZRangeByRank(1, 3)) != 2 {
-		t.Errorf("Range error expected 2 got %d", len(ss.ZRangeByRank(1, 3)))
 	}
 }
 

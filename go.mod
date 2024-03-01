@@ -1,4 +1,4 @@
-module github.com/diyyw/nodis
+module github.com/diiyw/nodis
 
 go 1.22.0
 

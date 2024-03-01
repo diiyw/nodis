@@ -38,7 +38,7 @@ type ScoreBorder struct {
 // if max.greater(score) then the score is within the upper border
 // do not use min.greater()
 func (border *ScoreBorder) greater(element *Element) bool {
-	value := element.score
+	value := element.Score
 	if border.Inf == scoreNegativeInf {
 		return false
 	} else if border.Inf == scorePositiveInf {
@@ -51,7 +51,7 @@ func (border *ScoreBorder) greater(element *Element) bool {
 }
 
 func (border *ScoreBorder) less(element *Element) bool {
-	value := element.score
+	value := element.Score
 	if border.Inf == scoreNegativeInf {
 		return true
 	} else if border.Inf == scorePositiveInf {
@@ -125,7 +125,7 @@ type LexBorder struct {
 // if max.greater(lex) then the lex is within the upper border
 // do not use min.greater()
 func (border *LexBorder) greater(element *Element) bool {
-	value := element.member
+	value := element.Member
 	if border.Inf == lexNegativeInf {
 		return false
 	} else if border.Inf == lexPositiveInf {
@@ -138,7 +138,7 @@ func (border *LexBorder) greater(element *Element) bool {
 }
 
 func (border *LexBorder) less(element *Element) bool {
-	value := element.member
+	value := element.Member
 	if border.Inf == lexNegativeInf {
 		return true
 	} else if border.Inf == lexPositiveInf {

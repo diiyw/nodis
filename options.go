@@ -10,5 +10,5 @@ type Options struct {
 }
 
 var DefaultOptions = Options{
-	SyncInterval: 10 * time.Second,
+	SyncInterval: 60 * time.Second,
 }
