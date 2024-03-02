@@ -31,32 +31,44 @@ func NewDoublyLinkedList() *DoublyLinkedList {
 }
 
 // LPush adds an element to the head of the list
-func (l *DoublyLinkedList) LPush(data []byte) {
+func (l *DoublyLinkedList) LPush(data ...[]byte) {
 	l.Lock()
 	defer l.Unlock()
-	newNode := &Node{data: data}
-	if l.head == nil {
-		l.head = newNode
-		l.tail = newNode
-	} else {
-		newNode.next = l.head
-		l.head.prev = newNode
-		l.head = newNode
+	l.lPush(data...)
+}
+
+func (l *DoublyLinkedList) lPush(data ...[]byte) {
+	for _, datum := range data {
+		newNode := &Node{data: datum}
+		if l.head == nil {
+			l.head = newNode
+			l.tail = newNode
+		} else {
+			newNode.next = l.head
+			l.head.prev = newNode
+			l.head = newNode
+		}
 	}
 }
 
 // RPush adds an element to the end of the list
-func (l *DoublyLinkedList) RPush(data []byte) {
+func (l *DoublyLinkedList) RPush(data ...[]byte) {
 	l.Lock()
 	defer l.Unlock()
-	newNode := &Node{data: data}
-	if l.head == nil {
-		l.head = newNode
-		l.tail = newNode
-	} else {
-		l.tail.next = newNode
-		newNode.prev = l.tail
-		l.tail = newNode
+	l.rPush(data...)
+}
+
+func (l *DoublyLinkedList) rPush(data ...[]byte) {
+	for _, datum := range data {
+		newNode := &Node{data: datum}
+		if l.head == nil {
+			l.head = newNode
+			l.tail = newNode
+		} else {
+			l.tail.next = newNode
+			newNode.prev = l.tail
+			l.tail = newNode
+		}
 	}
 }
 
@@ -207,7 +219,7 @@ func (l *DoublyLinkedList) LPushX(data []byte) int {
 	if l.head == nil {
 		return 0
 	}
-	l.LPush(data)
+	l.lPush(data)
 	return l.size()
 }
 
@@ -218,7 +230,7 @@ func (l *DoublyLinkedList) RPushX(data []byte) int {
 	if l.tail == nil {
 		return 0
 	}
-	l.RPush(data)
+	l.rPush(data)
 	return l.size()
 }
 

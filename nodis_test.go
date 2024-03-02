@@ -12,7 +12,7 @@ func TestNodis_Open(t *testing.T) {
 		Path:         "testdata",
 		SyncInterval: 60 * time.Second,
 	}
-	got := Open(opt)
+	got := Open(&opt)
 	if got == nil {
 		t.Errorf("Open() = %v, want %v", got, "Nodis{}")
 	}
@@ -23,7 +23,7 @@ func TestNodis_Sync(t *testing.T) {
 		Path:         "testdata",
 		SyncInterval: 60 * time.Second,
 	}
-	n := Open(opt)
+	n := Open(&opt)
 	defer func() {
 		_, _ = os.ReadFile("testdata/nodis.db")
 		_, _ = os.ReadFile("testdata/nodis.meta")
@@ -42,7 +42,7 @@ func TestNodis_OpenAndSync(t *testing.T) {
 		Path:         "testdata",
 		SyncInterval: 60 * time.Second,
 	}
-	n := Open(opt)
+	n := Open(&opt)
 	n.Set("set", []byte("set"), 0)
 	n.ZAdd("zset", "zset", 1)
 	n.HSet("hset", "hset", []byte("hset"))
@@ -51,7 +51,7 @@ func TestNodis_OpenAndSync(t *testing.T) {
 	if err != nil {
 		t.Errorf("Sync() = %v, want %v", err, nil)
 	}
-	n = Open(opt)
+	n = Open(&opt)
 	v := n.Get("set")
 	if v == nil {
 		t.Errorf("Get() = %s, want %v", v, "set")
@@ -77,7 +77,7 @@ func TestNodis_OpenAndSyncBigdata10000(t *testing.T) {
 		Path:         "testdata",
 		SyncInterval: 60 * time.Second,
 	}
-	n := Open(opt)
+	n := Open(&opt)
 	for i := 0; i < 10000; i++ {
 		is := strconv.Itoa(i)
 		n.Set(is, []byte(is), 0)
@@ -95,7 +95,7 @@ func TestNodis_OpenAndSyncBigdata10000(t *testing.T) {
 	if err != nil {
 		t.Errorf("Sync() = %v, want %v", err, nil)
 	}
-	n = Open(opt)
+	n = Open(&opt)
 	for i := 0; i < 10000; i++ {
 		is := strconv.Itoa(i)
 		v := n.Get(is)

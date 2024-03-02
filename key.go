@@ -115,12 +115,12 @@ func (n *Nodis) TTL(key string) time.Duration {
 }
 
 // Rename a key
-func (n *Nodis) Rename(key, newkey string) error {
+func (n *Nodis) Rename(key, newKey string) error {
 	n.Lock()
-	k, ok := n.getKey(newkey)
+	k, ok := n.getKey(newKey)
 	if ok {
 		n.Unlock()
-		return errors.New("newkey exists")
+		return errors.New("newKey exists")
 	}
 	v, ok := n.store.Get(key)
 	if !ok {
@@ -128,9 +128,9 @@ func (n *Nodis) Rename(key, newkey string) error {
 		return errors.New("key does not exist")
 	}
 	n.store.Delete(key)
-	n.store.Put(newkey, v)
+	n.store.Put(newKey, v)
 	n.keys.Delete(key)
-	n.keys.Put(newkey, k)
+	n.keys.Put(newKey, k)
 	n.Unlock()
 	return nil
 }

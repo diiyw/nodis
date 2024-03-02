@@ -14,9 +14,7 @@ func (n *Nodis) newList() ds.DataStruct {
 
 func (n *Nodis) LPush(key string, values ...[]byte) {
 	l := n.getDs(key, n.newList, 0)
-	for _, v := range values {
-		l.(*list.DoublyLinkedList).LPush(v)
-	}
+	l.(*list.DoublyLinkedList).LPush(values...)
 }
 
 func (n *Nodis) RPush(key string, values ...[]byte) {
