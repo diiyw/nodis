@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func TestSet_Set(t *testing.T) {
+func TestStr_Set(t *testing.T) {
 	n := Open(Options{
 		Path:         "testdata",
 		SyncInterval: 60 * time.Second,

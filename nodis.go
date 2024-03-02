@@ -2,6 +2,7 @@ package nodis
 
 import (
 	"bytes"
+	"github.com/diiyw/nodis/ds/set"
 	"log"
 	"os"
 	"path/filepath"
@@ -14,7 +15,7 @@ import (
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/hash"
 	"github.com/diiyw/nodis/ds/list"
-	"github.com/diiyw/nodis/ds/set"
+	"github.com/diiyw/nodis/ds/str"
 	"github.com/dolthub/swiss"
 )
 
@@ -78,11 +79,11 @@ func loadData(n *Nodis) {
 					return false
 				}
 				switch k.Type {
-				case "set":
-					s := set.NewSet()
+				case "string":
+					s := str.NewString()
 					err := s.Unmarshal(data)
 					if err != nil {
-						log.Println("SET: Unmarshal ", err)
+						log.Println("String: Unmarshal ", err)
 						return false
 					}
 					n.store.Put(key, s)
@@ -109,6 +110,15 @@ func loadData(n *Nodis) {
 						log.Println("HASH: Unmarshal ", err)
 						return false
 					}
+					n.store.Put(key, h)
+				case "set":
+					s := set.NewSet()
+					err := s.Unmarshal(data)
+					if err != nil {
+						log.Println("SET: Unmarshal ", err)
+						return false
+					}
+					n.store.Put(key, s)
 				}
 				return false
 			})
@@ -119,6 +129,7 @@ func loadData(n *Nodis) {
 // Tidy removes expired keys
 func (n *Nodis) Tidy() (keys map[string]*Key, store map[string][]byte) {
 	n.Lock()
+	defer n.Unlock()
 	keys = make(map[string]*Key, n.keys.Count())
 	store = make(map[string][]byte, n.store.Count())
 	n.keys.Iter(func(key string, k *Key) bool {
@@ -139,7 +150,6 @@ func (n *Nodis) Tidy() (keys map[string]*Key, store map[string][]byte) {
 		store[key] = data
 		return false
 	})
-	n.Unlock()
 	return
 }
 
@@ -173,26 +183,20 @@ func (n *Nodis) Sync() error {
 func (n *Nodis) getDs(key string, newFn func() ds.DataStruct, ttl int64) ds.DataStruct {
 	n.Lock()
 	defer n.Unlock()
-	if !n.exists(key) {
+	if !n.exists(key) && newFn == nil {
 		return nil
 	}
 	d, ok := n.store.Get(key)
 	if !ok {
 		if newFn != nil {
 			d = newFn()
-			n.saveDs(key, d, ttl)
+			n.store.Put(key, d)
+			n.keys.Put(key, newKey(d.GetType(), ttl))
 			return d
 		}
 		return nil
 	}
 	return d
-}
-
-func (n *Nodis) saveDs(key string, ds ds.DataStruct, ttl int64) {
-	n.Lock()
-	defer n.Unlock()
-	n.store.Put(key, ds)
-	n.keys.Put(key, newKey(ds.GetType(), ttl))
 }
 
 // Clear removes all keys from the store

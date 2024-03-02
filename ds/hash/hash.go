@@ -33,8 +33,12 @@ func (s *HashMap) HSet(key string, value []byte) {
 }
 
 // HGet gets the value of a hash
-func (s *HashMap) HGet(key string) ([]byte, bool) {
-	return s.data.Get(key)
+func (s *HashMap) HGet(key string) []byte {
+	v, ok := s.data.Get(key)
+	if !ok {
+		return nil
+	}
+	return v
 }
 
 // HDel deletes the value of a hash

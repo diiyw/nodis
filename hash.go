@@ -14,10 +14,10 @@ func (n *Nodis) HSet(key string, field string, value []byte) {
 	h.(*hash.HashMap).HSet(field, value)
 }
 
-func (n *Nodis) HGet(key string, field string) ([]byte, bool) {
+func (n *Nodis) HGet(key string, field string) []byte {
 	h := n.getDs(key, nil, 0)
 	if h == nil {
-		return nil, false
+		return nil
 	}
 	return h.(*hash.HashMap).HGet(field)
 }

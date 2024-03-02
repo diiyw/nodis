@@ -19,15 +19,21 @@ func newKey(typ string, ttl int64) *Key {
 	return k
 }
 
-func (k Key) expired() bool {
+func (k *Key) expired() bool {
+	if k == nil {
+		return false
+	}
 	return k.TTL != 0 && k.TTL <= time.Now().Unix()
 }
 
 // Del a key
 func (n *Nodis) Del(key string) {
 	n.Lock()
+	ds := n.getDs(key, nil, 0)
+	ds.Lock()
 	n.store.Delete(key)
 	n.keys.Delete(key)
+	ds.Unlock()
 	n.Unlock()
 }
 

@@ -7,6 +7,7 @@ It is a simple and easy to use in-memory key-value store.
 - String
 - List
 - Hash
+- Set
 - Sorted Set
 
 ## Get Started
