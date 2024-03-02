@@ -41,13 +41,13 @@ func (n *Nodis) getKey(key string) (*Key, bool) {
 
 // Del a key
 func (n *Nodis) Del(key string) {
-	n.Lock()
 	ds := n.getDs(key, nil, 0)
 	ds.Lock()
+	n.Lock()
 	n.store.Delete(key)
 	n.keys.Delete(key)
-	ds.Unlock()
 	n.Unlock()
+	ds.Unlock()
 }
 
 func (n *Nodis) Exists(key string) bool {

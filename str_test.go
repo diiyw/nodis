@@ -6,7 +6,7 @@ import (
 )
 
 func TestStr_Set(t *testing.T) {
-	n := Open(Options{
+	n := Open(&Options{
 		Path:         "testdata",
 		SyncInterval: 60 * time.Second,
 	})
