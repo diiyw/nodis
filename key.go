@@ -26,6 +26,19 @@ func (k *Key) expired() bool {
 	return k.TTL != 0 && k.TTL <= time.Now().Unix()
 }
 
+func (n *Nodis) getKey(key string) (*Key, bool) {
+	k, ok := n.keys.Get(key)
+	if !ok {
+		n.store.Delete(key)
+	}
+	if k.expired() {
+		n.keys.Delete(key)
+		n.store.Delete(key)
+		ok = false
+	}
+	return k, ok
+}
+
 // Del a key
 func (n *Nodis) Del(key string) {
 	n.Lock()
@@ -122,7 +135,7 @@ func (n *Nodis) Rename(key, newkey string) error {
 	return nil
 }
 
-// Type gets the type of a key
+// Type gets the type of key
 func (n *Nodis) Type(key string) string {
 	n.RLock()
 	k, ok := n.getKey(key)
@@ -134,15 +147,29 @@ func (n *Nodis) Type(key string) string {
 	return k.Type
 }
 
-func (n *Nodis) getKey(key string) (*Key, bool) {
-	k, ok := n.keys.Get(key)
-	if !ok {
-		n.store.Delete(key)
+// Scan the keys
+func (n *Nodis) Scan(cursor int, match string, count int) (int, []string) {
+	n.RLock()
+	keys := make([]string, 0, n.keys.Count())
+	n.keys.Iter(func(key string, k *Key) bool {
+		matched, _ := filepath.Match(match, key)
+		if matched && !k.expired() {
+			keys = append(keys, key)
+		}
+		return false
+	})
+	n.RUnlock()
+	if len(keys) == 0 {
+		return 0, nil
 	}
-	if k.expired() {
-		n.keys.Delete(key)
-		n.store.Delete(key)
-		ok = false
+	if cursor >= len(keys) {
+		return 0, nil
 	}
-	return k, ok
+	if count > len(keys) {
+		count = len(keys)
+	}
+	if cursor+count > len(keys) {
+		count = len(keys) - cursor
+	}
+	return cursor + count, keys[cursor : cursor+count]
 }

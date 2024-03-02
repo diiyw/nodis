@@ -23,12 +23,12 @@ type Nodis struct {
 	sync.RWMutex
 	store    *swiss.Map[string, ds.DataStruct]
 	keys     *swiss.Map[string, *Key]
-	options  Options
+	options  *Options
 	dbFile   string
 	metaFile string
 }
 
-func Open(opt Options) *Nodis {
+func Open(opt *Options) *Nodis {
 	n := &Nodis{
 		store:    swiss.NewMap[string, ds.DataStruct](16),
 		keys:     swiss.NewMap[string, *Key](16),

@@ -9,6 +9,7 @@ type Options struct {
 	SyncInterval time.Duration
 }
 
-var DefaultOptions = Options{
+var DefaultOptions = &Options{
+	Path:         "data",
 	SyncInterval: 60 * time.Second,
 }
