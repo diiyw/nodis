@@ -26,6 +26,10 @@ func main() {
 
 	// Set a key-value pair
 	n.Set("key", []byte("value"), 0)
+	n.LPush("list", []byte("value1"))
 }
 
 ```
+
+## Note
+Nodis does not guarantee persistence. Before closing your application, make sure to call the Sync method to save the data to disk for future use.
