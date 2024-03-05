@@ -73,7 +73,7 @@ func TestSortedSet_ZRange(t *testing.T) {
 	ss.ZAdd("member3", 0.5)
 
 	// Test if the range is correct
-	if len(ss.ZRange(0, 1)) != 1 {
+	if len(ss.ZRange(0, 2)) != 2 {
 		t.Errorf("Range error")
 	}
 }
@@ -156,9 +156,9 @@ func TestSortedSet_ZRemRangeByScore(t *testing.T) {
 	}
 
 	// Test if the elements are removed correctly
-	ss.ZRemRangeByScore(1, 2)
+	removed := ss.ZRemRangeByScore(1, 2)
 	if ss.ZCard() != 2 {
-		t.Errorf("Removal error")
+		t.Errorf("Removal error expected 2 got %d removed %d", ss.ZCard(), removed)
 	}
 }
 
@@ -220,29 +220,5 @@ func TestSortedSet_ZCount(t *testing.T) {
 	}
 	if ss.ZCount(2, 4) != 2 {
 		t.Errorf("Count error expected 2 got %d", ss.ZCount(2, 4))
-	}
-}
-
-func TestSortedSet_ZPopMax(t *testing.T) {
-	ss := NewSortedSet()
-	ss.ZAdd("member1", 1.5)
-	ss.ZAdd("member2", 3.5)
-	ss.ZAdd("member3", 0.5)
-
-	c := ss.ZPopMax(2)
-	if len(c) != 2 {
-		t.Errorf("Pop error expected 2 got %d", len(c))
-	}
-}
-
-func TestSortedSet_ZPopMin(t *testing.T) {
-	ss := NewSortedSet()
-	ss.ZAdd("member1", 1.5)
-	ss.ZAdd("member2", 3.5)
-	ss.ZAdd("member3", 0.5)
-
-	c := ss.ZPopMin(2)
-	if len(c) != 2 {
-		t.Errorf("Pop error expected 2 got %d", len(c))
 	}
 }

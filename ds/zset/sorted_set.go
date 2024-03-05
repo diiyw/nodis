@@ -157,16 +157,16 @@ func (sortedSet *SortedSet) ZRevRange(start int64, stop int64) []*Element {
 }
 
 // rangeCount returns the number of  members which score or member within the given border
-func (sortedSet *SortedSet) rangeCount(min Border, max Border) int64 {
+func (sortedSet *SortedSet) rangeCount(min float64, max float64) int64 {
 	var i int64 = 0
 	// ascending order
 	sortedSet.forEachByRank(0, sortedSet.ZCard(), false, func(element *Element) bool {
-		gtMin := min.less(element) // greater than min
+		gtMin := min < element.Score // greater than min
 		if !gtMin {
 			// has not into range, continue foreach
 			return true
 		}
-		ltMax := max.greater(element) // less than max
+		ltMax := max > element.Score // less than max
 		if !ltMax {
 			// break through score border, break foreach
 			return false
@@ -180,11 +180,11 @@ func (sortedSet *SortedSet) rangeCount(min Border, max Border) int64 {
 
 // ZCount returns the number of  members which score or member within the given border
 func (sortedSet *SortedSet) ZCount(min float64, max float64) int64 {
-	return sortedSet.rangeCount(&ScoreBorder{Value: min, Exclude: false}, &ScoreBorder{Value: max, Exclude: false})
+	return sortedSet.rangeCount(min, max)
 }
 
 // forEach visits members which score or member within the given border
-func (sortedSet *SortedSet) forEach(min Border, max Border, offset int64, limit int64, desc bool, consumer func(element *Element) bool) {
+func (sortedSet *SortedSet) forEach(min float64, max float64, offset int64, limit int64, desc bool, consumer func(element *Element) bool) {
 	// find start node
 	var node *node
 	if desc {
@@ -215,8 +215,8 @@ func (sortedSet *SortedSet) forEach(min Border, max Border, offset int64, limit 
 		if node == nil {
 			break
 		}
-		gtMin := min.less(&node.Element) // greater than min
-		ltMax := max.greater(&node.Element)
+		gtMin := min < node.Element.Score // greater than min
+		ltMax := max > node.Element.Score
 		if !gtMin || !ltMax {
 			break // break through score border
 		}
@@ -225,7 +225,7 @@ func (sortedSet *SortedSet) forEach(min Border, max Border, offset int64, limit 
 
 // zrange returns members which score or member within the given border
 // param limit: <0 means no limit
-func (sortedSet *SortedSet) zrange(min Border, max Border, offset int64, limit int64, desc bool) []*Element {
+func (sortedSet *SortedSet) zrange(min float64, max float64, offset int64, limit int64, desc bool) []*Element {
 	if limit == 0 || offset < 0 {
 		return make([]*Element, 0)
 	}
@@ -238,7 +238,7 @@ func (sortedSet *SortedSet) zrange(min Border, max Border, offset int64, limit i
 }
 
 // removeRange removes members which score or member within the given border
-func (sortedSet *SortedSet) removeRange(min Border, max Border) int64 {
+func (sortedSet *SortedSet) removeRange(min float64, max float64) int64 {
 	removed := sortedSet.skiplist.removeRange(min, max, 0)
 	for _, element := range removed {
 		sortedSet.dict.Delete(element.Member)
@@ -248,7 +248,7 @@ func (sortedSet *SortedSet) removeRange(min Border, max Border) int64 {
 
 // ZRemRangeByScore removes members which score or member within the given border
 func (sortedSet *SortedSet) ZRemRangeByScore(min float64, max float64) int64 {
-	return sortedSet.removeRange(&ScoreBorder{Value: min, Exclude: false}, &ScoreBorder{Value: max, Exclude: false})
+	return sortedSet.removeRange(min, max)
 }
 
 // ZRemRangeByRank removes member ranking within [start, stop)
@@ -261,38 +261,6 @@ func (sortedSet *SortedSet) ZRemRangeByRank(start int64, stop int64) int64 {
 	return int64(len(removed))
 }
 
-func (sortedSet *SortedSet) ZPopMin(count int) []*Element {
-	first := sortedSet.skiplist.getFirstInRange(scoreNegativeInfBorder, scorePositiveInfBorder)
-	if first == nil {
-		return nil
-	}
-	border := &ScoreBorder{
-		Value:   first.Score,
-		Exclude: false,
-	}
-	removed := sortedSet.skiplist.removeRange(border, scorePositiveInfBorder, count)
-	for _, element := range removed {
-		sortedSet.dict.Delete(element.Member)
-	}
-	return removed
-}
-
-func (sortedSet *SortedSet) ZPopMax(count int) []*Element {
-	last := sortedSet.skiplist.getLastInRange(scoreNegativeInfBorder, scorePositiveInfBorder)
-	if last == nil {
-		return nil
-	}
-	border := &ScoreBorder{
-		Value:   last.Score,
-		Exclude: false,
-	}
-	removed := sortedSet.skiplist.removeRange(scoreNegativeInfBorder, border, count)
-	for _, element := range removed {
-		sortedSet.dict.Delete(element.Member)
-	}
-	return removed
-}
-
 // ZExists returns whether the given member exists in set
 func (sortedSet *SortedSet) ZExists(member string) bool {
 	_, ok := sortedSet.dict.Get(member)
@@ -301,12 +269,12 @@ func (sortedSet *SortedSet) ZExists(member string) bool {
 
 // ZRangeByScore returns members which score or member within the given border
 func (sortedSet *SortedSet) ZRangeByScore(min float64, max float64) []*Element {
-	return sortedSet.zrange(&ScoreBorder{Value: min, Exclude: false}, &ScoreBorder{Value: max, Exclude: false}, 0, -1, false)
+	return sortedSet.zrange(min, max, 0, -1, false)
 }
 
 // ZRevRangeByScore returns members which score or member within the given border
 func (sortedSet *SortedSet) ZRevRangeByScore(min float64, max float64) []*Element {
-	return sortedSet.zrange(&ScoreBorder{Value: min, Exclude: false}, &ScoreBorder{Value: max, Exclude: false}, 0, -1, true)
+	return sortedSet.zrange(min, max, 0, -1, true)
 }
 
 // ZIncrBy increases the score of the given member
