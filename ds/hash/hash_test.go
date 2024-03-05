@@ -12,8 +12,8 @@ func TestHash_HSet(t *testing.T) {
 	value := []byte("testValue")
 
 	hash.HSet(key, value)
-	v, ok := hash.HGet(key)
-	if !ok {
+	v := hash.HGet(key)
+	if v == nil {
 		t.Errorf("HSet failed, expected %s but got nothing", value)
 	}
 	if !bytes.Equal(v, value) {
@@ -28,8 +28,8 @@ func TestHash_HDel(t *testing.T) {
 
 	hash.HSet(key, value)
 	hash.HDel(key)
-	_, ok := hash.HGet(key)
-	if ok {
+	v := hash.HGet(key)
+	if v != nil {
 		t.Errorf("HDel failed, expected nothing but got %s", value)
 	}
 }
@@ -83,7 +83,7 @@ func TestHash_HGetAll(t *testing.T) {
 	if len(values) != 1 {
 		t.Errorf("HGetAll failed, expected 1 but got %d", len(values))
 	}
-	if bytes.Equal(values[key], value) {
+	if !bytes.Equal(values[key], value) {
 		t.Errorf("HGetAll failed, expected %s but got %s", value, values[key])
 	}
 }
@@ -94,8 +94,8 @@ func TestHash_HIncrBy(t *testing.T) {
 	var value int64 = 1
 
 	hash.HIncrBy(key, value)
-	v, ok := hash.HGet(key)
-	if !ok {
+	v := hash.HGet(key)
+	if v == nil {
 		t.Errorf("HIncrBy failed, expected %d but got nothing", value)
 	}
 	if string(v) != strconv.FormatInt(value, 10) {
@@ -110,8 +110,8 @@ func TestHash_HIncrBy2(t *testing.T) {
 
 	hash.HIncrBy(key, value)
 	hash.HIncrBy(key, value)
-	v, ok := hash.HGet(key)
-	if !ok {
+	v := hash.HGet(key)
+	if v == nil {
 		t.Errorf("HIncrBy failed, expected %d but got nothing", value*2)
 	}
 	if string(v) != strconv.FormatInt(value*2, 10) {
@@ -125,8 +125,8 @@ func TestHash_HIncrByFloat(t *testing.T) {
 	value := 1.0
 
 	hash.HIncrByFloat(key, value)
-	v, ok := hash.HGet(key)
-	if !ok {
+	v := hash.HGet(key)
+	if v == nil {
 		t.Errorf("HIncrByFloat failed, expected %f but got nothing", value)
 	}
 	if string(v) != strconv.FormatFloat(value, 'f', -1, 64) {
@@ -141,8 +141,8 @@ func TestHash_HIncrByFloat2(t *testing.T) {
 
 	hash.HIncrByFloat(key, value)
 	hash.HIncrByFloat(key, value)
-	v, ok := hash.HGet(key)
-	if !ok {
+	v := hash.HGet(key)
+	if v == nil {
 		t.Errorf("HIncrByFloat failed, expected %f but got nothing", value*2)
 	}
 	if string(v) != strconv.FormatFloat(value*2, 'f', -1, 64) {
@@ -158,15 +158,15 @@ func TestHash_HMSet(t *testing.T) {
 	}
 
 	hash.HMSet(values)
-	v, ok := hash.HGet("testKey1")
-	if !ok {
+	v := hash.HGet("testKey1")
+	if v == nil {
 		t.Errorf("HMSet failed, expected %s but got nothing", "testValue1")
 	}
 	if string(v) != "testValue1" {
 		t.Errorf("HMSet failed, expected %s but got %s", "testValue1", v)
 	}
-	v, ok = hash.HGet("testKey2")
-	if !ok {
+	v = hash.HGet("testKey2")
+	if v == nil {
 		t.Errorf("HMSet failed, expected %s but got nothing", "testValue2")
 	}
 	if string(v) != "testValue2" {
@@ -187,8 +187,8 @@ func TestHash_HSetNX(t *testing.T) {
 	if ok {
 		t.Errorf("HSetNX failed, expected false but got true")
 	}
-	v, ok := hash.HGet("testKey")
-	if !ok {
+	v := hash.HGet("testKey")
+	if v == nil {
 		t.Errorf("HMSet failed, expected %s but got nothing", "testValue2")
 	}
 	if string(v) != "testValue" {
