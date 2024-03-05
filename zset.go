@@ -165,22 +165,6 @@ func (n *Nodis) ZRemRangeByScore(key string, min float64, max float64) int64 {
 	return s.(*zset.SortedSet).ZRemRangeByScore(min, max)
 }
 
-func (n *Nodis) ZPopMin(key string, count int) []*zset.Element {
-	s := n.getDs(key, nil, 0)
-	if s == nil {
-		return nil
-	}
-	return s.(*zset.SortedSet).ZPopMin(count)
-}
-
-func (n *Nodis) ZPopMax(key string, count int) []*zset.Element {
-	s := n.getDs(key, nil, 0)
-	if s == nil {
-		return nil
-	}
-	return s.(*zset.SortedSet).ZPopMax(count)
-}
-
 func (n *Nodis) ZExists(key string, member string) bool {
 	s := n.getDs(key, nil, 0)
 	if s == nil {

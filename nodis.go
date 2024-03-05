@@ -36,6 +36,17 @@ func Open(opt *Options) *Nodis {
 		dbFile:   filepath.Join(opt.Path, "nodis.db"),
 		metaFile: filepath.Join(opt.Path, "nodis.meta"),
 	}
+	stat, err := os.Stat(opt.Path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(opt.Path, 0755)
+			if err != nil {
+				panic(err)
+			}
+		}
+	} else if !stat.IsDir() {
+		panic("Path is not a directory")
+	}
 	loadData(n)
 	go func() {
 		for {
