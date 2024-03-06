@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/utils"
 	"github.com/dolthub/swiss"
 	"github.com/kelindar/binary"
@@ -23,8 +24,8 @@ func NewHashMap() *HashMap {
 }
 
 // GetType returns the type of the data structure
-func (s *HashMap) GetType() string {
-	return "hash"
+func (s *HashMap) GetType() ds.DataType {
+	return ds.Hash
 }
 
 // HSet sets the value of a hash

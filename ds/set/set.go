@@ -1,9 +1,11 @@
 package set
 
 import (
+	"sync"
+
+	"github.com/diiyw/nodis/ds"
 	"github.com/dolthub/swiss"
 	"github.com/kelindar/binary"
-	"sync"
 )
 
 type Set struct {
@@ -155,8 +157,8 @@ func (s *Set) SUnionStore(destination *Set, sets ...*Set) {
 }
 
 // GetType returns the type of the data structure
-func (s *Set) GetType() string {
-	return "set"
+func (s *Set) GetType() ds.DataType {
+	return ds.Set
 }
 
 // Marshal the string to bytes

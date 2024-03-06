@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/diiyw/nodis/ds"
 	"github.com/dolthub/swiss"
 	"github.com/kelindar/binary"
 )
@@ -24,8 +25,8 @@ func NewSortedSet() *SortedSet {
 }
 
 // GetType returns the type of the data structure
-func (sortedSet *SortedSet) GetType() string {
-	return "zset"
+func (sortedSet *SortedSet) GetType() ds.DataType {
+	return ds.ZSet
 }
 
 // ZAdd puts member into set,  and returns whether it has inserted new node

@@ -2,12 +2,13 @@ package nodis
 
 import (
 	"bytes"
-	"github.com/diiyw/nodis/ds/set"
 	"log"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/diiyw/nodis/ds/set"
 
 	"github.com/diiyw/nodis/ds/zset"
 	"github.com/kelindar/binary"
@@ -90,7 +91,7 @@ func loadData(n *Nodis) {
 					return false
 				}
 				switch k.Type {
-				case "string":
+				case ds.String:
 					s := str.NewString()
 					err := s.Unmarshal(data)
 					if err != nil {
@@ -98,7 +99,7 @@ func loadData(n *Nodis) {
 						return false
 					}
 					n.store.Put(key, s)
-				case "zset":
+				case ds.ZSet:
 					z := zset.NewSortedSet()
 					err := z.Unmarshal(data)
 					if err != nil {
@@ -106,7 +107,7 @@ func loadData(n *Nodis) {
 						return false
 					}
 					n.store.Put(key, z)
-				case "list":
+				case ds.List:
 					l := list.NewDoublyLinkedList()
 					err := l.Unmarshal(data)
 					if err != nil {
@@ -114,7 +115,7 @@ func loadData(n *Nodis) {
 						return false
 					}
 					n.store.Put(key, l)
-				case "hash":
+				case ds.Hash:
 					h := hash.NewHashMap()
 					err := h.Unmarshal(data)
 					if err != nil {
@@ -122,7 +123,7 @@ func loadData(n *Nodis) {
 						return false
 					}
 					n.store.Put(key, h)
-				case "set":
+				case ds.Set:
 					s := set.NewSet()
 					err := s.Unmarshal(data)
 					if err != nil {
@@ -138,11 +139,11 @@ func loadData(n *Nodis) {
 }
 
 // Tidy removes expired keys
-func (n *Nodis) Tidy() (keys map[string]*Key, store map[string][]byte) {
+func (n *Nodis) Tidy() (keys map[string]*Key, store map[string]ds.DataStruct) {
 	n.Lock()
 	defer n.Unlock()
 	keys = make(map[string]*Key, n.keys.Count())
-	store = make(map[string][]byte, n.store.Count())
+	store = make(map[string]ds.DataStruct, n.store.Count())
 	n.keys.Iter(func(key string, k *Key) bool {
 		if k.expired() {
 			n.store.Delete(key)
@@ -153,12 +154,7 @@ func (n *Nodis) Tidy() (keys map[string]*Key, store map[string][]byte) {
 			return true
 		}
 		keys[key] = k
-		data, err := v.Marshal()
-		if err != nil {
-			log.Println("Tidy: ", err)
-			return true
-		}
-		store[key] = data
+		store[key] = v
 		return false
 	})
 	return
@@ -169,9 +165,17 @@ func (n *Nodis) Sync() error {
 	keys, stores := n.Tidy()
 	var buf bytes.Buffer
 	buf.Grow(64)
+	newStores := make(map[string][]byte, len(stores))
+	for k, v := range stores {
+		data, err := v.Marshal()
+		if err != nil {
+			return err
+		}
+		newStores[k] = data
+	}
 	n.RLock()
 	defer n.RUnlock()
-	err := binary.MarshalTo(stores, &buf)
+	err := binary.MarshalTo(newStores, &buf)
 	if err != nil {
 		return err
 	}

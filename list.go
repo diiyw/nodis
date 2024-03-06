@@ -1,8 +1,9 @@
 package nodis
 
 import (
-	"github.com/diiyw/nodis/ds"
 	"time"
+
+	"github.com/diiyw/nodis/ds"
 
 	"github.com/diiyw/nodis/ds/list"
 )
@@ -120,7 +121,7 @@ func (n *Nodis) LPopRPush(source, destination string) []byte {
 	}
 	if !n.exists(destination) {
 		n.store.Put(destination, list.NewDoublyLinkedList())
-		n.keys.Put(destination, newKey("list", 0))
+		n.keys.Put(destination, newKey(ds.List, 0))
 	}
 	l, _ = n.store.Get(destination)
 	l.(*list.DoublyLinkedList).RPush(v)
@@ -139,7 +140,7 @@ func (n *Nodis) RPopLPush(source, destination string) []byte {
 	}
 	if !n.exists(destination) {
 		n.store.Put(destination, list.NewDoublyLinkedList())
-		n.keys.Put(destination, newKey("list", 0))
+		n.keys.Put(destination, newKey(ds.List, 0))
 	}
 	l, _ = n.store.Get(destination)
 	l.(*list.DoublyLinkedList).LPush(v)

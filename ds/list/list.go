@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/diiyw/nodis/ds"
 	"github.com/kelindar/binary"
 )
 
@@ -21,8 +22,8 @@ type DoublyLinkedList struct {
 }
 
 // GetType returns the type of the data structure
-func (l *DoublyLinkedList) GetType() string {
-	return "list"
+func (l *DoublyLinkedList) GetType() ds.DataType {
+	return ds.List
 }
 
 // NewDoublyLinkedList returns a new doubly linked list

@@ -3,6 +3,7 @@ package str
 import (
 	"sync"
 
+	"github.com/diiyw/nodis/ds"
 	"github.com/kelindar/binary"
 )
 
@@ -16,8 +17,8 @@ func NewString() *String {
 }
 
 // GetType returns the type of the data structure
-func (s *String) GetType() string {
-	return "string"
+func (s *String) GetType() ds.DataType {
+	return ds.String
 }
 
 // Set the value

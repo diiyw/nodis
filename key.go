@@ -4,14 +4,16 @@ import (
 	"errors"
 	"path/filepath"
 	"time"
+
+	"github.com/diiyw/nodis/ds"
 )
 
 type Key struct {
-	Type string
+	Type ds.DataType
 	TTL  int64
 }
 
-func newKey(typ string, ttl int64) *Key {
+func newKey(typ ds.DataType, ttl int64) *Key {
 	k := &Key{Type: typ}
 	if ttl != 0 {
 		k.TTL = ttl + time.Now().Unix()
@@ -144,7 +146,7 @@ func (n *Nodis) Type(key string) string {
 		return "none"
 	}
 	n.RUnlock()
-	return k.Type
+	return ds.DataTypeMap[k.Type]
 }
 
 // Scan the keys
