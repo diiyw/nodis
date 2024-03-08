@@ -116,14 +116,14 @@ func (n *Nodis) LPopRPush(source, destination string) []byte {
 	}
 	v := l.(*list.DoublyLinkedList).LPop()
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
-		n.store.Delete(source)
+		n.dataStructs.Delete(source)
 		n.keys.Delete(source)
 	}
 	if !n.exists(destination) {
-		n.store.Put(destination, list.NewDoublyLinkedList())
+		n.dataStructs.Put(destination, list.NewDoublyLinkedList())
 		n.keys.Put(destination, newKey(ds.List, 0))
 	}
-	l, _ = n.store.Get(destination)
+	l, _ = n.dataStructs.Get(destination)
 	l.(*list.DoublyLinkedList).RPush(v)
 	return v
 }
@@ -135,14 +135,14 @@ func (n *Nodis) RPopLPush(source, destination string) []byte {
 	}
 	v := l.(*list.DoublyLinkedList).RPop()
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
-		n.store.Delete(source)
+		n.dataStructs.Delete(source)
 		n.keys.Delete(source)
 	}
 	if !n.exists(destination) {
-		n.store.Put(destination, list.NewDoublyLinkedList())
+		n.dataStructs.Put(destination, list.NewDoublyLinkedList())
 		n.keys.Put(destination, newKey(ds.List, 0))
 	}
-	l, _ = n.store.Get(destination)
+	l, _ = n.dataStructs.Get(destination)
 	l.(*list.DoublyLinkedList).LPush(v)
 	return v
 }
@@ -154,7 +154,7 @@ func (n *Nodis) BLPop(key string, timeout time.Duration) []byte {
 	}
 	v := l.(*list.DoublyLinkedList).BLPop(timeout)
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
-		n.store.Delete(key)
+		n.dataStructs.Delete(key)
 		n.keys.Delete(key)
 	}
 	return v
@@ -167,7 +167,7 @@ func (n *Nodis) BRPop(key string, timeout time.Duration) []byte {
 	}
 	v := l.(*list.DoublyLinkedList).BRPop(timeout)
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
-		n.store.Delete(key)
+		n.dataStructs.Delete(key)
 		n.keys.Delete(key)
 	}
 	return v

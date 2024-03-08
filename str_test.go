@@ -8,7 +8,7 @@ import (
 func TestStr_Set(t *testing.T) {
 	n := Open(&Options{
 		Path:         "testdata",
-		SyncInterval: 60 * time.Second,
+		TidyDuration: 60 * time.Second,
 	})
 	n.Set("a", []byte("b"), 0)
 	v := n.Get("a")

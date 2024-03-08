@@ -9,14 +9,15 @@ import (
 )
 
 type Key struct {
-	Type ds.DataType
-	TTL  int64
+	Type      ds.DataType
+	ExpiredAt int64
+	lastUse   int64
 }
 
-func newKey(typ ds.DataType, ttl int64) *Key {
+func newKey(typ ds.DataType, seconds int64) *Key {
 	k := &Key{Type: typ}
-	if ttl != 0 {
-		k.TTL = ttl + time.Now().Unix()
+	if seconds != 0 {
+		k.ExpiredAt = seconds + time.Now().Unix()
 	}
 	return k
 }
@@ -25,17 +26,17 @@ func (k *Key) expired() bool {
 	if k == nil {
 		return false
 	}
-	return k.TTL != 0 && k.TTL <= time.Now().Unix()
+	return k.ExpiredAt != 0 && k.ExpiredAt <= time.Now().Unix()
 }
 
 func (n *Nodis) getKey(key string) (*Key, bool) {
 	k, ok := n.keys.Get(key)
 	if !ok {
-		n.store.Delete(key)
+		n.dataStructs.Delete(key)
 	}
 	if k.expired() {
 		n.keys.Delete(key)
-		n.store.Delete(key)
+		n.dataStructs.Delete(key)
 		ok = false
 	}
 	return k, ok
@@ -46,7 +47,7 @@ func (n *Nodis) Del(key string) {
 	ds := n.getDs(key, nil, 0)
 	ds.Lock()
 	n.Lock()
-	n.store.Delete(key)
+	n.dataStructs.Delete(key)
 	n.keys.Delete(key)
 	n.Unlock()
 	ds.Unlock()
@@ -62,6 +63,18 @@ func (n *Nodis) Exists(key string) bool {
 // exists checks if a key exists
 func (n *Nodis) exists(key string) bool {
 	_, ok := n.getKey(key)
+	if !ok {
+		// try get from store
+		v, err := n.store.get(key)
+		if err == nil && len(v) > 0 {
+			d := parseDs(v)
+			if d != nil {
+				n.dataStructs.Put(key, d)
+				n.keys.Put(key, newKey(d.GetType(), 0))
+				return true
+			}
+		}
+	}
 	return ok
 }
 
@@ -73,7 +86,7 @@ func (n *Nodis) Expire(key string, seconds int64) {
 		n.Unlock()
 		return
 	}
-	k.TTL += seconds
+	k.ExpiredAt += seconds
 	n.Unlock()
 }
 
@@ -85,7 +98,7 @@ func (n *Nodis) ExpireAt(key string, timestamp time.Time) {
 		n.Unlock()
 		return
 	}
-	k.TTL = timestamp.Unix()
+	k.ExpiredAt = timestamp.Unix()
 	n.Unlock()
 }
 
@@ -113,7 +126,7 @@ func (n *Nodis) TTL(key string) time.Duration {
 		return -1
 	}
 	n.RUnlock()
-	return time.Duration(k.TTL - time.Now().Unix())
+	return time.Duration(k.ExpiredAt - time.Now().Unix())
 }
 
 // Rename a key
@@ -124,13 +137,13 @@ func (n *Nodis) Rename(key, newKey string) error {
 		n.Unlock()
 		return errors.New("newKey exists")
 	}
-	v, ok := n.store.Get(key)
+	v, ok := n.dataStructs.Get(key)
 	if !ok {
 		n.Unlock()
 		return errors.New("key does not exist")
 	}
-	n.store.Delete(key)
-	n.store.Put(newKey, v)
+	n.dataStructs.Delete(key)
+	n.dataStructs.Put(newKey, v)
 	n.keys.Delete(key)
 	n.keys.Put(newKey, k)
 	n.Unlock()
@@ -153,8 +166,11 @@ func (n *Nodis) Type(key string) string {
 func (n *Nodis) Scan(cursor int, match string, count int) (int, []string) {
 	n.RLock()
 	keys := make([]string, 0, n.keys.Count())
-	n.keys.Iter(func(key string, k *Key) bool {
+	n.store.index.Iter(func(key string, index *index) bool {
 		matched, _ := filepath.Match(match, key)
+		k := &Key{
+			ExpiredAt: index.ExpiredAt,
+		}
 		if matched && !k.expired() {
 			keys = append(keys, key)
 		}

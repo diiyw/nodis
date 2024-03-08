@@ -1,17 +1,14 @@
 package nodis
 
 import (
-	"bytes"
 	"log"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/diiyw/nodis/ds/set"
 
 	"github.com/diiyw/nodis/ds/zset"
-	"github.com/kelindar/binary"
 
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/hash"
@@ -22,20 +19,17 @@ import (
 
 type Nodis struct {
 	sync.RWMutex
-	store    *swiss.Map[string, ds.DataStruct]
-	keys     *swiss.Map[string, *Key]
-	options  *Options
-	dbFile   string
-	metaFile string
+	dataStructs *swiss.Map[string, ds.DataStruct]
+	keys        *swiss.Map[string, *Key]
+	options     *Options
+	store       *store
 }
 
 func Open(opt *Options) *Nodis {
 	n := &Nodis{
-		store:    swiss.NewMap[string, ds.DataStruct](16),
-		keys:     swiss.NewMap[string, *Key](16),
-		options:  opt,
-		dbFile:   filepath.Join(opt.Path, "nodis.db"),
-		metaFile: filepath.Join(opt.Path, "nodis.meta"),
+		dataStructs: swiss.NewMap[string, ds.DataStruct](16),
+		keys:        swiss.NewMap[string, *Key](16),
+		options:     opt,
 	}
 	stat, err := os.Stat(opt.Path)
 	if err != nil {
@@ -48,151 +42,80 @@ func Open(opt *Options) *Nodis {
 	} else if !stat.IsDir() {
 		panic("Path is not a directory")
 	}
-	loadData(n)
+	n.store = newStore(opt.Path, opt.ChunkSize)
 	go func() {
-		for {
-			time.Sleep(opt.SyncInterval)
-			err := n.Sync()
-			if err != nil {
-				log.Println("Sync: ", err)
+		if opt.TidyDuration != 0 {
+			for {
+				time.Sleep(opt.TidyDuration)
+				err := n.sync()
+				if err != nil {
+					log.Println("Sync: ", err)
+				}
+			}
+		}
+	}()
+	go func() {
+		if opt.SnapshotDuration != 0 {
+			for {
+				time.Sleep(opt.SnapshotDuration)
+				n.Snapshot()
+				log.Println("Snapshot at", time.Now().Format("2006-01-02 15:04:05"))
 			}
 		}
 	}()
 	return n
 }
 
-func loadData(n *Nodis) {
-	metadata, err := os.ReadFile(n.metaFile)
-	if err == nil {
-		if len(metadata) > 0 {
-			var keys = make(map[string]*Key)
-			err := binary.Unmarshal(metadata, &keys)
-			if err != nil {
-				panic(err)
-			}
-			for name, k := range keys {
-				n.keys.Put(name, k)
-			}
-			dbData, err := os.ReadFile(n.dbFile)
-			if err != nil {
-				panic(err)
-			}
-			if len(dbData) == 0 {
-				return
-			}
-			store := make(map[string][]byte, n.keys.Count())
-			err = binary.Unmarshal(dbData, &store)
-			if err != nil {
-				panic(err)
-			}
-			n.keys.Iter(func(key string, k *Key) bool {
-				data, ok := store[key]
-				if !ok {
-					return false
-				}
-				switch k.Type {
-				case ds.String:
-					s := str.NewString()
-					err := s.Unmarshal(data)
-					if err != nil {
-						log.Println("String: Unmarshal ", err)
-						return false
-					}
-					n.store.Put(key, s)
-				case ds.ZSet:
-					z := zset.NewSortedSet()
-					err := z.Unmarshal(data)
-					if err != nil {
-						log.Println("ZSET: Unmarshal ", err)
-						return false
-					}
-					n.store.Put(key, z)
-				case ds.List:
-					l := list.NewDoublyLinkedList()
-					err := l.Unmarshal(data)
-					if err != nil {
-						log.Println("LIST: Unmarshal ", err)
-						return false
-					}
-					n.store.Put(key, l)
-				case ds.Hash:
-					h := hash.NewHashMap()
-					err := h.Unmarshal(data)
-					if err != nil {
-						log.Println("HASH: Unmarshal ", err)
-						return false
-					}
-					n.store.Put(key, h)
-				case ds.Set:
-					s := set.NewSet()
-					err := s.Unmarshal(data)
-					if err != nil {
-						log.Println("SET: Unmarshal ", err)
-						return false
-					}
-					n.store.Put(key, s)
-				}
-				return false
-			})
-		}
-	}
+// Snapshot saves the data to disk
+func (n *Nodis) Snapshot() {
+	n.RLock()
+	defer n.RUnlock()
+	n.Tidy()
+	n.store.snapshot()
 }
 
 // Tidy removes expired keys
-func (n *Nodis) Tidy() (keys map[string]*Key, store map[string]ds.DataStruct) {
+func (n *Nodis) Tidy() {
 	n.Lock()
 	defer n.Unlock()
-	keys = make(map[string]*Key, n.keys.Count())
-	store = make(map[string]ds.DataStruct, n.store.Count())
 	n.keys.Iter(func(key string, k *Key) bool {
 		if k.expired() {
-			n.store.Delete(key)
+			n.dataStructs.Delete(key)
+			n.keys.Delete(key)
+			n.store.remove(key)
+		}
+		if k.lastUse < time.Now().Unix()-int64(n.options.TidyDuration.Seconds()) {
+			n.dataStructs.Delete(key)
 			n.keys.Delete(key)
 		}
-		v, ok := n.store.Get(key)
-		if !ok {
-			return true
-		}
-		keys[key] = k
-		store[key] = v
 		return false
 	})
-	return
 }
 
-// Sync saves the data to disk
-func (n *Nodis) Sync() error {
-	keys, stores := n.Tidy()
-	var buf bytes.Buffer
-	buf.Grow(64)
-	newStores := make(map[string][]byte, len(stores))
-	for k, v := range stores {
-		data, err := v.Marshal()
-		if err != nil {
-			return err
+// sync saves the data to disk
+func (n *Nodis) sync() error {
+	n.keys.Iter(func(key string, k *Key) bool {
+		d, ok := n.dataStructs.Get(key)
+		if !ok {
+			return false
 		}
-		newStores[k] = data
-	}
-	n.RLock()
-	defer n.RUnlock()
-	err := binary.MarshalTo(newStores, &buf)
-	if err != nil {
-		return err
-	}
-	err = os.WriteFile(n.dbFile, buf.Bytes(), 0644)
-	if err != nil {
-		return err
-	}
-	buf.Reset()
-	err = binary.MarshalTo(keys, &buf)
-	if err != nil {
-		return err
-	}
-	err = os.WriteFile(n.metaFile, buf.Bytes(), 0644)
-	if err != nil {
-		return err
-	}
+		data, err := d.Marshal()
+		if err != nil {
+			log.Println("Sync Marshal: ", err)
+		}
+		n.store.put(key, append([]byte{byte(d.GetType())}, data...), k.ExpiredAt)
+		return false
+	})
 	return nil
+}
+
+// Close the store
+func (n *Nodis) Close() error {
+	n.Lock()
+	defer n.Unlock()
+	// save values to disk
+	n.sync()
+	return n.store.close()
 }
 
 func (n *Nodis) getDs(key string, newFn func() ds.DataStruct, ttl int64) ds.DataStruct {
@@ -201,11 +124,11 @@ func (n *Nodis) getDs(key string, newFn func() ds.DataStruct, ttl int64) ds.Data
 	if !n.exists(key) && newFn == nil {
 		return nil
 	}
-	d, ok := n.store.Get(key)
+	d, ok := n.dataStructs.Get(key)
 	if !ok {
 		if newFn != nil {
 			d = newFn()
-			n.store.Put(key, d)
+			n.dataStructs.Put(key, d)
 			n.keys.Put(key, newKey(d.GetType(), ttl))
 			return d
 		}
@@ -221,6 +144,49 @@ func (n *Nodis) Clear(key string) {
 	if !n.exists(key) {
 		return
 	}
-	n.store.Delete(key)
+	n.dataStructs.Delete(key)
 	n.keys.Delete(key)
+}
+
+func parseDs(data []byte) (d ds.DataStruct) {
+	dataType := ds.DataType(data[0])
+	data = data[1:]
+	switch dataType {
+	case ds.String:
+		s := str.NewString()
+		err := s.Unmarshal(data)
+		if err != nil {
+			log.Println("String: Unmarshal ", err)
+		}
+		d = s
+	case ds.ZSet:
+		z := zset.NewSortedSet()
+		err := z.Unmarshal(data)
+		if err != nil {
+			log.Println("ZSET: Unmarshal ", err)
+		}
+		d = z
+	case ds.List:
+		l := list.NewDoublyLinkedList()
+		err := l.Unmarshal(data)
+		if err != nil {
+			log.Println("LIST: Unmarshal ", err)
+		}
+		d = l
+	case ds.Hash:
+		h := hash.NewHashMap()
+		err := h.Unmarshal(data)
+		if err != nil {
+			log.Println("HASH: Unmarshal ", err)
+		}
+		d = h
+	case ds.Set:
+		s := set.NewSet()
+		err := s.Unmarshal(data)
+		if err != nil {
+			log.Println("SET: Unmarshal ", err)
+		}
+		d = s
+	}
+	return
 }

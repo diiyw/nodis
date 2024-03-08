@@ -1,6 +1,6 @@
 # Nodis
 A Golang implemented Redis data structure. 
-It is a simple and easy to use in-memory key-value store.
+It is a simple and easy to embed in your application.
 
 ## Supported Data Types
 
@@ -9,6 +9,12 @@ It is a simple and easy to use in-memory key-value store.
 - Hash
 - Set
 - Sorted Set
+
+## Features
+
+- Fast and embeddable
+- Low memory used, only hot key stored in memory
+- Snapshot and WAL for data storage.
 
 ## Get Started
 ```bash
@@ -32,4 +38,4 @@ func main() {
 ```
 
 ## Note
-Nodis does not guarantee persistence. Before closing your application, make sure to call the Sync method to save the data to disk for future use.
+Nodis is done by following the Redis data structure. It is not a complete Redis server. It is a simple and easy to embed in your application.

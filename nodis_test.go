@@ -10,7 +10,7 @@ import (
 func TestNodis_Open(t *testing.T) {
 	opt := Options{
 		Path:         "testdata",
-		SyncInterval: 60 * time.Second,
+		TidyDuration: 60 * time.Second,
 	}
 	got := Open(&opt)
 	if got == nil {
@@ -21,7 +21,7 @@ func TestNodis_Open(t *testing.T) {
 func TestNodis_Sync(t *testing.T) {
 	opt := Options{
 		Path:         "testdata",
-		SyncInterval: 60 * time.Second,
+		TidyDuration: 60 * time.Second,
 	}
 	n := Open(&opt)
 	defer func() {
@@ -29,29 +29,27 @@ func TestNodis_Sync(t *testing.T) {
 		_, _ = os.ReadFile("testdata/nodis.meta")
 	}()
 	n.Set("test", []byte("test1"), 0)
-	err := n.Sync()
+	err := n.sync()
 	if err != nil {
 		t.Errorf("Sync() = %v, want %v", err, nil)
 	}
 }
 
 func TestNodis_OpenAndSync(t *testing.T) {
-	_ = os.Remove("testdata/nodis.db")
-	_ = os.Remove("testdata/nodis.meta")
-	opt := Options{
-		Path:         "testdata",
-		SyncInterval: 60 * time.Second,
-	}
-	n := Open(&opt)
+	_ = os.RemoveAll("testdata")
+	opt := DefaultOptions
+	opt.Path = "testdata"
+	n := Open(opt)
 	n.Set("set", []byte("set"), 0)
 	n.ZAdd("zset", "zset", 1)
 	n.HSet("hset", "hset", []byte("hset"))
 	n.LPush("lpush", []byte("lpush"))
-	err := n.Sync()
+	err := n.sync()
 	if err != nil {
 		t.Errorf("Sync() = %v, want %v", err, nil)
 	}
-	n = Open(&opt)
+	n.Close()
+	n = Open(opt)
 	v := n.Get("set")
 	if v == nil {
 		t.Errorf("Get() = %s, want %v", v, "set")
@@ -75,7 +73,7 @@ func TestNodis_OpenAndSyncBigdata10000(t *testing.T) {
 	_ = os.Remove("testdata/nodis.meta")
 	opt := Options{
 		Path:         "testdata",
-		SyncInterval: 60 * time.Second,
+		TidyDuration: 60 * time.Second,
 	}
 	n := Open(&opt)
 	for i := 0; i < 10000; i++ {
@@ -91,7 +89,7 @@ func TestNodis_OpenAndSyncBigdata10000(t *testing.T) {
 	for i := 30000; i < 40000; i++ {
 		n.LPush("lpush", []byte(strconv.Itoa(i)))
 	}
-	err := n.Sync()
+	err := n.sync()
 	if err != nil {
 		t.Errorf("Sync() = %v, want %v", err, nil)
 	}

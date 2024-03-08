@@ -29,7 +29,7 @@ func (n *Nodis) HDel(key string, field string) {
 	}
 	h.(*hash.HashMap).HDel(field)
 	if h.(*hash.HashMap).HLen() == 0 {
-		n.store.Delete(key)
+		n.dataStructs.Delete(key)
 		n.keys.Delete(key)
 	}
 }
