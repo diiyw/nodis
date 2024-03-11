@@ -304,13 +304,13 @@ func (l *DoublyLinkedList) LTrim(start, end int) {
 	}
 }
 
-// Marshal returns the byte slice of the list
-func (l *DoublyLinkedList) Marshal() ([]byte, error) {
+// MarshalBinary returns the byte slice of the list
+func (l *DoublyLinkedList) MarshalBinary() ([]byte, error) {
 	return binary.Marshal(l.LRange(0, -1))
 }
 
-// Unmarshal restores the list from the byte slice
-func (l *DoublyLinkedList) Unmarshal(data []byte) error {
+// UnmarshalBinary restores the list from the byte slice
+func (l *DoublyLinkedList) UnmarshalBinary(data []byte) error {
 	var list [][]byte
 	if err := binary.Unmarshal(data, &list); err != nil {
 		return err

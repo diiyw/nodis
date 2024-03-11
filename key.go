@@ -2,6 +2,7 @@ package nodis
 
 import (
 	"errors"
+	"log"
 	"path/filepath"
 	"time"
 
@@ -71,10 +72,14 @@ func (n *Nodis) exists(key string) (k *Key, ok bool) {
 		// try get from store
 		v, err := n.store.get(key)
 		if err == nil && len(v) > 0 {
-			d := parseDs(v)
-			if d != nil {
-				n.dataStructs.Put(key, d)
-				k = newKey(d.GetType(), 0)
+			e, err := parseDs(v)
+			if err != nil {
+				log.Println("Parse Datastruct:", err)
+				return
+			}
+			if e != nil {
+				n.dataStructs.Put(key, e.Value)
+				k = newKey(e.Value.GetType(), 0)
 				k.changed = false
 				ok = true
 				n.keys.Put(key, k)

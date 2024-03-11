@@ -63,7 +63,7 @@ type index struct {
 }
 
 // put a key-value pair into store
-func (s *store) put(key string, value []byte, expiredAt int64) error {
+func (s *store) put(entry *Entry) error {
 	s.Lock()
 	defer s.Unlock()
 	var index = &index{}
@@ -109,12 +109,16 @@ func (s *store) put(key string, value []byte, expiredAt int64) error {
 		}
 		offset = 0
 	}
+	data, err := entry.Marshal()
+	if err != nil {
+		return err
+	}
 	index.FileID = s.fileId
 	index.Offset = offset
-	index.Size = uint32(len(value))
-	index.ExpiredAt = expiredAt
-	s.index.Put(key, index)
-	_, err = s.aof.Write(value)
+	index.Size = uint32(len(data))
+	index.ExpiredAt = entry.ExpiredAt
+	s.index.Put(entry.Key, index)
+	_, err = s.aof.Write(data)
 	if err != nil {
 		return err
 	}
@@ -160,33 +164,23 @@ func (s *store) remove(key string) {
 }
 
 // snapshot the store
-func (s *store) snapshot(path string) {
+func (s *store) snapshot(path string, entries []*Entry) {
 	s.RLock()
 	defer s.RUnlock()
-	var keys = make(map[string]int64, 0)
-	s.index.Iter(func(key string, value *index) bool {
-		if value.ExpiredAt == 0 || value.ExpiredAt > time.Now().Unix() {
-			keys[key] = value.ExpiredAt
-		}
-		return false
-	})
-	go func(snapshotKeys map[string]int64) {
-		snapshotDir := filepath.Join(path, "snapshots", time.Now().Format("20060102150405"))
-		err := os.MkdirAll(snapshotDir, 0755)
-		if err != nil {
-			log.Println("Snapshot mkdir error: ", err)
-			return
-		}
-		ns := newStore(snapshotDir, s.fileSize)
-		for key, expiredAt := range snapshotKeys {
-			value, _ := s.get(key)
-			ns.put(key, value, expiredAt)
-		}
-		err = ns.close()
-		if err != nil {
-			log.Println("Snapshot save error: ", err)
-		}
-	}(keys)
+	snapshotDir := filepath.Join(path, "snapshots", time.Now().Format("20060102150405"))
+	err := os.MkdirAll(snapshotDir, 0755)
+	if err != nil {
+		log.Println("Snapshot mkdir error: ", err)
+		return
+	}
+	ns := newStore(snapshotDir, s.fileSize)
+	for _, entry := range entries {
+		ns.put(entry)
+	}
+	err = ns.close()
+	if err != nil {
+		log.Println("Snapshot save error: ", err)
+	}
 }
 
 // close the store

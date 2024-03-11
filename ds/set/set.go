@@ -161,13 +161,13 @@ func (s *Set) GetType() ds.DataType {
 	return ds.Set
 }
 
-// Marshal the string to bytes
-func (s *Set) Marshal() ([]byte, error) {
+// MarshalBinary the string to bytes
+func (s *Set) MarshalBinary() ([]byte, error) {
 	return binary.Marshal(s.members)
 }
 
-// Unmarshal the bytes to string
-func (s *Set) Unmarshal(data []byte) error {
+// UnmarshalBinary the bytes to string
+func (s *Set) UnmarshalBinary(data []byte) error {
 	err := binary.Unmarshal(data, &s.members)
 	if err != nil {
 		return err

@@ -6,14 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/diiyw/nodis/ds/set"
-
-	"github.com/diiyw/nodis/ds/zset"
-
 	"github.com/diiyw/nodis/ds"
-	"github.com/diiyw/nodis/ds/hash"
-	"github.com/diiyw/nodis/ds/list"
-	"github.com/diiyw/nodis/ds/str"
 	"github.com/dolthub/swiss"
 )
 
@@ -66,7 +59,7 @@ func Open(opt *Options) *Nodis {
 // Snapshot saves the data to disk
 func (n *Nodis) Snapshot(path string) {
 	n.Recycle()
-	n.store.snapshot(path)
+	n.store.snapshot(path, n.sync())
 }
 
 // Recycle removes expired and unused keys
@@ -85,28 +78,10 @@ func (n *Nodis) Recycle() {
 			n.dataStructs.Delete(key)
 			n.keys.Delete(key)
 			if ok {
+				k.changed = false
 				go func() {
 					// save to disk
-					data, err := d.Marshal()
-					if err != nil {
-						log.Println("Tidy Marshal: ", err)
-						return
-					}
-					n.store.put(key, append([]byte{byte(d.GetType())}, data...), k.ExpiredAt)
-				}()
-			}
-		}
-		if !n.store.index.Has(key) {
-			d, ok := n.dataStructs.Get(key)
-			if ok {
-				go func() {
-					// save to disk
-					data, err := d.Marshal()
-					if err != nil {
-						log.Println("Tidy Marshal: ", err)
-						return
-					}
-					n.store.put(key, append([]byte{byte(d.GetType())}, data...), k.ExpiredAt)
+					n.store.put(newEntry(key, d, k.ExpiredAt))
 				}()
 			}
 		}
@@ -115,24 +90,20 @@ func (n *Nodis) Recycle() {
 }
 
 // sync saves the data to disk
-func (n *Nodis) sync() error {
+func (n *Nodis) sync() []*Entry {
+	entries := make([]*Entry, 0)
 	n.keys.Iter(func(key string, k *Key) bool {
-		if !k.changed {
+		if !k.changed || k.expired() {
 			return false
 		}
 		d, ok := n.dataStructs.Get(key)
 		if !ok {
 			return false
 		}
-		data, err := d.Marshal()
-		if err != nil {
-			log.Println("Sync Marshal: ", err)
-		}
-		k.changed = false
-		n.store.put(key, append([]byte{byte(d.GetType())}, data...), k.ExpiredAt)
+		entries = append(entries, newEntry(key, d, k.ExpiredAt))
 		return false
 	})
-	return nil
+	return entries
 }
 
 // Close the store
@@ -140,7 +111,10 @@ func (n *Nodis) Close() error {
 	n.Lock()
 	defer n.Unlock()
 	// save values to disk
-	n.sync()
+	entries := n.sync()
+	for _, entry := range entries {
+		n.store.put(entry)
+	}
 	return n.store.close()
 }
 
@@ -166,57 +140,22 @@ func (n *Nodis) getDs(key string, newFn func() ds.DataStruct, ttl int64) (*Key, 
 }
 
 // Clear removes all keys from the store
-func (n *Nodis) Clear(key string) {
+func (n *Nodis) Clear() {
 	n.Lock()
 	defer n.Unlock()
-	_, ok := n.exists(key)
-	if !ok {
-		return
+	n.dataStructs.Clear()
+	n.keys.Clear()
+	err := n.store.clear()
+	if err != nil {
+		log.Println("Clear: ", err)
 	}
-	n.dataStructs.Delete(key)
-	n.keys.Delete(key)
-	n.store.clear()
 }
 
-func parseDs(data []byte) (d ds.DataStruct) {
-	dataType := ds.DataType(data[0])
-	data = data[1:]
-	switch dataType {
-	case ds.String:
-		s := str.NewString()
-		err := s.Unmarshal(data)
-		if err != nil {
-			log.Println("String: Unmarshal ", err)
-		}
-		d = s
-	case ds.ZSet:
-		z := zset.NewSortedSet()
-		err := z.Unmarshal(data)
-		if err != nil {
-			log.Println("ZSET: Unmarshal ", err)
-		}
-		d = z
-	case ds.List:
-		l := list.NewDoublyLinkedList()
-		err := l.Unmarshal(data)
-		if err != nil {
-			log.Println("LIST: Unmarshal ", err)
-		}
-		d = l
-	case ds.Hash:
-		h := hash.NewHashMap()
-		err := h.Unmarshal(data)
-		if err != nil {
-			log.Println("HASH: Unmarshal ", err)
-		}
-		d = h
-	case ds.Set:
-		s := set.NewSet()
-		err := s.Unmarshal(data)
-		if err != nil {
-			log.Println("SET: Unmarshal ", err)
-		}
-		d = s
+func parseDs(data []byte) (*Entry, error) {
+	entry := &Entry{}
+	err := entry.Unmarshal(data)
+	if err != nil {
+		return nil, err
 	}
-	return
+	return entry, nil
 }

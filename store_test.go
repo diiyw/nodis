@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/diiyw/nodis/ds/str"
 )
 
 func TestStorePut(t *testing.T) {
@@ -18,9 +20,11 @@ func TestStorePut(t *testing.T) {
 	// Generate a random key and value for testing
 	key := "testKey"
 	value := []byte("testValue")
-
+	ds := str.NewString()
+	ds.Set(value)
+	e := newEntry(key, ds, time.Now().Unix())
 	// Call the put method
-	err := store.put(key, value, time.Now().Unix())
+	err := store.put(newEntry(key, ds, time.Now().Unix()))
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
@@ -38,8 +42,9 @@ func TestStorePut(t *testing.T) {
 	if index.Offset != 0 {
 		t.Errorf("Expected Offset to be 0, got %d", index.Offset)
 	}
-	if index.Size != uint32(len(value)) {
-		t.Errorf("Expected Size to be %d, got %d", len(value), index.Size)
+	v, _ := e.Marshal()
+	if index.Size != uint32(len(v)) {
+		t.Errorf("Expected Size to be %d, got %d", len(v), index.Size)
 	}
 	if index.ExpiredAt <= 0 {
 		t.Errorf("Expected ExpiredAt to be greater than 0, got %d", index.ExpiredAt)
@@ -57,8 +62,8 @@ func TestStorePut(t *testing.T) {
 		t.Fatalf("Failed to read aof file: %v", err)
 	}
 
-	if !bytes.Equal(aofData, value) {
-		t.Errorf("Expected aof data to be %v, got %v", value, aofData)
+	if !bytes.Equal(aofData, v) {
+		t.Errorf("Expected aof data to be %v, got %v", v, aofData)
 	}
 }
 
@@ -118,7 +123,10 @@ func TestStoreMultiPut(t *testing.T) {
 	}
 
 	for key, value := range kv {
-		err := store.put(key, value, time.Now().Unix()+3600)
+		ds := str.NewString()
+		ds.Set(value)
+		// Call the put method
+		err := store.put(newEntry(key, ds, time.Now().Unix()+3600))
 		if err != nil {
 			t.Fatalf("Failed to put key-value pair: %v", err)
 		}
@@ -169,7 +177,10 @@ func TestStoreMultiFilePut(t *testing.T) {
 
 	for _, m := range kv {
 		for key, value := range m {
-			err := store.put(key, value, time.Now().Unix()+3600)
+			ds := str.NewString()
+			ds.Set(value)
+			// Call the put method
+			err := store.put(newEntry(key, ds, time.Now().Unix()+3600))
 			if err != nil {
 				t.Fatalf("Failed to put key-value pair: %v", err)
 			}
@@ -202,9 +213,10 @@ func TestStoreRemove(t *testing.T) {
 	// Generate a random key and value for testing
 	key := "testKey"
 	value := []byte("testValue")
-
+	ds := str.NewString()
+	ds.Set(value)
 	// Call the put method
-	err := store.put(key, value, time.Now().Unix())
+	err := store.put(newEntry(key, ds, time.Now().Unix()+3600))
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}

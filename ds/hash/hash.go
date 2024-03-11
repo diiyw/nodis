@@ -161,13 +161,13 @@ func (s *HashMap) HScan(cursor int, match string, count int) (int, map[string][]
 }
 
 // Marshal the set to bytes
-func (s *HashMap) Marshal() ([]byte, error) {
+func (s *HashMap) MarshalBinary() ([]byte, error) {
 	var data = s.HGetAll()
 	return binary.Marshal(data)
 }
 
 // Unmarshal the set from bytes
-func (s *HashMap) Unmarshal(data []byte) error {
+func (s *HashMap) UnmarshalBinary(data []byte) error {
 	var values map[string][]byte
 	if err := binary.Unmarshal(data, &values); err != nil {
 		return err

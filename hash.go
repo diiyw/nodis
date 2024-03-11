@@ -105,7 +105,7 @@ func (n *Nodis) HMGet(key string, fields ...string) [][]byte {
 }
 
 func (n *Nodis) HClear(key string) {
-	n.Clear(key)
+	n.Del(key)
 }
 
 func (n *Nodis) HScan(key string, cursor int, match string, count int) (int, map[string][]byte) {

@@ -1,8 +1,8 @@
 package ds
 
 type DataStruct interface {
-	Marshal() ([]byte, error)
-	Unmarshal([]byte) error
+	MarshalBinary() ([]byte, error)
+	UnmarshalBinary([]byte) error
 	Lock()
 	Unlock()
 	RLock()

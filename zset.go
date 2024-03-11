@@ -180,5 +180,5 @@ func (n *Nodis) ZExists(key string, member string) bool {
 }
 
 func (n *Nodis) ZClear(key string) {
-	n.Clear(key)
+	n.Del(key)
 }

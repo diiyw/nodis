@@ -35,12 +35,12 @@ func (s *String) Get() []byte {
 	return s.V
 }
 
-// Marshal the string to bytes
-func (s *String) Marshal() ([]byte, error) {
+// MarshalBinary the string to bytes
+func (s *String) MarshalBinary() ([]byte, error) {
 	return binary.Marshal(s.V)
 }
 
-// Unmarshal the bytes to string
-func (s *String) Unmarshal(data []byte) error {
+// UnmarshalBinary the bytes to string
+func (s *String) UnmarshalBinary(data []byte) error {
 	return binary.Unmarshal(data, &s.V)
 }

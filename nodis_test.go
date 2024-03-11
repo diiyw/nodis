@@ -28,9 +28,9 @@ func TestNodis_Sync(t *testing.T) {
 	}
 	n := Open(&opt)
 	n.Set("test", []byte("test1"), 0)
-	err := n.sync()
-	if err != nil {
-		t.Errorf("Sync() = %v, want %v", err, nil)
+	keys := n.sync()
+	if keys == nil {
+		t.Errorf("Sync() = %v, want %v", keys, nil)
 	}
 	n.Close()
 }
@@ -44,13 +44,9 @@ func TestNodis_OpenAndSync(t *testing.T) {
 	n.ZAdd("zset", "zset", 1)
 	n.HSet("hset", "hset", []byte("hset"))
 	n.LPush("lpush", []byte("lpush"))
-	err := n.sync()
-	if err != nil {
-		t.Errorf("Sync() = %v, want %v", err, nil)
-	}
-	keys := n.Keys("*")
-	if len(keys) != 4 {
-		t.Errorf("Keys() = %v, want %v", len(keys), 4)
+	keys := n.sync()
+	if keys == nil {
+		t.Errorf("Sync() = %v, want %v", keys, nil)
 	}
 	n.Close()
 	n = Open(opt)

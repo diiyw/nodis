@@ -318,7 +318,7 @@ func (sortedSet *SortedSet) ZIncrBy(member string, score float64) float64 {
 	return element.Score + score
 }
 
-func (sortedSet *SortedSet) Marshal() ([]byte, error) {
+func (sortedSet *SortedSet) MarshalBinary() ([]byte, error) {
 	var m = make(map[string]*Item)
 	sortedSet.dict.Iter(func(key string, value *Item) bool {
 		m[key] = value
@@ -327,7 +327,7 @@ func (sortedSet *SortedSet) Marshal() ([]byte, error) {
 	return binary.Marshal(m)
 }
 
-func (sortedSet *SortedSet) Unmarshal(data []byte) error {
+func (sortedSet *SortedSet) UnmarshalBinary(data []byte) error {
 	var m = make(map[string]*Item)
 	err := binary.Unmarshal(data, &m)
 	if err != nil {
