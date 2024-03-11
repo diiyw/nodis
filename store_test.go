@@ -11,7 +11,7 @@ import (
 
 func TestStorePut(t *testing.T) {
 	tempDir := "testdata"
-
+	os.RemoveAll(tempDir)
 	// Create a new Store instance
 	store := newStore(tempDir, 1024)
 
@@ -32,8 +32,8 @@ func TestStorePut(t *testing.T) {
 	}
 
 	// Verify the index values
-	if index.ChunkID != 0 {
-		t.Errorf("Expected ChunkID to be 0, got %d", index.ChunkID)
+	if index.FileID != 0 {
+		t.Errorf("Expected FileID to be 0, got %d", index.FileID)
 	}
 	if index.Offset != 0 {
 		t.Errorf("Expected Offset to be 0, got %d", index.Offset)
@@ -86,7 +86,7 @@ func TestStoreGet(t *testing.T) {
 
 	// Create an index entry for the key
 	store.index.Put(key, &index{
-		ChunkID:   0,
+		FileID:    0,
 		Offset:    0,
 		Size:      uint32(len(value)),
 		ExpiredAt: time.Now().Unix(),

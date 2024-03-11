@@ -7,8 +7,8 @@ import (
 
 func TestKey_Expire(t *testing.T) {
 	n := Open(&Options{
-		Path:         "testdata",
-		TidyDuration: 60 * time.Second,
+		Path:            "testdata",
+		RecycleDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"), 1)
 	time.Sleep(2 * time.Second)

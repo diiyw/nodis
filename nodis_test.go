@@ -9,8 +9,9 @@ import (
 
 func TestNodis_Open(t *testing.T) {
 	opt := Options{
-		Path:         "testdata",
-		TidyDuration: 60 * time.Second,
+		Path:            "testdata",
+		RecycleDuration: 60 * time.Second,
+		FileSize:        GB,
 	}
 	got := Open(&opt)
 	if got == nil {
@@ -19,20 +20,19 @@ func TestNodis_Open(t *testing.T) {
 }
 
 func TestNodis_Sync(t *testing.T) {
+	os.RemoveAll("testdata")
 	opt := Options{
-		Path:         "testdata",
-		TidyDuration: 60 * time.Second,
+		Path:            "testdata",
+		RecycleDuration: 60 * time.Second,
+		FileSize:        GB,
 	}
 	n := Open(&opt)
-	defer func() {
-		_, _ = os.ReadFile("testdata/nodis.db")
-		_, _ = os.ReadFile("testdata/nodis.meta")
-	}()
 	n.Set("test", []byte("test1"), 0)
 	err := n.sync()
 	if err != nil {
 		t.Errorf("Sync() = %v, want %v", err, nil)
 	}
+	n.Close()
 }
 
 func TestNodis_OpenAndSync(t *testing.T) {
@@ -47,6 +47,10 @@ func TestNodis_OpenAndSync(t *testing.T) {
 	err := n.sync()
 	if err != nil {
 		t.Errorf("Sync() = %v, want %v", err, nil)
+	}
+	keys := n.Keys("*")
+	if len(keys) != 4 {
+		t.Errorf("Keys() = %v, want %v", len(keys), 4)
 	}
 	n.Close()
 	n = Open(opt)
@@ -69,11 +73,11 @@ func TestNodis_OpenAndSync(t *testing.T) {
 }
 
 func TestNodis_OpenAndSyncBigdata10000(t *testing.T) {
-	_ = os.Remove("testdata/nodis.db")
-	_ = os.Remove("testdata/nodis.meta")
+	_ = os.RemoveAll("testdata")
 	opt := Options{
-		Path:         "testdata",
-		TidyDuration: 60 * time.Second,
+		Path:            "testdata",
+		RecycleDuration: 60 * time.Second,
+		FileSize:        GB,
 	}
 	n := Open(&opt)
 	for i := 0; i < 10000; i++ {
@@ -89,9 +93,9 @@ func TestNodis_OpenAndSyncBigdata10000(t *testing.T) {
 	for i := 30000; i < 40000; i++ {
 		n.LPush("lpush", []byte(strconv.Itoa(i)))
 	}
-	err := n.sync()
+	err := n.Close()
 	if err != nil {
-		t.Errorf("Sync() = %v, want %v", err, nil)
+		t.Errorf("Close() = %v, want %v", err, nil)
 	}
 	n = Open(&opt)
 	for i := 0; i < 10000; i++ {
@@ -120,4 +124,15 @@ func TestNodis_OpenAndSyncBigdata10000(t *testing.T) {
 			t.Errorf("LPop() = %s, want %v", v, strconv.Itoa(9999-i))
 		}
 	}
+}
+
+func BenchmarkNodis_SetSame(b *testing.B) {
+	_ = os.RemoveAll("testdata")
+	opt := DefaultOptions
+	opt.Path = "testdata"
+	n := Open(opt)
+	for i := 0; i < b.N; i++ {
+		n.Set("test", []byte("test"), 0)
+	}
+	n.Close()
 }

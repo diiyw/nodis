@@ -12,6 +12,7 @@ type Key struct {
 	Type      ds.DataType
 	ExpiredAt int64
 	lastUse   int64
+	changed   bool
 }
 
 func newKey(typ ds.DataType, seconds int64) *Key {
@@ -19,6 +20,7 @@ func newKey(typ ds.DataType, seconds int64) *Key {
 	if seconds != 0 {
 		k.ExpiredAt = seconds + time.Now().Unix()
 	}
+	k.changed = true
 	return k
 }
 
@@ -37,6 +39,7 @@ func (n *Nodis) getKey(key string) (*Key, bool) {
 	if k.expired() {
 		n.keys.Delete(key)
 		n.dataStructs.Delete(key)
+		n.store.remove(key)
 		ok = false
 	}
 	return k, ok
@@ -44,25 +47,26 @@ func (n *Nodis) getKey(key string) (*Key, bool) {
 
 // Del a key
 func (n *Nodis) Del(key string) {
-	ds := n.getDs(key, nil, 0)
+	_, ds := n.getDs(key, nil, 0)
 	ds.Lock()
 	n.Lock()
 	n.dataStructs.Delete(key)
 	n.keys.Delete(key)
+	n.store.remove(key)
 	n.Unlock()
 	ds.Unlock()
 }
 
 func (n *Nodis) Exists(key string) bool {
 	n.RLock()
-	ok := n.exists(key)
+	_, ok := n.exists(key)
 	n.RUnlock()
 	return ok
 }
 
 // exists checks if a key exists
-func (n *Nodis) exists(key string) bool {
-	_, ok := n.getKey(key)
+func (n *Nodis) exists(key string) (k *Key, ok bool) {
+	k, ok = n.getKey(key)
 	if !ok {
 		// try get from store
 		v, err := n.store.get(key)
@@ -70,12 +74,15 @@ func (n *Nodis) exists(key string) bool {
 			d := parseDs(v)
 			if d != nil {
 				n.dataStructs.Put(key, d)
-				n.keys.Put(key, newKey(d.GetType(), 0))
-				return true
+				k = newKey(d.GetType(), 0)
+				k.changed = false
+				ok = true
+				n.keys.Put(key, k)
+				return
 			}
 		}
 	}
-	return ok
+	return
 }
 
 // Expire the keys
@@ -87,6 +94,7 @@ func (n *Nodis) Expire(key string, seconds int64) {
 		return
 	}
 	k.ExpiredAt += seconds
+	k.changed = true
 	n.Unlock()
 }
 
@@ -99,6 +107,7 @@ func (n *Nodis) ExpireAt(key string, timestamp time.Time) {
 		return
 	}
 	k.ExpiredAt = timestamp.Unix()
+	k.changed = true
 	n.Unlock()
 }
 
@@ -111,7 +120,7 @@ func (n *Nodis) Keys(pattern string) []string {
 		if matched && !k.expired() {
 			keys = append(keys, key)
 		}
-		return true
+		return false
 	})
 	n.RUnlock()
 	return keys
@@ -145,6 +154,7 @@ func (n *Nodis) Rename(key, newKey string) error {
 	n.dataStructs.Delete(key)
 	n.dataStructs.Put(newKey, v)
 	n.keys.Delete(key)
+	k.changed = true
 	n.keys.Put(newKey, k)
 	n.Unlock()
 	return nil

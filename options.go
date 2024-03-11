@@ -14,21 +14,21 @@ type Options struct {
 	// Path is the path to the database.
 	Path string
 
-	// TidyDuration is the interval at which the database is tidied.
+	// RecycleDuration is the interval at which the database is recycled .
 	// This is useful for reducing the risk of data loss in the event of a crash.
 	// It is also used for refreshing hot keys.
-	TidyDuration time.Duration
+	RecycleDuration time.Duration
 
-	// ChunkSize is the size of each chunk. The default value is 512MB.
-	ChunkSize int64
+	// FileSize is the size of each file. The default value is 1GB.
+	FileSize int64
 
 	// SnapshotDuration is the interval at which the database is snapshotted.
+	// Default 0 for disabling snapshot. and you can call Snapshot manually.
 	SnapshotDuration time.Duration
 }
 
 var DefaultOptions = &Options{
-	Path:             "data",
-	ChunkSize:        512 * MB,
-	TidyDuration:     60 * time.Second,
-	SnapshotDuration: time.Hour,
+	Path:            "data",
+	FileSize:        GB,
+	RecycleDuration: 60 * time.Second,
 }

@@ -11,13 +11,14 @@ func (n *Nodis) newStr() ds.DataStruct {
 
 // Set a key with a value and a TTL
 func (n *Nodis) Set(key string, value []byte, ttl int64) {
-	s := n.getDs(key, n.newStr, ttl)
+	k, s := n.getDs(key, n.newStr, ttl)
+	k.changed = true
 	s.(*str.String).Set(value)
 }
 
 // Get a key
 func (n *Nodis) Get(key string) []byte {
-	s := n.getDs(key, nil, 0)
+	_, s := n.getDs(key, nil, 0)
 	if s == nil {
 		return nil
 	}

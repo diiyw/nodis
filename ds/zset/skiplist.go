@@ -9,8 +9,8 @@ const (
 	maxLevel = 16
 )
 
-// Element is a key-score pair
-type Element struct {
+// Item is a key-score pair
+type Item struct {
 	Member string
 	Score  float64
 }
@@ -22,7 +22,7 @@ type Level struct {
 }
 
 type node struct {
-	Element
+	Item
 	backward *node
 	level    []*Level // level[0] is base level
 }
@@ -36,7 +36,7 @@ type skiplist struct {
 
 func newNode(level int16, score float64, member string) *node {
 	n := &node{
-		Element: Element{
+		Item: Item{
 			Score:  score,
 			Member: member,
 		},
@@ -219,12 +219,12 @@ func (skiplist *skiplist) hasInRange(min float64, max float64) bool {
 
 	// min > tail
 	n := skiplist.tail
-	if n == nil || min >= n.Element.Score {
+	if n == nil || min >= n.Item.Score {
 		return false
 	}
 	// max < head
 	n = skiplist.header.level[0].forward
-	if n == nil || max <= n.Element.Score {
+	if n == nil || max <= n.Item.Score {
 		return false
 	}
 	return true
@@ -238,13 +238,13 @@ func (skiplist *skiplist) getFirstInRange(min float64, max float64) *node {
 	// scan from top level
 	for level := skiplist.level - 1; level >= 0; level-- {
 		// if forward is not in range than move forward
-		for n.level[level].forward != nil && min >= n.level[level].forward.Element.Score {
+		for n.level[level].forward != nil && min >= n.level[level].forward.Item.Score {
 			n = n.level[level].forward
 		}
 	}
 	/* This is an inner range, so the next node cannot be NULL. */
 	n = n.level[0].forward
-	if max <= n.Element.Score {
+	if max <= n.Item.Score {
 		return nil
 	}
 	return n
@@ -257,24 +257,24 @@ func (skiplist *skiplist) getLastInRange(min float64, max float64) *node {
 	n := skiplist.header
 	// scan from top level
 	for level := skiplist.level - 1; level >= 0; level-- {
-		for n.level[level].forward != nil && max > n.level[level].forward.Element.Score {
+		for n.level[level].forward != nil && max > n.level[level].forward.Item.Score {
 			n = n.level[level].forward
 		}
 	}
-	if min >= n.Element.Score {
+	if min >= n.Item.Score {
 		return nil
 	}
 	return n
 }
 
-func (skiplist *skiplist) removeRange(min float64, max float64, limit int) (removed []*Element) {
+func (skiplist *skiplist) removeRange(min float64, max float64, limit int) (removed []*Item) {
 	update := make([]*node, maxLevel)
-	removed = make([]*Element, 0)
+	removed = make([]*Item, 0)
 	// find backward nodes (of target range) or last node of each level
 	node := skiplist.header
 	for i := skiplist.level - 1; i >= 0; i-- {
 		for node.level[i].forward != nil {
-			if min < node.level[i].forward.Element.Score { // already in range
+			if min < node.level[i].forward.Item.Score { // already in range
 				break
 			}
 			node = node.level[i].forward
@@ -287,11 +287,11 @@ func (skiplist *skiplist) removeRange(min float64, max float64, limit int) (remo
 
 	// remove nodes in range
 	for node != nil {
-		if max <= node.Element.Score { // already out of range
+		if max <= node.Item.Score { // already out of range
 			break
 		}
 		next := node.level[0].forward
-		removedElement := node.Element
+		removedElement := node.Item
 		removed = append(removed, &removedElement)
 		skiplist.removeNode(node, update)
 		if limit > 0 && len(removed) == limit {
@@ -303,10 +303,10 @@ func (skiplist *skiplist) removeRange(min float64, max float64, limit int) (remo
 }
 
 // 1-based rank, including start, exclude stop
-func (skiplist *skiplist) removeRangeByRank(start int64, stop int64) (removed []*Element) {
+func (skiplist *skiplist) removeRangeByRank(start int64, stop int64) (removed []*Item) {
 	var i int64 = 0 // rank of iterator
 	update := make([]*node, maxLevel)
-	removed = make([]*Element, 0)
+	removed = make([]*Item, 0)
 
 	// scan from top level
 	node := skiplist.header
@@ -324,7 +324,7 @@ func (skiplist *skiplist) removeRangeByRank(start int64, stop int64) (removed []
 	// remove nodes in range
 	for node != nil && i < stop {
 		next := node.level[0].forward
-		removedElement := node.Element
+		removedElement := node.Item
 		removed = append(removed, &removedElement)
 		skiplist.removeNode(node, update)
 		node = next

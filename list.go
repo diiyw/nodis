@@ -14,22 +14,25 @@ func (n *Nodis) newList() ds.DataStruct {
 }
 
 func (n *Nodis) LPush(key string, values ...[]byte) {
-	l := n.getDs(key, n.newList, 0)
+	k, l := n.getDs(key, n.newList, 0)
+	k.changed = true
 	l.(*list.DoublyLinkedList).LPush(values...)
 }
 
 func (n *Nodis) RPush(key string, values ...[]byte) {
-	l := n.getDs(key, n.newList, 0)
+	k, l := n.getDs(key, n.newList, 0)
+	k.changed = true
 	for _, v := range values {
 		l.(*list.DoublyLinkedList).RPush(v)
 	}
 }
 
 func (n *Nodis) LPop(key string) []byte {
-	l := n.getDs(key, nil, 0)
+	k, l := n.getDs(key, nil, 0)
 	if l == nil {
 		return nil
 	}
+	k.changed = true
 	v := l.(*list.DoublyLinkedList).LPop()
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
 		n.Del(key)
@@ -38,10 +41,11 @@ func (n *Nodis) LPop(key string) []byte {
 }
 
 func (n *Nodis) RPop(key string) []byte {
-	l := n.getDs(key, nil, 0)
+	k, l := n.getDs(key, nil, 0)
 	if l == nil {
 		return nil
 	}
+	k.changed = true
 	v := l.(*list.DoublyLinkedList).RPop()
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
 		n.Del(key)
@@ -50,7 +54,7 @@ func (n *Nodis) RPop(key string) []byte {
 }
 
 func (n *Nodis) LLen(key string) int {
-	l := n.getDs(key, nil, 0)
+	_, l := n.getDs(key, nil, 0)
 	if l == nil {
 		return 0
 	}
@@ -58,7 +62,7 @@ func (n *Nodis) LLen(key string) int {
 }
 
 func (n *Nodis) LIndex(key string, index int) ([]byte, bool) {
-	l := n.getDs(key, nil, 0)
+	_, l := n.getDs(key, nil, 0)
 	if l == nil {
 		return nil, false
 	}
@@ -66,43 +70,49 @@ func (n *Nodis) LIndex(key string, index int) ([]byte, bool) {
 }
 
 func (n *Nodis) LInsert(key string, pivot, data []byte, before bool) int {
-	l := n.getDs(key, n.newList, 0)
+	k, l := n.getDs(key, n.newList, 0)
+	k.changed = true
 	return l.(*list.DoublyLinkedList).LInsert(pivot, data, before)
 }
 
 func (n *Nodis) LPushX(key string, data []byte) int {
-	l := n.getDs(key, n.newList, 0)
+	k, l := n.getDs(key, n.newList, 0)
+	k.changed = true
 	return l.(*list.DoublyLinkedList).LPushX(data)
 }
 
 func (n *Nodis) RPushX(key string, data []byte) int {
-	l := n.getDs(key, n.newList, 0)
+	k, l := n.getDs(key, n.newList, 0)
+	k.changed = true
 	return l.(*list.DoublyLinkedList).RPushX(data)
 }
 
 func (n *Nodis) LRem(key string, count int, data []byte) int {
-	l := n.getDs(key, nil, 0)
+	k, l := n.getDs(key, nil, 0)
 	if l == nil {
 		return 0
 	}
+	k.changed = true
 	return l.(*list.DoublyLinkedList).LRem(count, data)
 }
 
 func (n *Nodis) LSet(key string, index int, data []byte) bool {
-	l := n.getDs(key, n.newList, 0)
+	k, l := n.getDs(key, n.newList, 0)
+	k.changed = true
 	return l.(*list.DoublyLinkedList).LSet(index, data)
 }
 
 func (n *Nodis) LTrim(key string, start, stop int) {
-	l := n.getDs(key, nil, 0)
+	k, l := n.getDs(key, nil, 0)
 	if l == nil {
 		return
 	}
+	k.changed = true
 	l.(*list.DoublyLinkedList).LTrim(start, stop)
 }
 
 func (n *Nodis) LRange(key string, start, stop int) [][]byte {
-	l := n.getDs(key, nil, 0)
+	_, l := n.getDs(key, nil, 0)
 	if l == nil {
 		return nil
 	}
@@ -110,48 +120,57 @@ func (n *Nodis) LRange(key string, start, stop int) [][]byte {
 }
 
 func (n *Nodis) LPopRPush(source, destination string) []byte {
-	l := n.getDs(source, nil, 0)
+	k, l := n.getDs(source, nil, 0)
 	if l == nil {
 		return nil
 	}
+	k.changed = true
 	v := l.(*list.DoublyLinkedList).LPop()
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
 		n.dataStructs.Delete(source)
 		n.keys.Delete(source)
 	}
-	if !n.exists(destination) {
+	destinationKey, ok := n.exists(destination)
+	if !ok {
 		n.dataStructs.Put(destination, list.NewDoublyLinkedList())
-		n.keys.Put(destination, newKey(ds.List, 0))
+		destinationKey = newKey(ds.List, 0)
+		n.keys.Put(destination, destinationKey)
 	}
+	destinationKey.changed = true
 	l, _ = n.dataStructs.Get(destination)
 	l.(*list.DoublyLinkedList).RPush(v)
 	return v
 }
 
 func (n *Nodis) RPopLPush(source, destination string) []byte {
-	l := n.getDs(source, nil, 0)
+	k, l := n.getDs(source, nil, 0)
 	if l == nil {
 		return nil
 	}
+	k.changed = true
 	v := l.(*list.DoublyLinkedList).RPop()
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
 		n.dataStructs.Delete(source)
 		n.keys.Delete(source)
 	}
-	if !n.exists(destination) {
+	destinationKey, ok := n.exists(destination)
+	if !ok {
 		n.dataStructs.Put(destination, list.NewDoublyLinkedList())
-		n.keys.Put(destination, newKey(ds.List, 0))
+		destinationKey = newKey(ds.List, 0)
+		n.keys.Put(destination, destinationKey)
 	}
+	destinationKey.changed = true
 	l, _ = n.dataStructs.Get(destination)
 	l.(*list.DoublyLinkedList).LPush(v)
 	return v
 }
 
 func (n *Nodis) BLPop(key string, timeout time.Duration) []byte {
-	l := n.getDs(key, nil, 0)
+	k, l := n.getDs(key, nil, 0)
 	if l == nil {
 		return nil
 	}
+	k.changed = true
 	v := l.(*list.DoublyLinkedList).BLPop(timeout)
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
 		n.dataStructs.Delete(key)
@@ -161,10 +180,11 @@ func (n *Nodis) BLPop(key string, timeout time.Duration) []byte {
 }
 
 func (n *Nodis) BRPop(key string, timeout time.Duration) []byte {
-	l := n.getDs(key, nil, 0)
+	k, l := n.getDs(key, nil, 0)
 	if l == nil {
 		return nil
 	}
+	k.changed = true
 	v := l.(*list.DoublyLinkedList).BRPop(timeout)
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
 		n.dataStructs.Delete(key)

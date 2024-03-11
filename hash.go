@@ -10,12 +10,13 @@ func (n *Nodis) newHash() ds.DataStruct {
 }
 
 func (n *Nodis) HSet(key string, field string, value []byte) {
-	h := n.getDs(key, n.newHash, 0)
+	k, h := n.getDs(key, n.newHash, 0)
+	k.changed = true
 	h.(*hash.HashMap).HSet(field, value)
 }
 
 func (n *Nodis) HGet(key string, field string) []byte {
-	h := n.getDs(key, nil, 0)
+	_, h := n.getDs(key, nil, 0)
 	if h == nil {
 		return nil
 	}
@@ -23,10 +24,11 @@ func (n *Nodis) HGet(key string, field string) []byte {
 }
 
 func (n *Nodis) HDel(key string, field string) {
-	h := n.getDs(key, nil, 0)
+	k, h := n.getDs(key, nil, 0)
 	if h == nil {
 		return
 	}
+	k.changed = true
 	h.(*hash.HashMap).HDel(field)
 	if h.(*hash.HashMap).HLen() == 0 {
 		n.dataStructs.Delete(key)
@@ -35,7 +37,7 @@ func (n *Nodis) HDel(key string, field string) {
 }
 
 func (n *Nodis) HLen(key string) int {
-	h := n.getDs(key, nil, 0)
+	_, h := n.getDs(key, nil, 0)
 	if h == nil {
 		return 0
 	}
@@ -43,7 +45,7 @@ func (n *Nodis) HLen(key string) int {
 }
 
 func (n *Nodis) HKeys(key string) []string {
-	h := n.getDs(key, nil, 0)
+	_, h := n.getDs(key, nil, 0)
 	if h == nil {
 		return nil
 	}
@@ -51,7 +53,7 @@ func (n *Nodis) HKeys(key string) []string {
 }
 
 func (n *Nodis) HExists(key string, field string) bool {
-	h := n.getDs(key, nil, 0)
+	_, h := n.getDs(key, nil, 0)
 	if h == nil {
 		return false
 	}
@@ -59,7 +61,7 @@ func (n *Nodis) HExists(key string, field string) bool {
 }
 
 func (n *Nodis) HGetAll(key string) map[string][]byte {
-	h := n.getDs(key, nil, 0)
+	_, h := n.getDs(key, nil, 0)
 	if h == nil {
 		return nil
 	}
@@ -67,31 +69,35 @@ func (n *Nodis) HGetAll(key string) map[string][]byte {
 }
 
 func (n *Nodis) HIncrBy(key string, field string, value int64) int64 {
-	h := n.getDs(key, n.newHash, 0)
+	k, h := n.getDs(key, n.newHash, 0)
+	k.changed = true
 	return h.(*hash.HashMap).HIncrBy(field, value)
 }
 
 func (n *Nodis) HIncrByFloat(key string, field string, value float64) float64 {
-	h := n.getDs(key, n.newHash, 0)
+	k, h := n.getDs(key, n.newHash, 0)
+	k.changed = true
 	return h.(*hash.HashMap).HIncrByFloat(field, value)
 }
 
 func (n *Nodis) HSetNX(key string, field string, value []byte) bool {
-	h := n.getDs(key, nil, 0)
+	k, h := n.getDs(key, nil, 0)
 	if h != nil {
 		return false
 	}
+	k.changed = true
 	n.HSet(key, field, value)
 	return true
 }
 
 func (n *Nodis) HMSet(key string, fields map[string][]byte) {
-	h := n.getDs(key, n.newHash, 0)
+	k, h := n.getDs(key, n.newHash, 0)
+	k.changed = true
 	h.(*hash.HashMap).HMSet(fields)
 }
 
 func (n *Nodis) HMGet(key string, fields ...string) [][]byte {
-	h := n.getDs(key, nil, 0)
+	_, h := n.getDs(key, nil, 0)
 	if h == nil {
 		return nil
 	}
@@ -103,7 +109,7 @@ func (n *Nodis) HClear(key string) {
 }
 
 func (n *Nodis) HScan(key string, cursor int, match string, count int) (int, map[string][]byte) {
-	h := n.getDs(key, nil, 0)
+	_, h := n.getDs(key, nil, 0)
 	if h == nil {
 		return 0, nil
 	}
@@ -111,7 +117,7 @@ func (n *Nodis) HScan(key string, cursor int, match string, count int) (int, map
 }
 
 func (n *Nodis) HVals(key string) [][]byte {
-	h := n.getDs(key, nil, 0)
+	_, h := n.getDs(key, nil, 0)
 	if h == nil {
 		return nil
 	}

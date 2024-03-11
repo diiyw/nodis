@@ -42,15 +42,12 @@ func Open(opt *Options) *Nodis {
 	} else if !stat.IsDir() {
 		panic("Path is not a directory")
 	}
-	n.store = newStore(opt.Path, opt.ChunkSize)
+	n.store = newStore(opt.Path, opt.FileSize)
 	go func() {
-		if opt.TidyDuration != 0 {
+		if opt.RecycleDuration != 0 {
 			for {
-				time.Sleep(opt.TidyDuration)
-				err := n.sync()
-				if err != nil {
-					log.Println("Sync: ", err)
-				}
+				time.Sleep(opt.RecycleDuration)
+				n.Recycle()
 			}
 		}
 	}()
@@ -58,7 +55,7 @@ func Open(opt *Options) *Nodis {
 		if opt.SnapshotDuration != 0 {
 			for {
 				time.Sleep(opt.SnapshotDuration)
-				n.Snapshot()
+				n.Snapshot(n.store.path)
 				log.Println("Snapshot at", time.Now().Format("2006-01-02 15:04:05"))
 			}
 		}
@@ -67,15 +64,13 @@ func Open(opt *Options) *Nodis {
 }
 
 // Snapshot saves the data to disk
-func (n *Nodis) Snapshot() {
-	n.RLock()
-	defer n.RUnlock()
-	n.Tidy()
-	n.store.snapshot()
+func (n *Nodis) Snapshot(path string) {
+	n.Recycle()
+	n.store.snapshot(path)
 }
 
-// Tidy removes expired keys
-func (n *Nodis) Tidy() {
+// Recycle removes expired and unused keys
+func (n *Nodis) Recycle() {
 	n.Lock()
 	defer n.Unlock()
 	n.keys.Iter(func(key string, k *Key) bool {
@@ -83,10 +78,37 @@ func (n *Nodis) Tidy() {
 			n.dataStructs.Delete(key)
 			n.keys.Delete(key)
 			n.store.remove(key)
+			return false
 		}
-		if k.lastUse < time.Now().Unix()-int64(n.options.TidyDuration.Seconds()) {
+		if k.lastUse != 0 && k.lastUse < time.Now().Unix()-int64(n.options.RecycleDuration.Seconds()) {
+			d, ok := n.dataStructs.Get(key)
 			n.dataStructs.Delete(key)
 			n.keys.Delete(key)
+			if ok {
+				go func() {
+					// save to disk
+					data, err := d.Marshal()
+					if err != nil {
+						log.Println("Tidy Marshal: ", err)
+						return
+					}
+					n.store.put(key, append([]byte{byte(d.GetType())}, data...), k.ExpiredAt)
+				}()
+			}
+		}
+		if !n.store.index.Has(key) {
+			d, ok := n.dataStructs.Get(key)
+			if ok {
+				go func() {
+					// save to disk
+					data, err := d.Marshal()
+					if err != nil {
+						log.Println("Tidy Marshal: ", err)
+						return
+					}
+					n.store.put(key, append([]byte{byte(d.GetType())}, data...), k.ExpiredAt)
+				}()
+			}
 		}
 		return false
 	})
@@ -95,6 +117,9 @@ func (n *Nodis) Tidy() {
 // sync saves the data to disk
 func (n *Nodis) sync() error {
 	n.keys.Iter(func(key string, k *Key) bool {
+		if !k.changed {
+			return false
+		}
 		d, ok := n.dataStructs.Get(key)
 		if !ok {
 			return false
@@ -103,6 +128,7 @@ func (n *Nodis) sync() error {
 		if err != nil {
 			log.Println("Sync Marshal: ", err)
 		}
+		k.changed = false
 		n.store.put(key, append([]byte{byte(d.GetType())}, data...), k.ExpiredAt)
 		return false
 	})
@@ -118,34 +144,38 @@ func (n *Nodis) Close() error {
 	return n.store.close()
 }
 
-func (n *Nodis) getDs(key string, newFn func() ds.DataStruct, ttl int64) ds.DataStruct {
+func (n *Nodis) getDs(key string, newFn func() ds.DataStruct, ttl int64) (*Key, ds.DataStruct) {
 	n.Lock()
 	defer n.Unlock()
-	if !n.exists(key) && newFn == nil {
-		return nil
+	k, ok := n.exists(key)
+	if !ok && newFn == nil {
+		return nil, nil
 	}
 	d, ok := n.dataStructs.Get(key)
 	if !ok {
 		if newFn != nil {
 			d = newFn()
 			n.dataStructs.Put(key, d)
-			n.keys.Put(key, newKey(d.GetType(), ttl))
-			return d
+			k = newKey(d.GetType(), ttl)
+			n.keys.Put(key, k)
+			return k, d
 		}
-		return nil
+		return nil, nil
 	}
-	return d
+	return k, d
 }
 
 // Clear removes all keys from the store
 func (n *Nodis) Clear(key string) {
 	n.Lock()
 	defer n.Unlock()
-	if !n.exists(key) {
+	_, ok := n.exists(key)
+	if !ok {
 		return
 	}
 	n.dataStructs.Delete(key)
 	n.keys.Delete(key)
+	n.store.clear()
 }
 
 func parseDs(data []byte) (d ds.DataStruct) {

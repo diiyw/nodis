@@ -12,14 +12,14 @@ import (
 // SortedSet is a set which keys sorted by bound score
 type SortedSet struct {
 	sync.RWMutex
-	dict     *swiss.Map[string, *Element]
+	dict     *swiss.Map[string, *Item]
 	skiplist *skiplist
 }
 
 // NewSortedSet makes a new SortedSet
 func NewSortedSet() *SortedSet {
 	return &SortedSet{
-		dict:     swiss.NewMap[string, *Element](16),
+		dict:     swiss.NewMap[string, *Item](16),
 		skiplist: makeSkiplist(),
 	}
 }
@@ -34,7 +34,7 @@ func (sortedSet *SortedSet) ZAdd(member string, score float64) bool {
 	sortedSet.Lock()
 	defer sortedSet.Unlock()
 	element, ok := sortedSet.dict.Get(member)
-	sortedSet.dict.Put(member, &Element{
+	sortedSet.dict.Put(member, &Item{
 		Member: member,
 		Score:  score,
 	})
@@ -110,7 +110,7 @@ func (sortedSet *SortedSet) ZScore(member string) float64 {
 }
 
 // forEachByRank visits each member which rank within [start, stop), sort by ascending order, rank starts from 0
-func (sortedSet *SortedSet) forEachByRank(start int64, stop int64, desc bool, consumer func(element *Element) bool) {
+func (sortedSet *SortedSet) forEachByRank(start int64, stop int64, desc bool, consumer func(element *Item) bool) {
 	size := sortedSet.ZCard()
 	if start < 0 || start >= size {
 		panic("illegal start " + strconv.FormatInt(start, 10))
@@ -135,7 +135,7 @@ func (sortedSet *SortedSet) forEachByRank(start int64, stop int64, desc bool, co
 
 	sliceSize := int(stop - start)
 	for i := 0; i < sliceSize; i++ {
-		if !consumer(&node.Element) {
+		if !consumer(&node.Item) {
 			break
 		}
 		if desc {
@@ -147,11 +147,11 @@ func (sortedSet *SortedSet) forEachByRank(start int64, stop int64, desc bool, co
 }
 
 // rangeByRank returns members which rank within [start, stop), sort by ascending order, rank starts from 0
-func (sortedSet *SortedSet) rangeByRank(start int64, stop int64, desc bool) []*Element {
+func (sortedSet *SortedSet) rangeByRank(start int64, stop int64, desc bool) []*Item {
 	sliceSize := int(stop - start)
-	slice := make([]*Element, sliceSize)
+	slice := make([]*Item, sliceSize)
 	i := 0
-	sortedSet.forEachByRank(start, stop, desc, func(element *Element) bool {
+	sortedSet.forEachByRank(start, stop, desc, func(element *Item) bool {
 		slice[i] = element
 		i++
 		return true
@@ -160,14 +160,14 @@ func (sortedSet *SortedSet) rangeByRank(start int64, stop int64, desc bool) []*E
 }
 
 // ZRange returns members which rank within [start, stop), sort by ascending order, rank starts from 0
-func (sortedSet *SortedSet) ZRange(start int64, stop int64) []*Element {
+func (sortedSet *SortedSet) ZRange(start int64, stop int64) []*Item {
 	sortedSet.RLock()
 	defer sortedSet.RUnlock()
 	return sortedSet.rangeByRank(start, stop, false)
 }
 
 // ZRevRange returns members which rank within [start, stop), sort by descending order, rank starts from 0
-func (sortedSet *SortedSet) ZRevRange(start int64, stop int64) []*Element {
+func (sortedSet *SortedSet) ZRevRange(start int64, stop int64) []*Item {
 	sortedSet.RLock()
 	defer sortedSet.RUnlock()
 	return sortedSet.rangeByRank(start, stop, true)
@@ -177,7 +177,7 @@ func (sortedSet *SortedSet) ZRevRange(start int64, stop int64) []*Element {
 func (sortedSet *SortedSet) rangeCount(min float64, max float64) int64 {
 	var i int64 = 0
 	// ascending order
-	sortedSet.forEachByRank(0, sortedSet.ZCard(), false, func(element *Element) bool {
+	sortedSet.forEachByRank(0, sortedSet.ZCard(), false, func(element *Item) bool {
 		gtMin := min < element.Score // greater than min
 		if !gtMin {
 			// has not into range, continue foreach
@@ -203,7 +203,7 @@ func (sortedSet *SortedSet) ZCount(min float64, max float64) int64 {
 }
 
 // forEach visits members which score or member within the given border
-func (sortedSet *SortedSet) forEach(min float64, max float64, offset int64, limit int64, desc bool, consumer func(element *Element) bool) {
+func (sortedSet *SortedSet) forEach(min float64, max float64, offset int64, limit int64, desc bool, consumer func(element *Item) bool) {
 	// find start node
 	var node *node
 	if desc {
@@ -223,7 +223,7 @@ func (sortedSet *SortedSet) forEach(min float64, max float64, offset int64, limi
 
 	// A negative limit returns all elements from the offset
 	for i := 0; (i < int(limit) || limit < 0) && node != nil; i++ {
-		if !consumer(&node.Element) {
+		if !consumer(&node.Item) {
 			break
 		}
 		if desc {
@@ -234,8 +234,8 @@ func (sortedSet *SortedSet) forEach(min float64, max float64, offset int64, limi
 		if node == nil {
 			break
 		}
-		gtMin := min < node.Element.Score // greater than min
-		ltMax := max > node.Element.Score
+		gtMin := min < node.Item.Score // greater than min
+		ltMax := max > node.Item.Score
 		if !gtMin || !ltMax {
 			break // break through score border
 		}
@@ -244,12 +244,12 @@ func (sortedSet *SortedSet) forEach(min float64, max float64, offset int64, limi
 
 // zRange returns members which score or member within the given border
 // param limit: <0 means no limit
-func (sortedSet *SortedSet) zRange(min float64, max float64, offset int64, limit int64, desc bool) []*Element {
+func (sortedSet *SortedSet) zRange(min float64, max float64, offset int64, limit int64, desc bool) []*Item {
 	if limit == 0 || offset < 0 {
-		return make([]*Element, 0)
+		return make([]*Item, 0)
 	}
-	slice := make([]*Element, 0)
-	sortedSet.forEach(min, max, offset, limit, desc, func(element *Element) bool {
+	slice := make([]*Item, 0)
+	sortedSet.forEach(min, max, offset, limit, desc, func(element *Item) bool {
 		slice = append(slice, element)
 		return true
 	})
@@ -293,14 +293,14 @@ func (sortedSet *SortedSet) ZExists(member string) bool {
 }
 
 // ZRangeByScore returns members which score or member within the given border
-func (sortedSet *SortedSet) ZRangeByScore(min float64, max float64) []*Element {
+func (sortedSet *SortedSet) ZRangeByScore(min float64, max float64) []*Item {
 	sortedSet.RLock()
 	defer sortedSet.RUnlock()
 	return sortedSet.zRange(min, max, 0, -1, false)
 }
 
 // ZRevRangeByScore returns members which score or member within the given border
-func (sortedSet *SortedSet) ZRevRangeByScore(min float64, max float64) []*Element {
+func (sortedSet *SortedSet) ZRevRangeByScore(min float64, max float64) []*Item {
 	sortedSet.RLock()
 	defer sortedSet.RUnlock()
 	return sortedSet.zRange(min, max, 0, -1, true)
@@ -319,8 +319,8 @@ func (sortedSet *SortedSet) ZIncrBy(member string, score float64) float64 {
 }
 
 func (sortedSet *SortedSet) Marshal() ([]byte, error) {
-	var m = make(map[string]*Element)
-	sortedSet.dict.Iter(func(key string, value *Element) bool {
+	var m = make(map[string]*Item)
+	sortedSet.dict.Iter(func(key string, value *Item) bool {
 		m[key] = value
 		return false
 	})
@@ -328,13 +328,13 @@ func (sortedSet *SortedSet) Marshal() ([]byte, error) {
 }
 
 func (sortedSet *SortedSet) Unmarshal(data []byte) error {
-	var m = make(map[string]*Element)
+	var m = make(map[string]*Item)
 	err := binary.Unmarshal(data, &m)
 	if err != nil {
 		return err
 	}
 	sortedSet.skiplist = makeSkiplist()
-	sortedSet.dict = swiss.NewMap[string, *Element](16)
+	sortedSet.dict = swiss.NewMap[string, *Item](16)
 	for k, v := range m {
 		sortedSet.ZAdd(k, v.Score)
 	}

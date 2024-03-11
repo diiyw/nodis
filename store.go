@@ -15,22 +15,23 @@ import (
 
 type store struct {
 	sync.RWMutex
-	chunkSize int64
+	fileSize  int64
 	aof       *os.File
 	path      string
 	current   string
 	index     *swiss.Map[string, *index]
-	chunkId   uint32
+	fileId    uint32
 	indexFile string
 }
 
-func newStore(path string, chunkSize int64) *store {
+func newStore(path string, fileSize int64) *store {
 	s := &store{
 		path:      path,
-		chunkSize: chunkSize,
+		fileSize:  fileSize,
 		index:     swiss.NewMap[string, *index](32),
 		indexFile: filepath.Join(path, "nodis.index"),
 	}
+	_ = os.MkdirAll(path, 0755)
 	data, _ := os.ReadFile(s.indexFile)
 	if len(data) >= 4 {
 		if len(data[4:]) > 0 {
@@ -43,11 +44,11 @@ func newStore(path string, chunkSize int64) *store {
 				s.index.Put(k, v)
 			}
 		}
-		s.chunkId = binary.LittleEndian.Uint32(data[:4])
+		s.fileId = binary.LittleEndian.Uint32(data[:4])
 	}
-	s.current = filepath.Join(path, "nodis."+strconv.Itoa(int(s.chunkId))+".aof")
+	s.current = filepath.Join(path, "nodis."+strconv.Itoa(int(s.fileId))+".aof")
 	var err error
-	s.aof, err = os.OpenFile(s.current, os.O_CREATE|os.O_RDWR|os.O_APPEND|os.O_SYNC, 0644)
+	s.aof, err = os.OpenFile(s.current, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
 		panic(err)
 	}
@@ -55,7 +56,7 @@ func newStore(path string, chunkSize int64) *store {
 }
 
 type index struct {
-	ChunkID   uint32
+	FileID    uint32
 	Offset    int64
 	Size      uint32
 	ExpiredAt int64
@@ -71,34 +72,44 @@ func (s *store) put(key string, value []byte, expiredAt int64) error {
 		return err
 	}
 	var offset = stat.Size()
-	if offset >= s.chunkSize {
+	if offset >= s.fileSize {
+		err = s.aof.Sync()
+		if err != nil {
+			return err
+		}
 		s.aof.Close()
-		// open file with new chunk id
-		s.chunkId++
-		s.current = filepath.Join(s.path, "nodis."+strconv.Itoa(int(s.chunkId))+".aof")
-		s.aof, err = os.OpenFile(s.current, os.O_CREATE|os.O_RDWR|os.O_APPEND|os.O_SYNC, 0644)
+		// open file with new file id
+		s.fileId++
+		s.current = filepath.Join(s.path, "nodis."+strconv.Itoa(int(s.fileId))+".aof")
+		s.aof, err = os.OpenFile(s.current, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 		if err != nil {
 			return err
 		}
 		// update index file
-		idxFi, err := os.OpenFile(s.indexFile, os.O_CREATE|os.O_RDWR|os.O_SYNC, 0644)
+		idxFi, err := os.OpenFile(s.indexFile, os.O_CREATE|os.O_RDWR, 0644)
 		if err != nil {
 			return err
 		}
-		defer idxFi.Close()
+		defer func() {
+			err := idxFi.Sync()
+			if err != nil {
+				log.Println("Index sync error: ", err)
+			}
+			idxFi.Close()
+		}()
 		_, err = idxFi.Seek(0, io.SeekStart)
 		if err != nil {
 			return err
 		}
 		var header = make([]byte, 4)
-		binary.LittleEndian.PutUint32(header, s.chunkId)
+		binary.LittleEndian.PutUint32(header, s.fileId)
 		_, err = idxFi.Write(header)
 		if err != nil {
 			return err
 		}
 		offset = 0
 	}
-	index.ChunkID = s.chunkId
+	index.FileID = s.fileId
 	index.Offset = offset
 	index.Size = uint32(len(value))
 	index.ExpiredAt = expiredAt
@@ -118,7 +129,7 @@ func (s *store) get(key string) ([]byte, error) {
 	if !ok {
 		return nil, nil
 	}
-	if index.ChunkID == s.chunkId {
+	if index.FileID == s.fileId {
 		data := make([]byte, index.Size)
 		_, err := s.aof.ReadAt(data, index.Offset)
 		if err != nil {
@@ -127,7 +138,7 @@ func (s *store) get(key string) ([]byte, error) {
 		return data, nil
 	}
 	// read from other file
-	file := filepath.Join(s.path, "nodis."+strconv.Itoa(int(index.ChunkID))+".aof")
+	file := filepath.Join(s.path, "nodis."+strconv.Itoa(int(index.FileID))+".aof")
 	f, err := os.Open(file)
 	if err != nil {
 		return nil, err
@@ -149,24 +160,24 @@ func (s *store) remove(key string) {
 }
 
 // snapshot the store
-func (s *store) snapshot() {
+func (s *store) snapshot(path string) {
 	s.RLock()
 	defer s.RUnlock()
 	var keys = make(map[string]int64, 0)
 	s.index.Iter(func(key string, value *index) bool {
-		if value.ExpiredAt > time.Now().Unix() {
+		if value.ExpiredAt == 0 || value.ExpiredAt > time.Now().Unix() {
 			keys[key] = value.ExpiredAt
 		}
 		return false
 	})
 	go func(snapshotKeys map[string]int64) {
-		snapshotDir := filepath.Join(s.path, "snapshots", time.Now().Format("20060102150405"))
+		snapshotDir := filepath.Join(path, "snapshots", time.Now().Format("20060102150405"))
 		err := os.MkdirAll(snapshotDir, 0755)
 		if err != nil {
 			log.Println("Snapshot mkdir error: ", err)
 			return
 		}
-		ns := newStore(snapshotDir, s.chunkSize)
+		ns := newStore(snapshotDir, s.fileSize)
 		for key, expiredAt := range snapshotKeys {
 			value, _ := s.get(key)
 			ns.put(key, value, expiredAt)
@@ -180,21 +191,31 @@ func (s *store) snapshot() {
 
 // close the store
 func (s *store) close() error {
-	err := s.aof.Close()
+	err := s.aof.Sync()
 	if err != nil {
 		return err
 	}
-	idxFi, err := os.OpenFile(s.indexFile+"~", os.O_CREATE|os.O_RDWR|os.O_SYNC|os.O_TRUNC, 0644)
+	err = s.aof.Close()
 	if err != nil {
 		return err
 	}
-	defer idxFi.Close()
+	idxFi, err := os.OpenFile(s.indexFile+"~", os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err := idxFi.Sync()
+		if err != nil {
+			log.Println("Close sync error: ", err)
+		}
+		idxFi.Close()
+	}()
 	_, err = idxFi.Seek(0, io.SeekStart)
 	if err != nil {
 		return err
 	}
 	var header = make([]byte, 4)
-	binary.LittleEndian.PutUint32(header, s.chunkId)
+	binary.LittleEndian.PutUint32(header, s.fileId)
 	_, err = idxFi.Write(header)
 	if err != nil {
 		return err
@@ -220,5 +241,21 @@ func (s *store) close() error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+// clear the store
+func (s *store) clear() error {
+	s.Lock()
+	defer s.Unlock()
+	err := s.aof.Close()
+	if err != nil {
+		return err
+	}
+	err = os.RemoveAll(s.path)
+	if err != nil {
+		return err
+	}
+	s.index.Clear()
 	return nil
 }
