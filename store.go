@@ -62,20 +62,16 @@ type index struct {
 	ExpiredAt int64
 }
 
-// put a key-value pair into store
-func (s *store) put(entry *Entry) error {
-	s.Lock()
-	defer s.Unlock()
-	var index = &index{}
+func (s *store) check() (int64, error) {
 	stat, err := s.aof.Stat()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	var offset = stat.Size()
 	if offset >= s.fileSize {
 		err = s.aof.Sync()
 		if err != nil {
-			return err
+			return 0, err
 		}
 		s.aof.Close()
 		// open file with new file id
@@ -83,12 +79,12 @@ func (s *store) put(entry *Entry) error {
 		s.current = filepath.Join(s.path, "nodis."+strconv.Itoa(int(s.fileId))+".aof")
 		s.aof, err = os.OpenFile(s.current, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		// update index file
 		idxFi, err := os.OpenFile(s.indexFile, os.O_CREATE|os.O_RDWR, 0644)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		defer func() {
 			err := idxFi.Sync()
@@ -99,15 +95,27 @@ func (s *store) put(entry *Entry) error {
 		}()
 		_, err = idxFi.Seek(0, io.SeekStart)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		var header = make([]byte, 4)
 		binary.LittleEndian.PutUint32(header, s.fileId)
 		_, err = idxFi.Write(header)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		offset = 0
+	}
+	return offset, nil
+}
+
+// put a key-value pair into store
+func (s *store) put(entry *Entry) error {
+	s.Lock()
+	defer s.Unlock()
+	var index = &index{}
+	offset, err := s.check()
+	if err != nil {
+		return err
 	}
 	data, err := entry.Marshal()
 	if err != nil {
@@ -118,6 +126,26 @@ func (s *store) put(entry *Entry) error {
 	index.Size = uint32(len(data))
 	index.ExpiredAt = entry.ExpiredAt
 	s.index.Put(entry.Key, index)
+	_, err = s.aof.Write(data)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *store) putRaw(key string, data []byte, expiredAt int64) error {
+	s.Lock()
+	defer s.Unlock()
+	var index = &index{}
+	offset, err := s.check()
+	if err != nil {
+		return err
+	}
+	index.FileID = s.fileId
+	index.Offset = offset
+	index.Size = uint32(len(data))
+	index.ExpiredAt = expiredAt
+	s.index.Put(key, index)
 	_, err = s.aof.Write(data)
 	if err != nil {
 		return err
@@ -167,7 +195,7 @@ func (s *store) remove(key string) {
 func (s *store) snapshot(path string, entries []*Entry) {
 	s.RLock()
 	defer s.RUnlock()
-	snapshotDir := filepath.Join(path, "snapshots", time.Now().Format("20060102150405"))
+	snapshotDir := filepath.Join(path, "snapshots", time.Now().Format("20060102_150405"))
 	err := os.MkdirAll(snapshotDir, 0755)
 	if err != nil {
 		log.Println("Snapshot mkdir error: ", err)
@@ -177,6 +205,22 @@ func (s *store) snapshot(path string, entries []*Entry) {
 	for _, entry := range entries {
 		ns.put(entry)
 	}
+	s.index.Iter(func(key string, index *index) bool {
+		if ns.index.Has(key) {
+			return false
+		}
+		data, err := s.get(key)
+		if err != nil {
+			log.Println("Snapshot get error: ", err)
+			return false
+		}
+		err = ns.putRaw(key, data, index.ExpiredAt)
+		if err != nil {
+			log.Println("Snapshot put error: ", err)
+			return false
+		}
+		return false
+	})
 	err = ns.close()
 	if err != nil {
 		log.Println("Snapshot save error: ", err)

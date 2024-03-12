@@ -45,7 +45,7 @@ func (e *Entry) Marshal() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	var buf = make([]byte, len(data)+1, len(data)+1)
+	var buf = make([]byte, len(data)+1)
 	buf[0] = byte(e.Value.GetType())
 	copy(buf[1:], data)
 	var block = entryBlock{
@@ -62,7 +62,7 @@ func (e *Entry) Unmarshal(data []byte) error {
 	if err := binary.Unmarshal(data, &block); err != nil {
 		return err
 	}
-	var buf = make([]byte, len(block.Body)+1, len(block.Body)+1)
+	var buf = make([]byte, len(block.Body)+1)
 	buf[0] = byte(block.Type)
 	copy(buf[1:], block.Body)
 	if block.Crc32 != crc32.ChecksumIEEE(buf) {

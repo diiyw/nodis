@@ -28,7 +28,7 @@ func TestNodis_Sync(t *testing.T) {
 	}
 	n := Open(&opt)
 	n.Set("test", []byte("test1"), 0)
-	keys := n.sync()
+	keys := n.getChangedEntries()
 	if keys == nil {
 		t.Errorf("Sync() = %v, want %v", keys, nil)
 	}
@@ -44,7 +44,7 @@ func TestNodis_OpenAndSync(t *testing.T) {
 	n.ZAdd("zset", "zset", 1)
 	n.HSet("hset", "hset", []byte("hset"))
 	n.LPush("lpush", []byte("lpush"))
-	keys := n.sync()
+	keys := n.getChangedEntries()
 	if keys == nil {
 		t.Errorf("Sync() = %v, want %v", keys, nil)
 	}
@@ -120,6 +120,29 @@ func TestNodis_OpenAndSyncBigdata10000(t *testing.T) {
 			t.Errorf("LPop() = %s, want %v", v, strconv.Itoa(9999-i))
 		}
 	}
+}
+
+func TestNodis_Snapshot(t *testing.T) {
+	_ = os.RemoveAll("testdata")
+	opt := DefaultOptions
+	opt.Path = "testdata"
+	n := Open(opt)
+	n.Set("test", []byte("test"), 0)
+	n.Snapshot("testdata")
+	n.Close()
+}
+
+func TestNodis_SnapshotChanged(t *testing.T) {
+	_ = os.RemoveAll("testdata")
+	opt := DefaultOptions
+	opt.Path = "testdata"
+	n := Open(opt)
+	n.Set("test", []byte("test"), 0)
+	n.Snapshot(opt.Path)
+	time.Sleep(time.Second)
+	n.Set("test", []byte("test_new"), 0)
+	n.Snapshot(opt.Path)
+	n.Close()
 }
 
 func BenchmarkNodis_SetSame(b *testing.B) {

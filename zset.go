@@ -48,7 +48,8 @@ func (n *Nodis) ZScore(key string, member string) float64 {
 }
 
 func (n *Nodis) ZIncrBy(key string, score float64, member string) float64 {
-	_, s := n.getDs(key, n.newZSet, 0)
+	k, s := n.getDs(key, n.newZSet, 0)
+	k.changed = true
 	return s.(*zset.SortedSet).ZIncrBy(member, score)
 }
 

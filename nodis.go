@@ -59,7 +59,7 @@ func Open(opt *Options) *Nodis {
 // Snapshot saves the data to disk
 func (n *Nodis) Snapshot(path string) {
 	n.Recycle()
-	n.store.snapshot(path, n.sync())
+	n.store.snapshot(path, n.getChangedEntries())
 }
 
 // Recycle removes expired and unused keys
@@ -89,8 +89,8 @@ func (n *Nodis) Recycle() {
 	})
 }
 
-// sync saves the data to disk
-func (n *Nodis) sync() []*Entry {
+// getChangedEntries returns all keys that have been getChangedEntries
+func (n *Nodis) getChangedEntries() []*Entry {
 	entries := make([]*Entry, 0)
 	n.keys.Iter(func(key string, k *Key) bool {
 		if !k.changed || k.expired() {
@@ -111,7 +111,7 @@ func (n *Nodis) Close() error {
 	n.Lock()
 	defer n.Unlock()
 	// save values to disk
-	entries := n.sync()
+	entries := n.getChangedEntries()
 	for _, entry := range entries {
 		n.store.put(entry)
 	}
