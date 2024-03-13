@@ -47,7 +47,7 @@ func (n *Nodis) ZScore(key string, member string) float64 {
 	return s.(*zset.SortedSet).ZScore(member)
 }
 
-func (n *Nodis) ZIncrBy(key string, score float64, member string) float64 {
+func (n *Nodis) ZIncrBy(key string, member string, score float64) float64 {
 	k, s := n.getDs(key, n.newZSet, 0)
 	k.changed = true
 	return s.(*zset.SortedSet).ZIncrBy(member, score)
@@ -61,6 +61,9 @@ func (n *Nodis) ZRange(key string, start int64, stop int64) []string {
 	els := s.(*zset.SortedSet).ZRange(start, stop)
 	members := make([]string, len(els))
 	for i, el := range els {
+		if el == nil {
+			continue
+		}
 		members[i] = el.Member
 	}
 	return members
@@ -82,6 +85,9 @@ func (n *Nodis) ZRevRange(key string, start int64, stop int64) []string {
 	els := s.(*zset.SortedSet).ZRevRange(start, stop)
 	members := make([]string, len(els))
 	for i, el := range els {
+		if el == nil {
+			continue
+		}
 		members[i] = el.Member
 	}
 	return members

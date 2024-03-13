@@ -10,9 +10,9 @@ import (
 )
 
 type Key struct {
-	Type      ds.DataType
 	ExpiredAt int64
-	lastUse   int64
+	lastUse   uint32
+	Type      ds.DataType
 	changed   bool
 }
 

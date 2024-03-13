@@ -46,10 +46,14 @@ func TestSet_SInter(t *testing.T) {
 	if len(inter) != 2 {
 		t.Errorf("SInter() = %v, want %v", len(inter), 2)
 	}
-	if inter[0] != "b" {
+	var m = map[string]bool{
+		"b": true,
+		"c": true,
+	}
+	if !m[inter[0]] {
 		t.Errorf("SInter() = %v, want %v", inter[0], "b")
 	}
-	if inter[1] != "c" {
+	if !m[inter[1]] {
 		t.Errorf("SInter() = %v, want %v", inter[1], "c")
 	}
 }

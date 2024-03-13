@@ -238,7 +238,7 @@ func (skiplist *skiplist) getFirstInRange(min float64, max float64) *node {
 	// scan from top level
 	for level := skiplist.level - 1; level >= 0; level-- {
 		// if forward is not in range than move forward
-		for n.level[level].forward != nil && min >= n.level[level].forward.Item.Score {
+		for n.level[level].forward != nil && min > n.level[level].forward.Item.Score {
 			n = n.level[level].forward
 		}
 	}
@@ -257,11 +257,11 @@ func (skiplist *skiplist) getLastInRange(min float64, max float64) *node {
 	n := skiplist.header
 	// scan from top level
 	for level := skiplist.level - 1; level >= 0; level-- {
-		for n.level[level].forward != nil && max > n.level[level].forward.Item.Score {
+		for n.level[level].forward != nil && max >= n.level[level].forward.Item.Score {
 			n = n.level[level].forward
 		}
 	}
-	if min >= n.Item.Score {
+	if min > n.Item.Score {
 		return nil
 	}
 	return n
@@ -274,7 +274,7 @@ func (skiplist *skiplist) removeRange(min float64, max float64, limit int) (remo
 	node := skiplist.header
 	for i := skiplist.level - 1; i >= 0; i-- {
 		for node.level[i].forward != nil {
-			if min < node.level[i].forward.Item.Score { // already in range
+			if min <= node.level[i].forward.Item.Score { // already in range
 				break
 			}
 			node = node.level[i].forward
@@ -287,7 +287,7 @@ func (skiplist *skiplist) removeRange(min float64, max float64, limit int) (remo
 
 	// remove nodes in range
 	for node != nil {
-		if max <= node.Item.Score { // already out of range
+		if max < node.Item.Score { // already out of range
 			break
 		}
 		next := node.level[0].forward

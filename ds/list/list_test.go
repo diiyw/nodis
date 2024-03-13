@@ -76,8 +76,8 @@ func TestList_LIndex(t *testing.T) {
 		is := strconv.Itoa(i)
 		l.LPush([]byte(is))
 	}
-	v, ok := l.LIndex(0)
-	if !ok || string(v) != "9" {
+	v := l.LIndex(0)
+	if string(v) != "9" {
 		t.Errorf("index error expect 9 go %d", v)
 	}
 }
@@ -101,8 +101,8 @@ func TestList_LInsert(t *testing.T) {
 		l.LPush([]byte(is))
 	}
 	l.LInsert([]byte("5"), []byte("100"), false)
-	v, ok := l.LIndex(5)
-	if !ok || string(v) != "100" {
+	v := l.LIndex(5)
+	if string(v) != "100" {
 		t.Errorf("insert error")
 	}
 }
@@ -133,8 +133,8 @@ func TestList_LRem(t *testing.T) {
 	if l.LLen() != 9 {
 		t.Errorf("rem error expect 9 go %d", l.LLen())
 	}
-	v, ok := l.LIndex(0)
-	if !ok || string(v) != "9" {
+	v := l.LIndex(0)
+	if string(v) != "9" {
 		t.Errorf("rem error expect 9 go %d", v)
 	}
 }
@@ -146,8 +146,8 @@ func TestList_LSet(t *testing.T) {
 		l.LPush([]byte(is))
 	}
 	l.LSet(5, []byte("100"))
-	v, ok := l.LIndex(5)
-	if !ok || string(v) != "100" {
+	v := l.LIndex(5)
+	if string(v) != "100" {
 		t.Errorf("set error")
 	}
 }

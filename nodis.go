@@ -66,6 +66,8 @@ func (n *Nodis) Snapshot(path string) {
 func (n *Nodis) Recycle() {
 	n.Lock()
 	defer n.Unlock()
+	now := uint32(time.Now().Unix())
+	recyleTime := now - uint32(n.options.RecycleDuration.Seconds())
 	n.keys.Iter(func(key string, k *Key) bool {
 		if k.expired() {
 			n.dataStructs.Delete(key)
@@ -73,7 +75,7 @@ func (n *Nodis) Recycle() {
 			n.store.remove(key)
 			return false
 		}
-		if k.lastUse != 0 && k.lastUse < time.Now().Unix()-int64(n.options.RecycleDuration.Seconds()) {
+		if k.lastUse != 0 && k.lastUse < recyleTime {
 			d, ok := n.dataStructs.Get(key)
 			n.dataStructs.Delete(key)
 			n.keys.Delete(key)
@@ -131,11 +133,13 @@ func (n *Nodis) getDs(key string, newFn func() ds.DataStruct, ttl int64) (*Key, 
 			d = newFn()
 			n.dataStructs.Put(key, d)
 			k = newKey(d.GetType(), ttl)
+			k.lastUse = uint32(time.Now().Unix())
 			n.keys.Put(key, k)
 			return k, d
 		}
 		return nil, nil
 	}
+	k.lastUse = uint32(time.Now().Unix())
 	return k, d
 }
 

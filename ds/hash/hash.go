@@ -112,9 +112,9 @@ func (s *HashMap) HMSet(values map[string][]byte) {
 }
 
 // HMGet gets the values of a hash
-func (s *HashMap) HMGet(keys ...string) [][]byte {
-	values := make([][]byte, len(keys))
-	for _, key := range keys {
+func (s *HashMap) HMGet(fields ...string) [][]byte {
+	values := make([][]byte, 0, len(fields))
+	for _, key := range fields {
 		value, ok := s.data.Get(key)
 		if ok {
 			values = append(values, value)
@@ -157,7 +157,7 @@ func (s *HashMap) HScan(cursor int, match string, count int) (int, map[string][]
 		i++
 		return i >= cursor+count
 	})
-	return i - 1, values
+	return i, values
 }
 
 // Marshal the set to bytes

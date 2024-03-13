@@ -74,7 +74,7 @@ func TestSortedSet_ZRange(t *testing.T) {
 
 	// Test if the range is correct
 	if len(ss.ZRange(0, 2)) != 2 {
-		t.Errorf("Range error")
+		t.Errorf("Range error expected 2 got %d", len(ss.ZRange(0, 2)))
 	}
 }
 
@@ -85,8 +85,9 @@ func TestSortedSet_ZRangeByScore(t *testing.T) {
 	ss.ZAdd("member3", 0.5)
 
 	// Test if the range is correct
-	if len(ss.ZRangeByScore(1, 2)) != 1 {
-		t.Errorf("Range error")
+	members := ss.ZRangeByScore(0.5, 2.5)
+	if len(members) != 3 {
+		t.Errorf("Range error expected 3 got %d", len(members))
 	}
 }
 

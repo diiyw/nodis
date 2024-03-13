@@ -1,7 +1,6 @@
 package zset
 
 import (
-	"strconv"
 	"sync"
 
 	"github.com/diiyw/nodis/ds"
@@ -33,6 +32,11 @@ func (sortedSet *SortedSet) GetType() ds.DataType {
 func (sortedSet *SortedSet) ZAdd(member string, score float64) bool {
 	sortedSet.Lock()
 	defer sortedSet.Unlock()
+	return sortedSet.zAdd(member, score)
+}
+
+// zAdd puts member into set,  and returns whether it has inserted new node
+func (sortedSet *SortedSet) zAdd(member string, score float64) bool {
 	element, ok := sortedSet.dict.Get(member)
 	sortedSet.dict.Put(member, &Item{
 		Member: member,
@@ -71,11 +75,11 @@ func (sortedSet *SortedSet) ZRem(member string) bool {
 
 // getRank returns the rank of the given member, sort by ascending order, rank starts from 0
 func (sortedSet *SortedSet) getRank(member string, desc bool) (rank int64) {
-	element, ok := sortedSet.dict.Get(member)
+	item, ok := sortedSet.dict.Get(member)
 	if !ok {
 		return -1
 	}
-	r := sortedSet.skiplist.getRank(member, element.Score)
+	r := sortedSet.skiplist.getRank(member, item.Score)
 	if desc {
 		r = sortedSet.skiplist.length - r
 	} else {
@@ -109,32 +113,39 @@ func (sortedSet *SortedSet) ZScore(member string) float64 {
 	return element.Score
 }
 
-// forEachByRank visits each member which rank within [start, stop), sort by ascending order, rank starts from 0
-func (sortedSet *SortedSet) forEachByRank(start int64, stop int64, desc bool, consumer func(element *Item) bool) {
+// forEachByRank visits each member which rank within [start, stop), sort by ascending order, rank starts from 1
+func (sortedSet *SortedSet) forEachByRank(start int64, stop int64, desc bool, consumer func(item *Item) bool) {
 	size := sortedSet.ZCard()
-	if start < 0 || start >= size {
-		panic("illegal start " + strconv.FormatInt(start, 10))
+	if start < 0 || start > size {
+		return
 	}
-	if stop < start || stop > size {
-		panic("illegal end " + strconv.FormatInt(stop, 10))
+	if stop < start {
+		return
+	}
+	// stop max is size
+	if stop > size {
+		stop = size
+	}
+	if start == 0 {
+		start = 1
 	}
 
 	// find start node
 	var node *node
 	if desc {
 		node = sortedSet.skiplist.tail
-		if start > 0 {
+		if start > 1 {
 			node = sortedSet.skiplist.getByRank(size - start)
 		}
 	} else {
 		node = sortedSet.skiplist.header.level[0].forward
-		if start > 0 {
-			node = sortedSet.skiplist.getByRank(start + 1)
+		if start > 1 {
+			node = sortedSet.skiplist.getByRank(start)
 		}
 	}
 
 	sliceSize := int(stop - start)
-	for i := 0; i < sliceSize; i++ {
+	for i := 0; i <= sliceSize; i++ {
 		if !consumer(&node.Item) {
 			break
 		}
@@ -148,12 +159,10 @@ func (sortedSet *SortedSet) forEachByRank(start int64, stop int64, desc bool, co
 
 // rangeByRank returns members which rank within [start, stop), sort by ascending order, rank starts from 0
 func (sortedSet *SortedSet) rangeByRank(start int64, stop int64, desc bool) []*Item {
-	sliceSize := int(stop - start)
-	slice := make([]*Item, sliceSize)
-	i := 0
-	sortedSet.forEachByRank(start, stop, desc, func(element *Item) bool {
-		slice[i] = element
-		i++
+	sliceSize := int(stop - start + 1)
+	slice := make([]*Item, 0, sliceSize)
+	sortedSet.forEachByRank(start, stop, desc, func(item *Item) bool {
+		slice = append(slice, item)
 		return true
 	})
 	return slice
@@ -234,8 +243,8 @@ func (sortedSet *SortedSet) forEach(min float64, max float64, offset int64, limi
 		if node == nil {
 			break
 		}
-		gtMin := min < node.Item.Score // greater than min
-		ltMax := max > node.Item.Score
+		gtMin := min <= node.Item.Score // greater than min
+		ltMax := max >= node.Item.Score
 		if !gtMin || !ltMax {
 			break // break through score border
 		}
@@ -314,7 +323,7 @@ func (sortedSet *SortedSet) ZIncrBy(member string, score float64) float64 {
 	if !ok {
 		return 0
 	}
-	sortedSet.ZAdd(member, element.Score+score)
+	sortedSet.zAdd(member, element.Score+score)
 	return element.Score + score
 }
 
@@ -336,7 +345,7 @@ func (sortedSet *SortedSet) UnmarshalBinary(data []byte) error {
 	sortedSet.skiplist = makeSkiplist()
 	sortedSet.dict = swiss.NewMap[string, *Item](16)
 	for k, v := range m {
-		sortedSet.ZAdd(k, v.Score)
+		sortedSet.zAdd(k, v.Score)
 	}
 	return nil
 }

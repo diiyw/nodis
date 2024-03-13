@@ -164,19 +164,19 @@ func (l *DoublyLinkedList) BRPop(timeout time.Duration) []byte {
 }
 
 // LIndex returns the element at index in the list
-func (l *DoublyLinkedList) LIndex(index int) ([]byte, bool) {
+func (l *DoublyLinkedList) LIndex(index int) []byte {
 	l.RLock()
 	defer l.RUnlock()
 	currentNode := l.head
 	currentIndex := 0
 	for currentNode != nil {
 		if currentIndex == index {
-			return currentNode.data, true
+			return currentNode.data
 		}
 		currentNode = currentNode.next
 		currentIndex++
 	}
-	return nil, false
+	return nil
 }
 
 // LInsert inserts the element before or after the pivot element

@@ -121,12 +121,15 @@ func TestStoreMultiPut(t *testing.T) {
 		"testKey4": []byte("testValue4"),
 		"testKey5": []byte("testValue5"),
 	}
-
+	result := make(map[string][]byte)
 	for key, value := range kv {
 		ds := str.NewString()
 		ds.Set(value)
 		// Call the put method
-		err := store.put(newEntry(key, ds, time.Now().Unix()+3600))
+		e := newEntry(key, ds, time.Now().Unix()+3600)
+		data, _ := e.Marshal()
+		result[key] = data
+		err := store.put(e)
 		if err != nil {
 			t.Fatalf("Failed to put key-value pair: %v", err)
 		}
@@ -144,7 +147,7 @@ func TestStoreMultiPut(t *testing.T) {
 			t.Fatalf("Failed to retrieve index for key: %s", key)
 		}
 
-		if !bytes.Equal(value, v) {
+		if !bytes.Equal(result[key], v) {
 			t.Errorf("Expected value to be %v, got %v", value, v)
 		}
 	}
@@ -156,7 +159,7 @@ func TestStoreMultiFilePut(t *testing.T) {
 	os.Mkdir(tempDir, 0755)
 	// Create a new Store instance
 	store := newStore(tempDir, 10)
-
+	result := make(map[string][]byte)
 	var kv = []map[string][]byte{
 		{
 			"testKey1": []byte("testValue11"),
@@ -180,7 +183,10 @@ func TestStoreMultiFilePut(t *testing.T) {
 			ds := str.NewString()
 			ds.Set(value)
 			// Call the put method
-			err := store.put(newEntry(key, ds, time.Now().Unix()+3600))
+			e := newEntry(key, ds, time.Now().Unix()+3600)
+			data, _ := e.Marshal()
+			result[key] = data
+			err := store.put(e)
 			if err != nil {
 				t.Fatalf("Failed to put key-value pair: %v", err)
 			}
@@ -197,7 +203,7 @@ func TestStoreMultiFilePut(t *testing.T) {
 				t.Fatalf("Failed to retrieve index for key: %s", key)
 			}
 
-			if !bytes.Equal(value, v) {
+			if !bytes.Equal(result[key], v) {
 				t.Errorf("Expected value to be %v, got %v", value, v)
 			}
 		}

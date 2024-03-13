@@ -21,7 +21,7 @@ It is a simple and easy to embed in your application.
 
 ## Get Started
 ```bash
- go get github.com/diiyw/nodis@v1.1.0-beta.2
+ go get github.com/diiyw/nodis@v1.1.0-beta.3
 ```
 ```go
 package main

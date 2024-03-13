@@ -1,6 +1,8 @@
 package nodis
 
 import (
+	"time"
+
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/hash"
 )
@@ -85,6 +87,11 @@ func (n *Nodis) HSetNX(key string, field string, value []byte) bool {
 	if h != nil {
 		return false
 	}
+	h = n.newHash()
+	n.dataStructs.Put(key, h)
+	k = newKey(h.GetType(), 0)
+	k.lastUse = uint32(time.Now().Unix())
+	n.keys.Put(key, k)
 	k.changed = true
 	n.HSet(key, field, value)
 	return true
