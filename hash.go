@@ -83,13 +83,13 @@ func (n *Nodis) HIncrByFloat(key string, field string, value float64) float64 {
 }
 
 func (n *Nodis) HSetNX(key string, field string, value []byte) bool {
-	k, h := n.getDs(key, nil, 0)
+	_, h := n.getDs(key, nil, 0)
 	if h != nil {
 		return false
 	}
 	h = n.newHash()
 	n.dataStructs.Put(key, h)
-	k = newKey(h.GetType(), 0)
+	k := newKey(h.GetType(), 0)
 	k.lastUse = uint32(time.Now().Unix())
 	n.keys.Put(key, k)
 	k.changed = true
