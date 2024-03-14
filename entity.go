@@ -17,21 +17,21 @@ var (
 	ErrCorruptedData = errors.New("corrupted data")
 )
 
-type Entry struct {
+type Entity struct {
 	Key       string
 	Value     ds.DataStruct
 	ExpiredAt int64
 }
 
-type entryBlock struct {
+type dataEntity struct {
 	Crc32 uint32
 	Type  ds.DataType
 	Body  []byte
 }
 
 // newEntry creates a new entry
-func newEntry(key string, value ds.DataStruct, expiredAt int64) *Entry {
-	return &Entry{
+func newEntry(key string, value ds.DataStruct, expiredAt int64) *Entity {
+	return &Entity{
 		Key:       key,
 		Value:     value,
 		ExpiredAt: expiredAt,
@@ -39,7 +39,7 @@ func newEntry(key string, value ds.DataStruct, expiredAt int64) *Entry {
 }
 
 // Marshal marshals the entry
-func (e *Entry) Marshal() ([]byte, error) {
+func (e *Entity) Marshal() ([]byte, error) {
 	var err error
 	data, err := binary.Marshal(e)
 	if err != nil {
@@ -48,7 +48,7 @@ func (e *Entry) Marshal() ([]byte, error) {
 	var buf = make([]byte, len(data)+1)
 	buf[0] = byte(e.Value.GetType())
 	copy(buf[1:], data)
-	var block = entryBlock{
+	var block = dataEntity{
 		Crc32: crc32.ChecksumIEEE(buf),
 		Type:  e.Value.GetType(),
 		Body:  data,
@@ -57,8 +57,8 @@ func (e *Entry) Marshal() ([]byte, error) {
 }
 
 // Unmarshal unmarshals the entry
-func (e *Entry) Unmarshal(data []byte) error {
-	var block entryBlock
+func (e *Entity) Unmarshal(data []byte) error {
+	var block dataEntity
 	if err := binary.Unmarshal(data, &block); err != nil {
 		return err
 	}

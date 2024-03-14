@@ -140,13 +140,13 @@ func (n *Nodis) TTL(key string) time.Duration {
 		return -1
 	}
 	n.RUnlock()
-	return time.Duration(k.ExpiredAt - time.Now().Unix())
+	return time.Until(time.Unix(k.ExpiredAt, 0))
 }
 
 // Rename a key
-func (n *Nodis) Rename(key, newKey string) error {
+func (n *Nodis) Rename(key, key2 string) error {
 	n.Lock()
-	k, ok := n.getKey(newKey)
+	_, ok := n.getKey(key2)
 	if ok {
 		n.Unlock()
 		return errors.New("newKey exists")
@@ -157,10 +157,9 @@ func (n *Nodis) Rename(key, newKey string) error {
 		return errors.New("key does not exist")
 	}
 	n.dataStructs.Delete(key)
-	n.dataStructs.Put(newKey, v)
+	n.dataStructs.Put(key2, v)
 	n.keys.Delete(key)
-	k.changed = true
-	n.keys.Put(newKey, k)
+	n.keys.Put(key2, newKey(v.GetType(), 0))
 	n.Unlock()
 	return nil
 }
@@ -181,11 +180,8 @@ func (n *Nodis) Type(key string) string {
 func (n *Nodis) Scan(cursor int, match string, count int) (int, []string) {
 	n.RLock()
 	keys := make([]string, 0, n.keys.Count())
-	n.store.index.Iter(func(key string, index *index) bool {
+	n.keys.Iter(func(key string, k *Key) bool {
 		matched, _ := filepath.Match(match, key)
-		k := &Key{
-			ExpiredAt: index.ExpiredAt,
-		}
 		if matched && !k.expired() {
 			keys = append(keys, key)
 		}

@@ -1,4 +1,6 @@
 # Nodis
+![GitHub top language](https://img.shields.io/github/languages/top/diiyw/nodis) ![GitHub Release](https://img.shields.io/github/v/release/diiyw/nodis)
+
 
 English | [简体中文](https://github.com/diiyw/nodis/blob/main/README_zh-cn.md)
 
@@ -16,7 +18,7 @@ It is a simple and easy to embed in your application.
 ## Features
 
 - Fast and embeddable
-- Low memory used, only hot key stored in memory
+- Low memory used, only hot data stored in memory
 - Snapshot and WAL for data storage.
 
 ## Get Started

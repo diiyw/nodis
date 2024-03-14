@@ -145,13 +145,39 @@ func TestNodis_SnapshotChanged(t *testing.T) {
 	n.Close()
 }
 
-func BenchmarkNodis_SetSame(b *testing.B) {
+func TestNodis_Recycle(t *testing.T) {
+	_ = os.RemoveAll("testdata")
+	opt := DefaultOptions
+	opt.Path = "testdata"
+	opt.RecycleDuration = time.Second
+	n := Open(opt)
+	n.Set("test", []byte("test"), 1)
+	time.Sleep(2 * time.Second)
+	n.Recycle()
+	v := n.Get("test")
+	if v != nil {
+		t.Errorf("Get() = %v, want %v", v, nil)
+	}
+	n.Set("test", []byte("test"), 0)
+	time.Sleep(2 * time.Second)
+	n.Recycle()
+	v = n.Get("test")
+	if v != nil {
+		t.Errorf("Get() = %v, want %v", v, nil)
+	}
+	n.Close()
+}
+
+func TestNodis_Clear(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	opt := DefaultOptions
 	opt.Path = "testdata"
 	n := Open(opt)
-	for i := 0; i < b.N; i++ {
-		n.Set("test", []byte("test"), 0)
+	n.Set("test", []byte("test"), 0)
+	n.Clear()
+	v := n.Get("test")
+	if v != nil {
+		t.Errorf("Get() = %v, want %v", v, nil)
 	}
 	n.Close()
 }

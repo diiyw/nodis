@@ -109,7 +109,7 @@ func (s *store) check() (int64, error) {
 }
 
 // put a key-value pair into store
-func (s *store) put(entry *Entry) error {
+func (s *store) put(entry *Entity) error {
 	s.Lock()
 	defer s.Unlock()
 	var index = &index{}
@@ -192,7 +192,7 @@ func (s *store) remove(key string) {
 }
 
 // snapshot the store
-func (s *store) snapshot(path string, entries []*Entry) {
+func (s *store) snapshot(path string, entries []*Entity) {
 	s.RLock()
 	defer s.RUnlock()
 	snapshotDir := filepath.Join(path, "snapshots", time.Now().Format("20060102_150405"))

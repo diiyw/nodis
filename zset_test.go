@@ -303,3 +303,45 @@ func TestZSet_ZRevRangeWithScores(t *testing.T) {
 		t.Errorf("ZRevRangeWithScores() = %v, want %v", range1[1].Member, "b")
 	}
 }
+
+func TestZSet_ZRangeByScoreWithScores(t *testing.T) {
+	opt := DefaultOptions
+	opt.Path = "testdata"
+	os.RemoveAll("testdata")
+	n := Open(opt)
+	defer n.Close()
+	n.ZAdd("zset", "a", 1)
+	n.ZAdd("zset", "b", 2)
+	n.ZAdd("zset", "c", 3)
+	range1 := n.ZRangeByScoreWithScores("zset", 1, 2)
+	if len(range1) != 2 {
+		t.Errorf("ZRangeByScoreWithScores() = %v, want %v", len(range1), 2)
+	}
+	if range1[0].Member != "a" {
+		t.Errorf("ZRangeByScoreWithScores() = %v, want %v", range1[0].Member, "a")
+	}
+	if range1[1].Member != "b" {
+		t.Errorf("ZRangeByScoreWithScores() = %v, want %v", range1[1].Member, "b")
+	}
+}
+
+func TestZSet_ZRevRangeByScoreWithScores(t *testing.T) {
+	opt := DefaultOptions
+	opt.Path = "testdata"
+	os.RemoveAll("testdata")
+	n := Open(opt)
+	defer n.Close()
+	n.ZAdd("zset", "a", 1)
+	n.ZAdd("zset", "b", 2)
+	n.ZAdd("zset", "c", 3)
+	range1 := n.ZRevRangeByScoreWithScores("zset", 1, 2)
+	if len(range1) != 2 {
+		t.Errorf("ZRevRangeByScoreWithScores() = %v, want %v", len(range1), 2)
+	}
+	if range1[0].Member != "b" {
+		t.Errorf("ZRevRangeByScoreWithScores() = %v, want %v", range1[0].Member, "b")
+	}
+	if range1[1].Member != "a" {
+		t.Errorf("ZRevRangeByScoreWithScores() = %v, want %v", range1[1].Member, "a")
+	}
+}

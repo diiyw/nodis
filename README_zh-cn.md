@@ -1,4 +1,6 @@
 # Nodis
+![GitHub top language](https://img.shields.io/github/languages/top/diiyw/nodis) ![GitHub Release](https://img.shields.io/github/v/release/diiyw/nodis)
+
 
 [English](https://github.com/diiyw/nodis/blob/main/README.md) | 简体中文
 

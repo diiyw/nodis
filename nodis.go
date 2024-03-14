@@ -92,8 +92,8 @@ func (n *Nodis) Recycle() {
 }
 
 // getChangedEntries returns all keys that have been getChangedEntries
-func (n *Nodis) getChangedEntries() []*Entry {
-	entries := make([]*Entry, 0)
+func (n *Nodis) getChangedEntries() []*Entity {
+	entries := make([]*Entity, 0)
 	n.keys.Iter(func(key string, k *Key) bool {
 		if !k.changed || k.expired() {
 			return false
@@ -155,8 +155,8 @@ func (n *Nodis) Clear() {
 	}
 }
 
-func parseDs(data []byte) (*Entry, error) {
-	entry := &Entry{}
+func parseDs(data []byte) (*Entity, error) {
+	entry := &Entity{}
 	err := entry.Unmarshal(data)
 	if err != nil {
 		return nil, err

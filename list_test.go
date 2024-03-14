@@ -10,7 +10,17 @@ func TestList_LPush(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{Path: "testdata"})
 	n.LPush("list", []byte("value"))
-	if string(n.LPop("list")) != "value" {
+	n.LPush("list", []byte("value1"))
+	n.LPush("list", []byte("value2"))
+	n.LPush("list", []byte("value3"))
+	if string(n.LPop("list")) != "value3" {
+		t.Error("LPush failed")
+	}
+	if n.LLen("list") != 3 {
+		t.Error("LPush failed")
+	}
+	v := n.LRange("list", 0, -1)
+	if string(v[0]) != "value2" || string(v[1]) != "value1" || string(v[2]) != "value" {
 		t.Error("LPush failed")
 	}
 }
