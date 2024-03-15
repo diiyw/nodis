@@ -19,6 +19,9 @@ type Nodis struct {
 }
 
 func Open(opt *Options) *Nodis {
+	if opt.FileSize == 0 {
+		opt.FileSize = FileSizeGB
+	}
 	n := &Nodis{
 		dataStructs: swiss.NewMap[string, ds.DataStruct](16),
 		keys:        swiss.NewMap[string, *Key](16),
@@ -75,12 +78,12 @@ func (n *Nodis) Recycle() {
 			n.store.remove(key)
 			return false
 		}
-		if k.lastUse != 0 && k.lastUse < recyleTime {
+		if k.lastUse.Load() != 0 && k.lastUse.Load() < recyleTime {
 			d, ok := n.dataStructs.Get(key)
 			n.dataStructs.Delete(key)
 			n.keys.Delete(key)
 			if ok {
-				k.changed = false
+				k.changed.Store(true)
 				go func() {
 					// save to disk
 					n.store.put(newEntry(key, d, k.ExpiredAt))
@@ -95,7 +98,7 @@ func (n *Nodis) Recycle() {
 func (n *Nodis) getChangedEntries() []*Entity {
 	entries := make([]*Entity, 0)
 	n.keys.Iter(func(key string, k *Key) bool {
-		if !k.changed || k.expired() {
+		if !k.changed.Load() || k.expired() {
 			return false
 		}
 		d, ok := n.dataStructs.Get(key)
@@ -133,13 +136,13 @@ func (n *Nodis) getDs(key string, newFn func() ds.DataStruct, ttl int64) (*Key, 
 			d = newFn()
 			n.dataStructs.Put(key, d)
 			k = newKey(d.GetType(), ttl)
-			k.lastUse = uint32(time.Now().Unix())
+			k.lastUse.Store(uint32(time.Now().Unix()))
 			n.keys.Put(key, k)
 			return k, d
 		}
 		return nil, nil
 	}
-	k.lastUse = uint32(time.Now().Unix())
+	k.lastUse.Store(uint32(time.Now().Unix()))
 	return k, d
 }
 

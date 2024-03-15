@@ -37,6 +37,8 @@ func (s *String) Get() []byte {
 
 // MarshalBinary the string to bytes
 func (s *String) MarshalBinary() ([]byte, error) {
+	s.RLock()
+	defer s.RUnlock()
 	return binary.Marshal(s.V)
 }
 

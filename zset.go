@@ -11,7 +11,7 @@ func (n *Nodis) newZSet() ds.DataStruct {
 
 func (n *Nodis) ZAdd(key string, member string, score float64) {
 	k, s := n.getDs(key, n.newZSet, 0)
-	k.changed = true
+	k.changed.Store(true)
 	s.(*zset.SortedSet).ZAdd(member, score)
 }
 
@@ -49,7 +49,7 @@ func (n *Nodis) ZScore(key string, member string) float64 {
 
 func (n *Nodis) ZIncrBy(key string, member string, score float64) float64 {
 	k, s := n.getDs(key, n.newZSet, 0)
-	k.changed = true
+	k.changed.Store(true)
 	return s.(*zset.SortedSet).ZIncrBy(member, score)
 }
 
@@ -154,7 +154,7 @@ func (n *Nodis) ZRem(key string, members ...string) int64 {
 			removed++
 		}
 	}
-	k.changed = removed > 0
+	k.changed.Store(removed > 0)
 	return removed
 }
 
@@ -164,7 +164,7 @@ func (n *Nodis) ZRemRangeByRank(key string, start int64, stop int64) int64 {
 		return 0
 	}
 	removed := s.(*zset.SortedSet).ZRemRangeByRank(start, stop)
-	k.changed = removed > 0
+	k.changed.Store(removed > 0)
 	return removed
 }
 
@@ -174,7 +174,7 @@ func (n *Nodis) ZRemRangeByScore(key string, min float64, max float64) int64 {
 		return 0
 	}
 	removed := s.(*zset.SortedSet).ZRemRangeByScore(min, max)
-	k.changed = removed > 0
+	k.changed.Store(removed > 0)
 	return removed
 }
 

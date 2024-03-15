@@ -12,7 +12,7 @@ func (n *Nodis) newSet() ds.DataStruct {
 // SAdd adds the specified members to the set stored at key.
 func (n *Nodis) SAdd(key string, members ...string) int {
 	k, s := n.getDs(key, n.newSet, 0)
-	k.changed = true
+	k.changed.Store(true)
 	s.(*set.Set).SAdd(members...)
 	return s.(*set.Set).SCard()
 }

@@ -149,7 +149,9 @@ func (l *DoublyLinkedList) LLen() int {
 
 // BLPop removes and returns the first element of the list
 func (l *DoublyLinkedList) BLPop(timeout time.Duration) []byte {
+	l.RLock()
 	if l.head == nil {
+		l.RUnlock()
 		time.Sleep(timeout)
 	}
 	return l.LPop()
@@ -157,7 +159,9 @@ func (l *DoublyLinkedList) BLPop(timeout time.Duration) []byte {
 
 // BRPop removes and returns the last element of the list
 func (l *DoublyLinkedList) BRPop(timeout time.Duration) []byte {
+	l.RLock()
 	if l.tail == nil {
+		l.RUnlock()
 		time.Sleep(timeout)
 	}
 	return l.RPop()

@@ -1,5 +1,11 @@
 # Nodis
 ![GitHub top language](https://img.shields.io/github/languages/top/diiyw/nodis) ![GitHub Release](https://img.shields.io/github/v/release/diiyw/nodis)
+<div class="column" align="left">
+  <a href="https://godoc.org/github.com/diiyw/nodis"><img src="https://godoc.org/github.com/diiyw/nodis?status.svg" /></a>
+  <a href="https://goreportcard.com/report/github.com/diiyw/nodis"><img src="https://goreportcard.com/badge/github.com/diiyw/nodis" /></a>
+  <a href="https://goreportcard.com/report/github.com/diiyw/nodis"><img src="https://github.com/diiyw/nodis/workflows/Go/badge.svg?branch=main"/></a>
+  <a href="https://codecov.io/gh/diiyw/nodis"><img src="https://codecov.io/gh/diiyw/nodis/branch/main/graph/badge.svg?token=CupujOXpbe"/></a>
+</div>
 
 
 English | [简体中文](https://github.com/diiyw/nodis/blob/main/README_zh-cn.md)

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"github.com/diiyw/nodis/ds"
@@ -11,9 +12,9 @@ import (
 
 type Key struct {
 	ExpiredAt int64
-	lastUse   uint32
+	lastUse   atomic.Uint32
 	Type      ds.DataType
-	changed   bool
+	changed   atomic.Bool
 }
 
 func newKey(typ ds.DataType, seconds int64) *Key {
@@ -21,7 +22,7 @@ func newKey(typ ds.DataType, seconds int64) *Key {
 	if seconds != 0 {
 		k.ExpiredAt = seconds + time.Now().Unix()
 	}
-	k.changed = true
+	k.changed.Store(true)
 	return k
 }
 
@@ -80,7 +81,7 @@ func (n *Nodis) exists(key string) (k *Key, ok bool) {
 			if e != nil {
 				n.dataStructs.Put(key, e.Value)
 				k = newKey(e.Value.GetType(), 0)
-				k.changed = false
+				k.changed.Store(false)
 				ok = true
 				n.keys.Put(key, k)
 				return
@@ -99,7 +100,7 @@ func (n *Nodis) Expire(key string, seconds int64) {
 		return
 	}
 	k.ExpiredAt += seconds
-	k.changed = true
+	k.changed.Store(true)
 	n.Unlock()
 }
 
@@ -112,7 +113,7 @@ func (n *Nodis) ExpireAt(key string, timestamp time.Time) {
 		return
 	}
 	k.ExpiredAt = timestamp.Unix()
-	k.changed = true
+	k.changed.Store(true)
 	n.Unlock()
 }
 

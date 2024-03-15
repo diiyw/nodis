@@ -3,10 +3,9 @@ package nodis
 import "time"
 
 const (
-	B  = 1
-	KB = 1024 * B
-	MB = 1024 * KB
-	GB = 1024 * MB
+	FileSizeKB = 1024
+	FileSizeMB = 1024 * FileSizeKB
+	FileSizeGB = 1024 * FileSizeMB
 )
 
 // Options represents the configuration options for the database.
@@ -29,6 +28,6 @@ type Options struct {
 
 var DefaultOptions = &Options{
 	Path:            "data",
-	FileSize:        GB,
+	FileSize:        FileSizeGB,
 	RecycleDuration: 60 * time.Second,
 }

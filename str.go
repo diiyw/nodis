@@ -12,7 +12,7 @@ func (n *Nodis) newStr() ds.DataStruct {
 // Set a key with a value and a TTL
 func (n *Nodis) Set(key string, value []byte, ttl int64) {
 	k, s := n.getDs(key, n.newStr, ttl)
-	k.changed = true
+	k.changed.Store(true)
 	s.(*str.String).Set(value)
 }
 

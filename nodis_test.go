@@ -11,7 +11,7 @@ func TestNodis_Open(t *testing.T) {
 	opt := Options{
 		Path:            "testdata",
 		RecycleDuration: 60 * time.Second,
-		FileSize:        GB,
+		FileSize:        FileSizeGB,
 	}
 	got := Open(&opt)
 	if got == nil {
@@ -24,7 +24,7 @@ func TestNodis_Sync(t *testing.T) {
 	opt := Options{
 		Path:            "testdata",
 		RecycleDuration: 60 * time.Second,
-		FileSize:        GB,
+		FileSize:        FileSizeGB,
 	}
 	n := Open(&opt)
 	n.Set("test", []byte("test1"), 0)
@@ -37,8 +37,9 @@ func TestNodis_Sync(t *testing.T) {
 
 func TestNodis_OpenAndSync(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	opt := DefaultOptions
-	opt.Path = "testdata"
+	opt := &Options{
+		Path: "testdata",
+	}
 	n := Open(opt)
 	n.Set("set", []byte("set"), 0)
 	n.ZAdd("zset", "zset", 1)
@@ -73,7 +74,7 @@ func TestNodis_OpenAndSyncBigdata10000(t *testing.T) {
 	opt := Options{
 		Path:            "testdata",
 		RecycleDuration: 60 * time.Second,
-		FileSize:        GB,
+		FileSize:        FileSizeGB,
 	}
 	n := Open(&opt)
 	for i := 0; i < 10000; i++ {
@@ -124,8 +125,9 @@ func TestNodis_OpenAndSyncBigdata10000(t *testing.T) {
 
 func TestNodis_Snapshot(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	opt := DefaultOptions
-	opt.Path = "testdata"
+	opt := &Options{
+		Path: "testdata",
+	}
 	n := Open(opt)
 	n.Set("test", []byte("test"), 0)
 	n.Snapshot("testdata")
@@ -134,8 +136,9 @@ func TestNodis_Snapshot(t *testing.T) {
 
 func TestNodis_SnapshotChanged(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	opt := DefaultOptions
-	opt.Path = "testdata"
+	opt := &Options{
+		Path: "testdata",
+	}
 	n := Open(opt)
 	n.Set("test", []byte("test"), 0)
 	n.Snapshot(opt.Path)
@@ -147,9 +150,10 @@ func TestNodis_SnapshotChanged(t *testing.T) {
 
 func TestNodis_Recycle(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	opt := DefaultOptions
-	opt.Path = "testdata"
-	opt.RecycleDuration = time.Second
+	opt := &Options{
+		Path:            "testdata",
+		RecycleDuration: time.Second,
+	}
 	n := Open(opt)
 	n.Set("test", []byte("test"), 1)
 	time.Sleep(2 * time.Second)
@@ -170,8 +174,9 @@ func TestNodis_Recycle(t *testing.T) {
 
 func TestNodis_Clear(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	opt := DefaultOptions
-	opt.Path = "testdata"
+	opt := &Options{
+		Path: "testdata",
+	}
 	n := Open(opt)
 	n.Set("test", []byte("test"), 0)
 	n.Clear()

@@ -329,6 +329,8 @@ func (sortedSet *SortedSet) ZIncrBy(member string, score float64) float64 {
 
 func (sortedSet *SortedSet) MarshalBinary() ([]byte, error) {
 	var m = make(map[string]*Item)
+	sortedSet.RLock()
+	defer sortedSet.RUnlock()
 	sortedSet.dict.Iter(func(key string, value *Item) bool {
 		m[key] = value
 		return false

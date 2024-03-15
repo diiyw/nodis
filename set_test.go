@@ -6,8 +6,9 @@ import (
 )
 
 func TestSet_SAdd(t *testing.T) {
-	opt := DefaultOptions
-	opt.Path = "testdata"
+	opt := &Options{
+		Path: "testdata",
+	}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -18,8 +19,9 @@ func TestSet_SAdd(t *testing.T) {
 }
 
 func TestSet_SDiff(t *testing.T) {
-	opt := DefaultOptions
-	opt.Path = "testdata"
+	opt := &Options{
+		Path: "testdata",
+	}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -35,8 +37,9 @@ func TestSet_SDiff(t *testing.T) {
 }
 
 func TestSet_SInter(t *testing.T) {
-	opt := DefaultOptions
-	opt.Path = "testdata"
+	opt := &Options{
+		Path: "testdata",
+	}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -59,8 +62,9 @@ func TestSet_SInter(t *testing.T) {
 }
 
 func TestSet_SIsMember(t *testing.T) {
-	opt := DefaultOptions
-	opt.Path = "testdata"
+	opt := &Options{
+		Path: "testdata",
+	}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -71,8 +75,9 @@ func TestSet_SIsMember(t *testing.T) {
 }
 
 func TestSet_SMembers(t *testing.T) {
-	opt := DefaultOptions
-	opt.Path = "testdata"
+	opt := &Options{
+		Path: "testdata",
+	}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()

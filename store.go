@@ -229,6 +229,8 @@ func (s *store) snapshot(path string, entries []*Entity) {
 
 // close the store
 func (s *store) close() error {
+	s.Lock()
+	defer s.Unlock()
 	err := s.aof.Sync()
 	if err != nil {
 		return err

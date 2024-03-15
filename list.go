@@ -15,13 +15,13 @@ func (n *Nodis) newList() ds.DataStruct {
 
 func (n *Nodis) LPush(key string, values ...[]byte) {
 	k, l := n.getDs(key, n.newList, 0)
-	k.changed = true
+	k.changed.Store(true)
 	l.(*list.DoublyLinkedList).LPush(values...)
 }
 
 func (n *Nodis) RPush(key string, values ...[]byte) {
 	k, l := n.getDs(key, n.newList, 0)
-	k.changed = true
+	k.changed.Store(true)
 	for _, v := range values {
 		l.(*list.DoublyLinkedList).RPush(v)
 	}
@@ -32,7 +32,7 @@ func (n *Nodis) LPop(key string) []byte {
 	if l == nil {
 		return nil
 	}
-	k.changed = true
+	k.changed.Store(true)
 	v := l.(*list.DoublyLinkedList).LPop()
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
 		n.Del(key)
@@ -45,7 +45,7 @@ func (n *Nodis) RPop(key string) []byte {
 	if l == nil {
 		return nil
 	}
-	k.changed = true
+	k.changed.Store(true)
 	v := l.(*list.DoublyLinkedList).RPop()
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
 		n.Del(key)
@@ -71,19 +71,19 @@ func (n *Nodis) LIndex(key string, index int) []byte {
 
 func (n *Nodis) LInsert(key string, pivot, data []byte, before bool) int {
 	k, l := n.getDs(key, n.newList, 0)
-	k.changed = true
+	k.changed.Store(true)
 	return l.(*list.DoublyLinkedList).LInsert(pivot, data, before)
 }
 
 func (n *Nodis) LPushX(key string, data []byte) int {
 	k, l := n.getDs(key, n.newList, 0)
-	k.changed = true
+	k.changed.Store(true)
 	return l.(*list.DoublyLinkedList).LPushX(data)
 }
 
 func (n *Nodis) RPushX(key string, data []byte) int {
 	k, l := n.getDs(key, n.newList, 0)
-	k.changed = true
+	k.changed.Store(true)
 	return l.(*list.DoublyLinkedList).RPushX(data)
 }
 
@@ -92,13 +92,13 @@ func (n *Nodis) LRem(key string, count int, data []byte) int {
 	if l == nil {
 		return 0
 	}
-	k.changed = true
+	k.changed.Store(true)
 	return l.(*list.DoublyLinkedList).LRem(count, data)
 }
 
 func (n *Nodis) LSet(key string, index int, data []byte) bool {
 	k, l := n.getDs(key, n.newList, 0)
-	k.changed = true
+	k.changed.Store(true)
 	return l.(*list.DoublyLinkedList).LSet(index, data)
 }
 
@@ -107,7 +107,7 @@ func (n *Nodis) LTrim(key string, start, stop int) {
 	if l == nil {
 		return
 	}
-	k.changed = true
+	k.changed.Store(true)
 	l.(*list.DoublyLinkedList).LTrim(start, stop)
 }
 
@@ -124,7 +124,7 @@ func (n *Nodis) LPopRPush(source, destination string) []byte {
 	if l == nil {
 		return nil
 	}
-	k.changed = true
+	k.changed.Store(true)
 	v := l.(*list.DoublyLinkedList).LPop()
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
 		n.Del(source)
@@ -135,7 +135,7 @@ func (n *Nodis) LPopRPush(source, destination string) []byte {
 		destinationKey = newKey(ds.List, 0)
 		n.keys.Put(destination, destinationKey)
 	}
-	destinationKey.changed = true
+	destinationKey.changed.Store(true)
 	l, _ = n.dataStructs.Get(destination)
 	l.(*list.DoublyLinkedList).RPush(v)
 	return v
@@ -146,7 +146,7 @@ func (n *Nodis) RPopLPush(source, destination string) []byte {
 	if l == nil {
 		return nil
 	}
-	k.changed = true
+	k.changed.Store(true)
 	v := l.(*list.DoublyLinkedList).RPop()
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
 		n.Del(source)
@@ -157,7 +157,7 @@ func (n *Nodis) RPopLPush(source, destination string) []byte {
 		destinationKey = newKey(ds.List, 0)
 		n.keys.Put(destination, destinationKey)
 	}
-	destinationKey.changed = true
+	destinationKey.changed.Store(true)
 	l, _ = n.dataStructs.Get(destination)
 	l.(*list.DoublyLinkedList).LPush(v)
 	return v
@@ -165,11 +165,8 @@ func (n *Nodis) RPopLPush(source, destination string) []byte {
 
 func (n *Nodis) BLPop(key string, timeout time.Duration) []byte {
 	k, l := n.getDs(key, n.newList, 0)
-	if l == nil {
-		return nil
-	}
-	k.changed = true
 	v := l.(*list.DoublyLinkedList).BLPop(timeout)
+	k.changed.Store(true)
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
 		n.Del(key)
 	}
@@ -178,11 +175,8 @@ func (n *Nodis) BLPop(key string, timeout time.Duration) []byte {
 
 func (n *Nodis) BRPop(key string, timeout time.Duration) []byte {
 	k, l := n.getDs(key, n.newList, 0)
-	if l == nil {
-		return nil
-	}
-	k.changed = true
 	v := l.(*list.DoublyLinkedList).BRPop(timeout)
+	k.changed.Store(true)
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
 		n.Del(key)
 	}
