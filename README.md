@@ -29,7 +29,7 @@ It is a simple and easy to embed in your application.
 
 ## Get Started
 ```bash
- go get github.com/diiyw/nodis@v1.1.0-beta.5
+ go get github.com/diiyw/nodis@v1.1.0-beta.6
 ```
 ```go
 package main

@@ -49,14 +49,14 @@ func (n *Nodis) getKey(key string) (*Key, bool) {
 
 // Del a key
 func (n *Nodis) Del(key string) {
-	_, ds := n.getDs(key, nil, 0)
-	ds.Lock()
+	_, d := n.getDs(key, nil, 0)
+	d.Lock()
 	n.Lock()
 	n.dataStructs.Delete(key)
 	n.keys.Delete(key)
 	n.store.remove(key)
 	n.Unlock()
-	ds.Unlock()
+	d.Unlock()
 }
 
 func (n *Nodis) Exists(key string) bool {
