@@ -156,18 +156,17 @@ func TestNodis_Recycle(t *testing.T) {
 	}
 	n := Open(opt)
 	n.Set("test", []byte("test"), 1)
-	time.Sleep(2 * time.Second)
-	n.Recycle()
+	time.Sleep(1 * time.Second)
 	v := n.Get("test")
 	if v != nil {
 		t.Errorf("Get() = %v, want %v", v, nil)
 	}
 	n.Set("test", []byte("test"), 0)
+	// load from disk
 	time.Sleep(2 * time.Second)
-	n.Recycle()
 	v = n.Get("test")
-	if v != nil {
-		t.Errorf("Get() = %v, want %v", v, nil)
+	if v == nil {
+		t.Errorf("Get() = %v, want %v", v, "test")
 	}
 	n.Close()
 }

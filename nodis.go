@@ -70,7 +70,7 @@ func (n *Nodis) Recycle() {
 	n.Lock()
 	defer n.Unlock()
 	now := uint32(time.Now().Unix())
-	recyleTime := now - uint32(n.options.RecycleDuration.Seconds())
+	recycleTime := now - uint32(n.options.RecycleDuration.Seconds())
 	n.keys.Iter(func(key string, k *Key) bool {
 		if k.expired() {
 			n.dataStructs.Delete(key)
@@ -78,15 +78,19 @@ func (n *Nodis) Recycle() {
 			n.store.remove(key)
 			return false
 		}
-		if k.lastUse.Load() != 0 && k.lastUse.Load() < recyleTime {
+		lastUse := k.lastUse.Load()
+		if lastUse != 0 && lastUse <= recycleTime {
 			d, ok := n.dataStructs.Get(key)
 			n.dataStructs.Delete(key)
 			n.keys.Delete(key)
 			if ok {
-				k.changed.Store(true)
+				k.changed.Store(false)
 				go func() {
 					// save to disk
-					n.store.put(newEntry(key, d, k.ExpiredAt))
+					err := n.store.put(newEntry(key, d, k.ExpiredAt))
+					if err != nil {
+						log.Println("Recycle: ", err)
+					}
 				}()
 			}
 		}
@@ -118,7 +122,10 @@ func (n *Nodis) Close() error {
 	// save values to disk
 	entries := n.getChangedEntries()
 	for _, entry := range entries {
-		n.store.put(entry)
+		err := n.store.put(entry)
+		if err != nil {
+			return err
+		}
 	}
 	return n.store.close()
 }
