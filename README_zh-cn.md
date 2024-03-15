@@ -29,7 +29,7 @@ Nodis 是一个简单可嵌入到应用中内存数据库，实现Redis的数据
 ## Get Started
 
 ```bash
-go get github.com/diiyw/nodis@v1.1.0-beta.5
+go get github.com/diiyw/nodis@v1.1.0-beta.7
 ```
 
 ```go
