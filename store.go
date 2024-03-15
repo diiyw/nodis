@@ -112,7 +112,7 @@ func (s *store) check() (int64, error) {
 func (s *store) put(entry *Entity) error {
 	s.Lock()
 	defer s.Unlock()
-	var index = &index{}
+	var idx = &index{}
 	offset, err := s.check()
 	if err != nil {
 		return err
@@ -121,11 +121,11 @@ func (s *store) put(entry *Entity) error {
 	if err != nil {
 		return err
 	}
-	index.FileID = s.fileId
-	index.Offset = offset
-	index.Size = uint32(len(data))
-	index.ExpiredAt = entry.ExpiredAt
-	s.index.Put(entry.Key, index)
+	idx.FileID = s.fileId
+	idx.Offset = offset
+	idx.Size = uint32(len(data))
+	idx.ExpiredAt = entry.ExpiredAt
+	s.index.Put(entry.Key, idx)
 	_, err = s.aof.Write(data)
 	if err != nil {
 		return err
