@@ -243,16 +243,9 @@ func (s *store) close() error {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err := idxFi.Sync()
-		if err != nil {
-			log.Println("Close sync error: ", err)
-		}
-		idxFi.Close()
-	}()
 	_, err = idxFi.Seek(0, io.SeekStart)
 	if err != nil {
-		return err
+		return idxFi.Close()
 	}
 	var header = make([]byte, 4)
 	binary.LittleEndian.PutUint32(header, s.fileId)
@@ -275,7 +268,13 @@ func (s *store) close() error {
 	}
 	_, err = idxFi.Write(data)
 	if err != nil {
-		panic(err)
+		return err
+	}
+	if err = idxFi.Sync(); err != nil {
+		return err
+	}
+	if err = idxFi.Close(); err != nil {
+		log.Println("Close sync error: ", err)
 	}
 	err = os.Rename(s.indexFile+"~", s.indexFile)
 	if err != nil {
