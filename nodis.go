@@ -85,13 +85,11 @@ func (n *Nodis) Recycle() {
 			n.keys.Delete(key)
 			if ok {
 				k.changed.Store(false)
-				go func() {
-					// save to disk
-					err := n.store.put(newEntry(key, d, k.ExpiredAt))
-					if err != nil {
-						log.Println("Recycle: ", err)
-					}
-				}()
+				// save to disk
+				err := n.store.put(newEntry(key, d, k.ExpiredAt))
+				if err != nil {
+					log.Println("Recycle: ", err)
+				}
 			}
 		}
 		return false
