@@ -184,7 +184,19 @@ func (n *Nodis) Type(key string) string {
 	k, ok := n.getKey(key)
 	if !ok {
 		n.RUnlock()
-		return "none"
+		n.store.RLock()
+		v, err := n.store.get(key)
+		if err != nil {
+			n.store.RUnlock()
+			return "none"
+		}
+		e, err := parseDs(v)
+		if err != nil {
+			n.store.RUnlock()
+			return "none"
+		}
+		n.store.RUnlock()
+		return ds.DataTypeMap[e.Value.GetType()]
 	}
 	n.RUnlock()
 	return ds.DataTypeMap[k.Type]

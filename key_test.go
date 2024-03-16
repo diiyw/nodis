@@ -120,6 +120,26 @@ func TestKey_Type(t *testing.T) {
 	if n.Type("test5") != "hash" {
 		t.Errorf("Type() = %v, want %v", n.Type("test5"), "bool")
 	}
+	n.Close()
+	n = Open(&Options{
+		Path:            "testdata",
+		RecycleDuration: 60 * time.Second,
+	})
+	if n.Type("test1") != "string" {
+		t.Errorf("Type() = %v, want %v", n.Type("test1"), "string")
+	}
+	if n.Type("test2") != "list" {
+		t.Errorf("Type() = %v, want %v", n.Type("test2"), "int")
+	}
+	if n.Type("test3") != "zset" {
+		t.Errorf("Type() = %v, want %v", n.Type("test3"), "float64")
+	}
+	if n.Type("test4") != "set" {
+		t.Errorf("Type() = %v, want %v", n.Type("test4"), "string")
+	}
+	if n.Type("test5") != "hash" {
+		t.Errorf("Type() = %v, want %v", n.Type("test5"), "bool")
+	}
 }
 
 func TestKey_Scan(t *testing.T) {
