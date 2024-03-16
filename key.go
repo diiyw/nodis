@@ -120,15 +120,28 @@ func (n *Nodis) ExpireAt(key string, timestamp time.Time) {
 // Keys gets the keys
 func (n *Nodis) Keys(pattern string) []string {
 	n.RLock()
-	keys := make([]string, 0, n.keys.Count())
+	keyMap := make(map[string]struct{})
 	n.keys.Iter(func(key string, k *Key) bool {
 		matched, _ := filepath.Match(pattern, key)
 		if matched && !k.expired() {
-			keys = append(keys, key)
+			keyMap[key] = struct{}{}
 		}
 		return false
 	})
+	n.store.RLock()
+	n.store.index.Iter(func(key string, _ *index) bool {
+		matched, _ := filepath.Match(pattern, key)
+		if matched {
+			keyMap[key] = struct{}{}
+		}
+		return false
+	})
+	n.store.RUnlock()
 	n.RUnlock()
+	var keys []string
+	for key := range keyMap {
+		keys = append(keys, key)
+	}
 	return keys
 }
 
