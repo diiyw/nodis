@@ -123,10 +123,16 @@ func (s *Set) SIsMember(member string) bool {
 }
 
 // SRem removes a member from the set.
-func (s *Set) SRem(member string) {
+func (s *Set) SRem(member ...string) int {
 	s.Lock()
 	defer s.Unlock()
-	s.data.Delete(member)
+	var removed = 0
+	for _, m := range member {
+		if s.data.Delete(m) {
+			removed++
+		}
+	}
+	return removed
 }
 
 // SUnion gets the union between sets.

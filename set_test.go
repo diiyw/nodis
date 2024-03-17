@@ -87,3 +87,17 @@ func TestSet_SMembers(t *testing.T) {
 		t.Errorf("SMembers() = %v, want %v", len(members), 3)
 	}
 }
+
+func TestSet_SRem(t *testing.T) {
+	opt := &Options{
+		Path: "testdata",
+	}
+	_ = os.RemoveAll("testdata")
+	n := Open(opt)
+	defer n.Close()
+	n.SAdd("set", "a", "b", "c")
+	n.SRem("set", "a", "b")
+	if n.SCard("set") != 1 {
+		t.Errorf("SCard() = %v, want %v", n.SCard("set"), 1)
+	}
+}

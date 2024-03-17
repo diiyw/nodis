@@ -90,3 +90,13 @@ func (n *Nodis) SMembers(key string) []string {
 	}
 	return s.(*set.Set).SMembers()
 }
+
+// SRem removes the specified members from the set stored at key.
+func (n *Nodis) SRem(key string, members ...string) int {
+	k, s := n.getDs(key, nil, 0)
+	if s == nil {
+		return 0
+	}
+	k.changed.Store(true)
+	return s.(*set.Set).SRem(members...)
+}
