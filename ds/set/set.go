@@ -21,16 +21,17 @@ func NewSet() *Set {
 }
 
 // SAdd adds a member to the set
-func (s *Set) SAdd(member ...string) {
+func (s *Set) SAdd(member ...string) int {
 	s.Lock()
 	defer s.Unlock()
-	s.sAdd(member...)
+	return s.sAdd(member...)
 }
 
-func (s *Set) sAdd(member ...string) {
+func (s *Set) sAdd(member ...string) int {
 	for _, m := range member {
 		s.data.Put(m, struct{}{})
 	}
+	return len(member)
 }
 
 // SCard gets the set members count.

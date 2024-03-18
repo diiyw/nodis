@@ -18,7 +18,7 @@ type SortedSet struct {
 // NewSortedSet makes a new SortedSet
 func NewSortedSet() *SortedSet {
 	return &SortedSet{
-		dict:     swiss.NewMap[string, *Item](16),
+		dict:     swiss.NewMap[string, *Item](32),
 		skiplist: makeSkiplist(),
 	}
 }
@@ -345,7 +345,7 @@ func (sortedSet *SortedSet) UnmarshalBinary(data []byte) error {
 		return err
 	}
 	sortedSet.skiplist = makeSkiplist()
-	sortedSet.dict = swiss.NewMap[string, *Item](16)
+	sortedSet.dict = swiss.NewMap[string, *Item](32)
 	for k, v := range m {
 		sortedSet.zAdd(k, v.Score)
 	}

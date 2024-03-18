@@ -13,8 +13,7 @@ func (n *Nodis) newSet() ds.DataStruct {
 func (n *Nodis) SAdd(key string, members ...string) int {
 	k, s := n.getDs(key, n.newSet, 0)
 	k.changed.Store(true)
-	s.(*set.Set).SAdd(members...)
-	return s.(*set.Set).SCard()
+	return s.(*set.Set).SAdd(members...)
 }
 
 // SCard gets the set members count.

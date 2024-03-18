@@ -287,7 +287,7 @@ func (s *store) close() error {
 func (s *store) clear() error {
 	s.Lock()
 	defer s.Unlock()
-	err := s.aof.Close()
+	err := s.aof.Truncate(0)
 	if err != nil {
 		return err
 	}

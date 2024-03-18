@@ -23,8 +23,8 @@ func Open(opt *Options) *Nodis {
 		opt.FileSize = FileSizeGB
 	}
 	n := &Nodis{
-		dataStructs: swiss.NewMap[string, ds.DataStruct](16),
-		keys:        swiss.NewMap[string, *Key](16),
+		dataStructs: swiss.NewMap[string, ds.DataStruct](32),
+		keys:        swiss.NewMap[string, *Key](32),
 		options:     opt,
 	}
 	stat, err := os.Stat(opt.Path)

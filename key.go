@@ -35,9 +35,6 @@ func (k *Key) expired() bool {
 
 func (n *Nodis) getKey(key string) (*Key, bool) {
 	k, ok := n.keys.Get(key)
-	if !ok {
-		n.dataStructs.Delete(key)
-	}
 	if k.expired() {
 		n.keys.Delete(key)
 		n.dataStructs.Delete(key)
