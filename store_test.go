@@ -15,7 +15,7 @@ func TestStorePut(t *testing.T) {
 	tempDir := "testdata"
 	os.RemoveAll(tempDir)
 	// Create a new Store instance
-	store := newStore(tempDir, 1024)
+	store := newStore(tempDir, 1024, 0)
 
 	// Generate a random key and value for testing
 	key := "testKey"
@@ -30,24 +30,24 @@ func TestStorePut(t *testing.T) {
 	}
 
 	// Retrieve the value from the index
-	index, _ := store.index.Get(key)
-	if index == nil {
+	idx, _ := store.index.Get(key)
+	if idx == nil {
 		t.Fatalf("Failed to retrieve index for key: %s", key)
 	}
 
 	// Verify the index values
-	if index.FileID != 0 {
-		t.Errorf("Expected FileID to be 0, got %d", index.FileID)
+	if idx.FileID != 0 {
+		t.Errorf("Expected FileID to be 0, got %d", idx.FileID)
 	}
-	if index.Offset != 0 {
-		t.Errorf("Expected Offset to be 0, got %d", index.Offset)
+	if idx.Offset != 0 {
+		t.Errorf("Expected Offset to be 0, got %d", idx.Offset)
 	}
 	v, _ := e.Marshal()
-	if index.Size != uint32(len(v)) {
-		t.Errorf("Expected Size to be %d, got %d", len(v), index.Size)
+	if idx.Size != uint32(len(v)) {
+		t.Errorf("Expected Size to be %d, got %d", len(v), idx.Size)
 	}
-	if index.ExpiredAt <= 0 {
-		t.Errorf("Expected ExpiredAt to be greater than 0, got %d", index.ExpiredAt)
+	if idx.ExpiredAt <= 0 {
+		t.Errorf("Expected ExpiredAt to be greater than 0, got %d", idx.ExpiredAt)
 	}
 
 	// Read the value from the aof file
@@ -71,7 +71,7 @@ func TestStoreGet(t *testing.T) {
 	tempDir := "testdata"
 
 	// Create a new Store instance
-	store := newStore(tempDir, 1024)
+	store := newStore(tempDir, 1024, 0)
 
 	// Generate a random key and value for testing
 	key := "testKey"
@@ -112,7 +112,7 @@ func TestStoreMultiPut(t *testing.T) {
 	tempDir := "testdata"
 
 	// Create a new Store instance
-	store := newStore(tempDir, 1024)
+	store := newStore(tempDir, 1024, 0)
 
 	var kv = map[string][]byte{
 		"testKey1": []byte("testValue1"),
@@ -158,7 +158,7 @@ func TestStoreMultiFilePut(t *testing.T) {
 	os.RemoveAll(tempDir)
 	os.Mkdir(tempDir, 0755)
 	// Create a new Store instance
-	store := newStore(tempDir, 10)
+	store := newStore(tempDir, 10, 0)
 	result := make(map[string][]byte)
 	var kv = []map[string][]byte{
 		{
@@ -214,7 +214,7 @@ func TestStoreRemove(t *testing.T) {
 	tempDir := "testdata"
 
 	// Create a new Store instance
-	store := newStore(tempDir, 1024)
+	store := newStore(tempDir, 1024, 0)
 
 	// Generate a random key and value for testing
 	key := "testKey"
@@ -231,8 +231,52 @@ func TestStoreRemove(t *testing.T) {
 	store.remove(key)
 
 	// Retrieve the value from the index
-	index, _ := store.index.Get(key)
-	if index != nil {
-		t.Fatalf("Expected index to be nil, got %v", index)
+	idx, _ := store.index.Get(key)
+	if idx != nil {
+		t.Fatalf("Expected index to be nil, got %v", idx)
+	}
+}
+
+func TestStorePutRaw(t *testing.T) {
+	tempDir := "testdata"
+
+	// Create a new Store instance
+	store := newStore(tempDir, 1024, 0)
+
+	// Generate a random key and value for testing
+	key := "testKey"
+	value := []byte("testValue")
+	d := str.NewString()
+	d.Set(value)
+	var e = newEntry(key, d, time.Now().Unix()+3600)
+	data, err := e.Marshal()
+	if err != nil {
+		t.Fatalf("Failed to marshal data: %v", err)
+	}
+	// Call the putRaw method
+	err = store.putRaw(key, data, e.ExpiredAt)
+	if err != nil {
+		t.Fatalf("Failed to put key-value pair: %v", err)
+	}
+
+	// Retrieve the value from the index
+	idx, _ := store.index.Get(key)
+	if idx == nil {
+		t.Fatalf("Failed to retrieve index for key: %s", key)
+	}
+	nd, err := store.get(key)
+	if err != nil {
+		t.Fatalf("Failed to get value for key: %v", err)
+	}
+	if !bytes.Equal(nd, data) {
+		t.Errorf("Expected value to be %v, got %v", data, nd)
+	}
+	e, err = parseDs(nd)
+	if err != nil {
+		t.Fatalf("Failed to parse value for key: %v", err)
+	}
+	v := e.Value.(*str.String).Get()
+	if !bytes.Equal(value, v) {
+		t.Errorf("Expected value to be %v, got %v", value, v)
 	}
 }

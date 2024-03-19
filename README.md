@@ -3,7 +3,6 @@
 <div class="column" align="left">
   <a href="https://godoc.org/github.com/diiyw/nodis"><img src="https://godoc.org/github.com/diiyw/nodis?status.svg" /></a>
   <a href="https://goreportcard.com/report/github.com/diiyw/nodis"><img src="https://goreportcard.com/badge/github.com/diiyw/nodis" /></a>
-  <a href="https://goreportcard.com/report/github.com/diiyw/nodis"><img src="https://github.com/diiyw/nodis/workflows/Go/badge.svg?branch=main"/></a>
   <a href="https://codecov.io/gh/diiyw/nodis"><img src="https://codecov.io/gh/diiyw/nodis/branch/main/graph/badge.svg?token=CupujOXpbe"/></a>
 </div>
 
@@ -29,7 +28,7 @@ It is a simple and easy to embed in your application.
 
 ## Get Started
 ```bash
- go get github.com/diiyw/nodis@v1.1.0-beta.10
+ go get github.com/diiyw/nodis@v1.1.0-beta.11
 ```
 ```go
 package main
@@ -45,25 +44,40 @@ func main() {
 	n.Set("key", []byte("value"), 0)
 	n.LPush("list", []byte("value1"))
 }
-
 ```
 
 ## Benchmark
+Windows 11: 12C/32G
 ```bash
 goos: windows
 goarch: amd64
 pkg: github.com/diiyw/nodis/bench
-cpu: 12th Gen Intel(R) Core(TM) i5-12490F
-BenchmarkSet-12               2095956                   538.0 ns/op            269B/op            3 allocs/op
-BenchmarkGet-12               15941229                  68.03 ns/op            7B/op              0 allocs/op
-BenchmarkLPush-12             2238814                   608.0 ns/op            306B/op            4 allocs/op
-BenchmarkLPop-12              18975078                  63.12 ns/op            7B/op              0 allocs/op
-BenchmarkSAdd-12              1000000                   1029 ns/op             1285B/op           6 allocs/op
-BenchmarkSMembers-12          17402097                  66.90 ns/op            8B/op              1 allocs/op
-BenchmarkZAdd-12              1847750                   704.0 ns/op            245B/op            7 allocs/op
-BenchmarkZRank-12             16226691                  74.38 ns/op            7B/op              0 allocs/op
-BenchmarkHSet-12              1000000                   1704 ns/op             2453B/op           7 allocs/op
-BenchmarkHGet-12              16762840                  73.54 ns/op            7B/op              0 allocs/op
+BenchmarkSet-12                  1247017               844.3 ns/op           223 B/op          4 allocs/op
+BenchmarkGet-12                  7624095               144.2 ns/op             7 B/op          0 allocs/op
+BenchmarkLPush-12                1331316               884.9 ns/op           271 B/op          5 allocs/op
+BenchmarkLPop-12                15884398               70.02 ns/op             8 B/op          1 allocs/op
+BenchmarkSAdd-12                 1204911                1032 ns/op           335 B/op          6 allocs/op
+BenchmarkSMembers-12             7263865               142.0 ns/op             8 B/op          1 allocs/op
+BenchmarkZAdd-12                 1311826               845.4 ns/op           214 B/op          7 allocs/op
+BenchmarkZRank-12                6371636               160.2 ns/op             7 B/op          0 allocs/op
+BenchmarkHSet-12                 1000000                1079 ns/op           399 B/op          7 allocs/op
+BenchmarkHGet-12                 6938287               183.0 ns/op             7 B/op          0 allocs/op
+```
+Linux VM: 2C/8GB
+```bash
+goos: linux
+goarch: amd64
+pkg: github.com/diiyw/nodis/bench             
+BenchmarkSet-2        	 1000000	      1359 ns/op	     223 B/op	       4 allocs/op
+BenchmarkGet-2        	 4724623	     214.9 ns/op	       7 B/op	       0 allocs/op
+BenchmarkLPush-2      	 1000000	      1422 ns/op	     271 B/op	       5 allocs/op
+BenchmarkLPop-2       	17787996	     71.42 ns/op	       8 B/op	       1 allocs/op
+BenchmarkSAdd-2       	 1000000	      1669 ns/op	     335 B/op	       6 allocs/op
+BenchmarkSMembers-2   	 5861822	     178.0 ns/op	       8 B/op	       1 allocs/op
+BenchmarkZAdd-2       	 1000000	      1625 ns/op	     214 B/op	       7 allocs/op
+BenchmarkZRank-2      	 5033864	     207.4 ns/op	       7 B/op	       0 allocs/op
+BenchmarkHSet-2       	  939238	      1782 ns/op	     399 B/op	       7 allocs/op
+BenchmarkHGet-2       	 6019508	     197.3 ns/op	       7 B/op	       0 allocs/op
 ```
 
 ## Note

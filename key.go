@@ -72,7 +72,7 @@ func (n *Nodis) exists(key string) (k *Key, ok bool) {
 		if err == nil && len(v) > 0 {
 			e, err := parseDs(v)
 			if err != nil {
-				log.Println("Parse Datastruct:", err)
+				log.Println("Parse DataStruct:", err)
 				return
 			}
 			if e != nil {

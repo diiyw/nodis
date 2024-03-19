@@ -26,18 +26,20 @@ func Open(opt *Options) *Nodis {
 	n := &Nodis{
 		options: opt,
 	}
-	stat, err := os.Stat(opt.Path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			err = os.MkdirAll(opt.Path, 0755)
-			if err != nil {
-				panic(err)
+	if opt.Mode == HotDataMode {
+		stat, err := os.Stat(opt.Path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				err = os.MkdirAll(opt.Path, 0755)
+				if err != nil {
+					panic(err)
+				}
 			}
+		} else if !stat.IsDir() {
+			panic("Path is not a directory")
 		}
-	} else if !stat.IsDir() {
-		panic("Path is not a directory")
 	}
-	n.store = newStore(opt.Path, opt.FileSize)
+	n.store = newStore(opt.Path, opt.FileSize, opt.Mode)
 	go func() {
 		if opt.RecycleDuration != 0 {
 			for {

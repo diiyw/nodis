@@ -56,7 +56,7 @@ func (e *Entity) Marshal() ([]byte, error) {
 	return binary.Marshal(block)
 }
 
-// Unmarshal unmarshals the entry
+// Unmarshal the entry
 func (e *Entity) Unmarshal(data []byte) error {
 	var block dataEntity
 	if err := binary.Unmarshal(data, &block); err != nil {

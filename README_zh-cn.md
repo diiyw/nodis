@@ -3,7 +3,6 @@
 <div class="column" align="left">
   <a href="https://godoc.org/github.com/diiyw/nodis"><img src="https://godoc.org/github.com/diiyw/nodis?status.svg" /></a>
   <a href="https://goreportcard.com/report/github.com/diiyw/nodis"><img src="https://goreportcard.com/badge/github.com/diiyw/nodis" /></a>
-  <a href="https://goreportcard.com/report/github.com/diiyw/nodis"><img src="https://github.com/diiyw/nodis/workflows/Go/badge.svg?branch=master"/></a>
   <a href="https://codecov.io/gh/diiyw/nodis"><img src="https://codecov.io/gh/diiyw/nodis/branch/master/graph/badge.svg?token=CupujOXpbe"/></a>
 </div>
 
@@ -29,7 +28,7 @@ Nodis 是一个简单可嵌入到应用中内存数据库，实现Redis的数据
 ## Get Started
 
 ```bash
-go get github.com/diiyw/nodis@v1.1.0-beta.8
+go get github.com/diiyw/nodis@v1.1.0-beta.11
 ```
 
 ```go

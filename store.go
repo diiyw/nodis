@@ -24,32 +24,34 @@ type store struct {
 	index     btree.Map[string, *index]
 }
 
-func newStore(path string, fileSize int64) *store {
+func newStore(path string, fileSize int64, mode uint8) *store {
 	s := &store{
 		path:      path,
 		fileSize:  fileSize,
 		indexFile: filepath.Join(path, "nodis.index"),
 	}
-	_ = os.MkdirAll(path, 0755)
-	data, _ := os.ReadFile(s.indexFile)
-	if len(data) >= 4 {
-		if len(data[4:]) > 0 {
-			var m map[string]*index
-			err := binary.Unmarshal(data[4:], &m)
-			if err != nil {
-				panic(err)
+	if mode == HotDataMode {
+		_ = os.MkdirAll(path, 0755)
+		data, _ := os.ReadFile(s.indexFile)
+		if len(data) >= 4 {
+			if len(data[4:]) > 0 {
+				var m map[string]*index
+				err := binary.Unmarshal(data[4:], &m)
+				if err != nil {
+					panic(err)
+				}
+				for k, v := range m {
+					s.index.Set(k, v)
+				}
 			}
-			for k, v := range m {
-				s.index.Set(k, v)
-			}
+			s.fileId = binary.LittleEndian.Uint32(data[:4])
 		}
-		s.fileId = binary.LittleEndian.Uint32(data[:4])
-	}
-	s.current = filepath.Join(path, "nodis."+strconv.Itoa(int(s.fileId))+".aof")
-	var err error
-	s.aof, err = os.OpenFile(s.current, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
-	if err != nil {
-		panic(err)
+		s.current = filepath.Join(path, "nodis."+strconv.Itoa(int(s.fileId))+".aof")
+		var err error
+		s.aof, err = os.OpenFile(s.current, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
+		if err != nil {
+			panic(err)
+		}
 	}
 	return s
 }
@@ -135,16 +137,16 @@ func (s *store) put(entry *Entity) error {
 func (s *store) putRaw(key string, data []byte, expiredAt int64) error {
 	s.Lock()
 	defer s.Unlock()
-	var index = &index{}
+	var idx = &index{}
 	offset, err := s.check()
 	if err != nil {
 		return err
 	}
-	index.FileID = s.fileId
-	index.Offset = offset
-	index.Size = uint32(len(data))
-	index.ExpiredAt = expiredAt
-	s.index.Set(key, index)
+	idx.FileID = s.fileId
+	idx.Offset = offset
+	idx.Size = uint32(len(data))
+	idx.ExpiredAt = expiredAt
+	s.index.Set(key, idx)
 	_, err = s.aof.Write(data)
 	if err != nil {
 		return err
@@ -156,27 +158,27 @@ func (s *store) putRaw(key string, data []byte, expiredAt int64) error {
 func (s *store) get(key string) ([]byte, error) {
 	s.RLock()
 	defer s.RUnlock()
-	index, ok := s.index.Get(key)
+	idx, ok := s.index.Get(key)
 	if !ok {
 		return nil, nil
 	}
-	if index.FileID == s.fileId {
-		data := make([]byte, index.Size)
-		_, err := s.aof.ReadAt(data, index.Offset)
+	if idx.FileID == s.fileId {
+		data := make([]byte, idx.Size)
+		_, err := s.aof.ReadAt(data, idx.Offset)
 		if err != nil {
 			return nil, err
 		}
 		return data, nil
 	}
 	// read from other file
-	file := filepath.Join(s.path, "nodis."+strconv.Itoa(int(index.FileID))+".aof")
+	file := filepath.Join(s.path, "nodis."+strconv.Itoa(int(idx.FileID))+".aof")
 	f, err := os.Open(file)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	data := make([]byte, index.Size)
-	_, err = f.ReadAt(data, index.Offset)
+	data := make([]byte, idx.Size)
+	_, err = f.ReadAt(data, idx.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +202,7 @@ func (s *store) snapshot(path string, entries []*Entity) {
 		log.Println("Snapshot mkdir error: ", err)
 		return
 	}
-	ns := newStore(snapshotDir, s.fileSize)
+	ns := newStore(snapshotDir, s.fileSize, 0)
 	for _, entry := range entries {
 		ns.put(entry)
 	}
