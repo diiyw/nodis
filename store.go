@@ -9,26 +9,25 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dolthub/swiss"
 	"github.com/kelindar/binary"
+	"github.com/tidwall/btree"
 )
 
 type store struct {
 	sync.RWMutex
 	fileSize  int64
-	aof       *os.File
+	fileId    uint32
 	path      string
 	current   string
-	index     *swiss.Map[string, *index]
-	fileId    uint32
 	indexFile string
+	aof       *os.File
+	index     btree.Map[string, *index]
 }
 
 func newStore(path string, fileSize int64) *store {
 	s := &store{
 		path:      path,
 		fileSize:  fileSize,
-		index:     swiss.NewMap[string, *index](32),
 		indexFile: filepath.Join(path, "nodis.index"),
 	}
 	_ = os.MkdirAll(path, 0755)
@@ -41,7 +40,7 @@ func newStore(path string, fileSize int64) *store {
 				panic(err)
 			}
 			for k, v := range m {
-				s.index.Put(k, v)
+				s.index.Set(k, v)
 			}
 		}
 		s.fileId = binary.LittleEndian.Uint32(data[:4])
@@ -125,7 +124,7 @@ func (s *store) put(entry *Entity) error {
 	idx.Offset = offset
 	idx.Size = uint32(len(data))
 	idx.ExpiredAt = entry.ExpiredAt
-	s.index.Put(entry.Key, idx)
+	s.index.Set(entry.Key, idx)
 	_, err = s.aof.Write(data)
 	if err != nil {
 		return err
@@ -145,7 +144,7 @@ func (s *store) putRaw(key string, data []byte, expiredAt int64) error {
 	index.Offset = offset
 	index.Size = uint32(len(data))
 	index.ExpiredAt = expiredAt
-	s.index.Put(key, index)
+	s.index.Set(key, index)
 	_, err = s.aof.Write(data)
 	if err != nil {
 		return err
@@ -205,21 +204,21 @@ func (s *store) snapshot(path string, entries []*Entity) {
 	for _, entry := range entries {
 		ns.put(entry)
 	}
-	s.index.Iter(func(key string, index *index) bool {
-		if ns.index.Has(key) {
-			return false
+	s.index.Scan(func(key string, index *index) bool {
+		if _, ok := ns.index.Get(key); !ok {
+			return true
 		}
 		data, err := s.get(key)
 		if err != nil {
 			log.Println("Snapshot get error: ", err)
-			return false
+			return true
 		}
 		err = ns.putRaw(key, data, index.ExpiredAt)
 		if err != nil {
 			log.Println("Snapshot put error: ", err)
-			return false
+			return true
 		}
-		return false
+		return true
 	})
 	err = ns.close()
 	if err != nil {
@@ -254,13 +253,13 @@ func (s *store) close() error {
 		return err
 	}
 	var indexData = make(map[string][]byte, 0)
-	s.index.Iter(func(key string, value *index) bool {
+	s.index.Scan(func(key string, value *index) bool {
 		data, err := binary.Marshal(value)
 		if err != nil {
-			return true
+			return false
 		}
 		indexData[key] = data
-		return false
+		return true
 	})
 	data, err := binary.Marshal(indexData)
 	if err != nil {

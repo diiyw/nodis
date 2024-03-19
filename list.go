@@ -131,9 +131,9 @@ func (n *Nodis) LPopRPush(source, destination string) []byte {
 	}
 	destinationKey, ok := n.exists(destination)
 	if !ok {
-		n.dataStructs.Put(destination, list.NewDoublyLinkedList())
+		n.dataStructs.Set(destination, list.NewDoublyLinkedList())
 		destinationKey = newKey(ds.List, 0)
-		n.keys.Put(destination, destinationKey)
+		n.keys.Set(destination, destinationKey)
 	}
 	destinationKey.changed.Store(true)
 	l, _ = n.dataStructs.Get(destination)
@@ -153,9 +153,9 @@ func (n *Nodis) RPopLPush(source, destination string) []byte {
 	}
 	destinationKey, ok := n.exists(destination)
 	if !ok {
-		n.dataStructs.Put(destination, list.NewDoublyLinkedList())
+		n.dataStructs.Set(destination, list.NewDoublyLinkedList())
 		destinationKey = newKey(ds.List, 0)
-		n.keys.Put(destination, destinationKey)
+		n.keys.Set(destination, destinationKey)
 	}
 	destinationKey.changed.Store(true)
 	l, _ = n.dataStructs.Get(destination)

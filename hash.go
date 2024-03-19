@@ -88,10 +88,10 @@ func (n *Nodis) HSetNX(key string, field string, value []byte) bool {
 		return false
 	}
 	h = n.newHash()
-	n.dataStructs.Put(key, h)
+	n.dataStructs.Set(key, h)
 	k := newKey(h.GetType(), 0)
 	k.lastUse.Store(uint32(time.Now().Unix()))
-	n.keys.Put(key, k)
+	n.keys.Set(key, k)
 	k.changed.Store(true)
 	n.HSet(key, field, value)
 	return true

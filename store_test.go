@@ -90,7 +90,7 @@ func TestStoreGet(t *testing.T) {
 	}
 
 	// Create an index entry for the key
-	store.index.Put(key, &index{
+	store.index.Set(key, &index{
 		FileID:    0,
 		Offset:    0,
 		Size:      uint32(len(value)),
@@ -135,8 +135,8 @@ func TestStoreMultiPut(t *testing.T) {
 		}
 	}
 
-	if store.index.Count() != 5 {
-		t.Fatalf("Expected index count to be 5, got %d", store.index.Count())
+	if store.index.Len() != 5 {
+		t.Fatalf("Expected index count to be 5, got %d", store.index.Len())
 	}
 	for key, value := range kv {
 		v, err := store.get(key)

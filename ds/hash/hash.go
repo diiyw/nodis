@@ -7,20 +7,18 @@ import (
 
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/utils"
-	"github.com/dolthub/swiss"
 	"github.com/kelindar/binary"
+	"github.com/tidwall/btree"
 )
 
 type HashMap struct {
 	sync.RWMutex
-	data *swiss.Map[string, []byte]
+	data btree.Map[string, []byte]
 }
 
 // NewHashMap creates a new hash
 func NewHashMap() *HashMap {
-	return &HashMap{
-		data: swiss.NewMap[string, []byte](32),
-	}
+	return &HashMap{}
 }
 
 // GetType returns the type of the data structure
@@ -30,7 +28,7 @@ func (s *HashMap) GetType() ds.DataType {
 
 // HSet sets the value of a hash
 func (s *HashMap) HSet(key string, value []byte) {
-	s.data.Put(key, value)
+	s.data.Set(key, value)
 }
 
 // HGet gets the value of a hash
@@ -49,17 +47,12 @@ func (s *HashMap) HDel(key string) {
 
 // HLen gets the length of a hash
 func (s *HashMap) HLen() int {
-	return s.data.Count()
+	return s.data.Len()
 }
 
 // HKeys gets the keys of a hash
 func (s *HashMap) HKeys() []string {
-	keys := make([]string, 0, s.data.Count())
-	s.data.Iter(func(key string, _ []byte) bool {
-		keys = append(keys, key)
-		return false
-	})
-	return keys
+	return s.data.Keys()
 }
 
 // HExists checks if a key exists in a hash
@@ -70,10 +63,10 @@ func (s *HashMap) HExists(key string) bool {
 
 // HGetAll gets all the values of a hash
 func (s *HashMap) HGetAll() map[string][]byte {
-	values := make(map[string][]byte, s.data.Count())
-	s.data.Iter(func(key string, value []byte) bool {
+	values := make(map[string][]byte, s.data.Len())
+	s.data.Scan(func(key string, value []byte) bool {
 		values[key] = value
-		return false
+		return true
 	})
 	return values
 }
@@ -82,12 +75,12 @@ func (s *HashMap) HGetAll() map[string][]byte {
 func (s *HashMap) HIncrBy(key string, value int64) int64 {
 	v, ok := s.data.Get(key)
 	if !ok {
-		s.data.Put(key, []byte(strconv.FormatInt(value, 10)))
+		s.data.Set(key, []byte(strconv.FormatInt(value, 10)))
 		return 0
 	}
 	vi, _ := strconv.ParseInt(utils.Byte2String(v), 10, 64)
 	i := vi + value
-	s.data.Put(key, []byte(strconv.FormatInt(i, 10)))
+	s.data.Set(key, []byte(strconv.FormatInt(i, 10)))
 	return i
 }
 
@@ -95,19 +88,19 @@ func (s *HashMap) HIncrBy(key string, value int64) int64 {
 func (s *HashMap) HIncrByFloat(key string, value float64) float64 {
 	v, ok := s.data.Get(key)
 	if !ok {
-		s.data.Put(key, []byte(strconv.FormatFloat(value, 'f', -1, 64)))
+		s.data.Set(key, []byte(strconv.FormatFloat(value, 'f', -1, 64)))
 		return 0
 	}
 	vf, _ := strconv.ParseFloat(utils.Byte2String(v), 64)
 	f := vf + value
-	s.data.Put(key, []byte(strconv.FormatFloat(f, 'f', -1, 64)))
+	s.data.Set(key, []byte(strconv.FormatFloat(f, 'f', -1, 64)))
 	return f
 }
 
 // HMSet sets the values of a hash
 func (s *HashMap) HMSet(values map[string][]byte) {
 	for key, value := range values {
-		s.data.Put(key, value)
+		s.data.Set(key, value)
 	}
 }
 
@@ -131,31 +124,26 @@ func (s *HashMap) HSetNX(key string, value []byte) bool {
 	if ok {
 		return false
 	}
-	s.data.Put(key, value)
+	s.data.Set(key, value)
 	return true
 }
 
 // HVals gets the values of a hash
 func (s *HashMap) HVals() [][]byte {
-	values := make([][]byte, 0, s.data.Count())
-	s.data.Iter(func(_ string, value []byte) bool {
-		values = append(values, value)
-		return false
-	})
-	return values
+	return s.data.Values()
 }
 
 // HScan scans the values of a hash
 func (s *HashMap) HScan(cursor int, match string, count int) (int, map[string][]byte) {
-	values := make(map[string][]byte, s.data.Count())
+	values := make(map[string][]byte, s.data.Len())
 	i := 0
-	s.data.Iter(func(key string, value []byte) bool {
+	s.data.Scan(func(key string, value []byte) bool {
 		matched, _ := filepath.Match(match, key)
 		if matched && i >= cursor {
 			values[key] = value
 		}
 		i++
-		return i >= cursor+count
+		return i < cursor+count
 	})
 	return i, values
 }
@@ -172,10 +160,8 @@ func (s *HashMap) UnmarshalBinary(data []byte) error {
 	if err := binary.Unmarshal(data, &values); err != nil {
 		return err
 	}
-
-	s.data = swiss.NewMap[string, []byte](32)
 	for key, value := range values {
-		s.data.Put(key, value)
+		s.data.Set(key, value)
 	}
 	return nil
 }

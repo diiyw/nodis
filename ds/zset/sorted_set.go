@@ -4,21 +4,20 @@ import (
 	"sync"
 
 	"github.com/diiyw/nodis/ds"
-	"github.com/dolthub/swiss"
 	"github.com/kelindar/binary"
+	"github.com/tidwall/btree"
 )
 
 // SortedSet is a set which keys sorted by bound score
 type SortedSet struct {
 	sync.RWMutex
-	dict     *swiss.Map[string, *Item]
+	dict     btree.Map[string, *Item]
 	skiplist *skiplist
 }
 
 // NewSortedSet makes a new SortedSet
 func NewSortedSet() *SortedSet {
 	return &SortedSet{
-		dict:     swiss.NewMap[string, *Item](32),
 		skiplist: makeSkiplist(),
 	}
 }
@@ -38,7 +37,7 @@ func (sortedSet *SortedSet) ZAdd(member string, score float64) bool {
 // zAdd puts member into set,  and returns whether it has inserted new node
 func (sortedSet *SortedSet) zAdd(member string, score float64) bool {
 	element, ok := sortedSet.dict.Get(member)
-	sortedSet.dict.Put(member, &Item{
+	sortedSet.dict.Set(member, &Item{
 		Member: member,
 		Score:  score,
 	})
@@ -57,7 +56,7 @@ func (sortedSet *SortedSet) zAdd(member string, score float64) bool {
 func (sortedSet *SortedSet) ZCard() int64 {
 	sortedSet.RLock()
 	defer sortedSet.RUnlock()
-	return int64(sortedSet.dict.Count())
+	return int64(sortedSet.dict.Len())
 }
 
 // ZRem removes the given member from set
@@ -331,9 +330,9 @@ func (sortedSet *SortedSet) MarshalBinary() ([]byte, error) {
 	var m = make(map[string]*Item)
 	sortedSet.RLock()
 	defer sortedSet.RUnlock()
-	sortedSet.dict.Iter(func(key string, value *Item) bool {
+	sortedSet.dict.Scan(func(key string, value *Item) bool {
 		m[key] = value
-		return false
+		return true
 	})
 	return binary.Marshal(m)
 }
@@ -345,7 +344,6 @@ func (sortedSet *SortedSet) UnmarshalBinary(data []byte) error {
 		return err
 	}
 	sortedSet.skiplist = makeSkiplist()
-	sortedSet.dict = swiss.NewMap[string, *Item](32)
 	for k, v := range m {
 		sortedSet.zAdd(k, v.Score)
 	}

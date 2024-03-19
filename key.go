@@ -76,11 +76,11 @@ func (n *Nodis) exists(key string) (k *Key, ok bool) {
 				return
 			}
 			if e != nil {
-				n.dataStructs.Put(key, e.Value)
+				n.dataStructs.Set(key, e.Value)
 				k = newKey(e.Value.GetType(), 0)
 				k.changed.Store(false)
 				ok = true
-				n.keys.Put(key, k)
+				n.keys.Set(key, k)
 				return
 			}
 		}
@@ -118,20 +118,20 @@ func (n *Nodis) ExpireAt(key string, timestamp time.Time) {
 func (n *Nodis) Keys(pattern string) []string {
 	n.RLock()
 	keyMap := make(map[string]struct{})
-	n.keys.Iter(func(key string, k *Key) bool {
+	n.keys.Scan(func(key string, k *Key) bool {
 		matched, _ := filepath.Match(pattern, key)
 		if matched && !k.expired() {
 			keyMap[key] = struct{}{}
 		}
-		return false
+		return true
 	})
 	n.store.RLock()
-	n.store.index.Iter(func(key string, _ *index) bool {
+	n.store.index.Scan(func(key string, _ *index) bool {
 		matched, _ := filepath.Match(pattern, key)
 		if matched {
 			keyMap[key] = struct{}{}
 		}
-		return false
+		return true
 	})
 	n.store.RUnlock()
 	n.RUnlock()
@@ -168,9 +168,9 @@ func (n *Nodis) Rename(key, key2 string) error {
 		return errors.New("key does not exist")
 	}
 	n.dataStructs.Delete(key)
-	n.dataStructs.Put(key2, v)
+	n.dataStructs.Set(key2, v)
 	n.keys.Delete(key)
-	n.keys.Put(key2, newKey(v.GetType(), 0))
+	n.keys.Set(key2, newKey(v.GetType(), 0))
 	n.Unlock()
 	return nil
 }
@@ -202,13 +202,13 @@ func (n *Nodis) Type(key string) string {
 // Scan the keys
 func (n *Nodis) Scan(cursor int, match string, count int) (int, []string) {
 	n.RLock()
-	keys := make([]string, 0, n.keys.Count())
-	n.keys.Iter(func(key string, k *Key) bool {
+	keys := make([]string, 0, n.keys.Len())
+	n.keys.Scan(func(key string, k *Key) bool {
 		matched, _ := filepath.Match(match, key)
 		if matched && !k.expired() {
 			keys = append(keys, key)
 		}
-		return false
+		return true
 	})
 	n.RUnlock()
 	if len(keys) == 0 {

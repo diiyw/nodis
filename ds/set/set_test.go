@@ -71,7 +71,7 @@ func TestSet_SInter(t *testing.T) {
 	s2.SAdd("world")
 	inter := s1.SInter(s2)
 	if len(inter) != 1 {
-		t.Errorf("SInter failed")
+		t.Errorf("SInter failed excepted 1 got %d", len(inter))
 	}
 }
 

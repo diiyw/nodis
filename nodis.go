@@ -7,15 +7,16 @@ import (
 	"time"
 
 	"github.com/diiyw/nodis/ds"
-	"github.com/dolthub/swiss"
+	"github.com/tidwall/btree"
 )
 
 type Nodis struct {
 	sync.RWMutex
-	dataStructs *swiss.Map[string, ds.DataStruct]
-	keys        *swiss.Map[string, *Key]
+	dataStructs btree.Map[string, ds.DataStruct]
+	keys        btree.Map[string, *Key]
 	options     *Options
 	store       *store
+	closed      bool
 }
 
 func Open(opt *Options) *Nodis {
@@ -23,9 +24,7 @@ func Open(opt *Options) *Nodis {
 		opt.FileSize = FileSizeGB
 	}
 	n := &Nodis{
-		dataStructs: swiss.NewMap[string, ds.DataStruct](32),
-		keys:        swiss.NewMap[string, *Key](32),
-		options:     opt,
+		options: opt,
 	}
 	stat, err := os.Stat(opt.Path)
 	if err != nil {
@@ -69,14 +68,17 @@ func (n *Nodis) Snapshot(path string) {
 func (n *Nodis) Recycle() {
 	n.Lock()
 	defer n.Unlock()
+	if n.closed {
+		return
+	}
 	now := uint32(time.Now().Unix())
 	recycleTime := now - uint32(n.options.RecycleDuration.Seconds())
-	n.keys.Iter(func(key string, k *Key) bool {
+	n.keys.Scan(func(key string, k *Key) bool {
 		if k.expired() {
 			n.dataStructs.Delete(key)
 			n.keys.Delete(key)
 			n.store.remove(key)
-			return false
+			return true
 		}
 		lastUse := k.lastUse.Load()
 		if lastUse != 0 && lastUse <= recycleTime {
@@ -92,23 +94,23 @@ func (n *Nodis) Recycle() {
 				}
 			}
 		}
-		return false
+		return true
 	})
 }
 
 // getChangedEntries returns all keys that have been getChangedEntries
 func (n *Nodis) getChangedEntries() []*Entity {
 	entries := make([]*Entity, 0)
-	n.keys.Iter(func(key string, k *Key) bool {
+	n.keys.Scan(func(key string, k *Key) bool {
 		if !k.changed.Load() || k.expired() {
-			return false
+			return true
 		}
 		d, ok := n.dataStructs.Get(key)
 		if !ok {
-			return false
+			return true
 		}
 		entries = append(entries, newEntry(key, d, k.ExpiredAt))
-		return false
+		return true
 	})
 	return entries
 }
@@ -125,6 +127,7 @@ func (n *Nodis) Close() error {
 			return err
 		}
 	}
+	n.closed = true
 	return n.store.close()
 }
 
@@ -139,10 +142,10 @@ func (n *Nodis) getDs(key string, newFn func() ds.DataStruct, ttl int64) (*Key, 
 	if !ok {
 		if newFn != nil {
 			d = newFn()
-			n.dataStructs.Put(key, d)
+			n.dataStructs.Set(key, d)
 			k = newKey(d.GetType(), ttl)
 			k.lastUse.Store(uint32(time.Now().Unix()))
-			n.keys.Put(key, k)
+			n.keys.Set(key, k)
 			return k, d
 		}
 		return nil, nil

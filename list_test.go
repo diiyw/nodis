@@ -202,3 +202,27 @@ func TestList_RPopLPush(t *testing.T) {
 		t.Error("LPopRPush failed expected list length 2 got 1")
 	}
 }
+
+func TestList_LPopRPush2(t *testing.T) {
+	_ = os.RemoveAll("testdata")
+	n := Open(&Options{Path: "testdata"})
+	n.LPush("list", []byte("value"))
+	if string(n.LPopRPush("list", "list2")) != "value" {
+		t.Error("LPopRPush failed")
+	}
+	if n.LLen("list2") != 1 {
+		t.Error("LPopRPush failed expected list length 1")
+	}
+}
+
+func TestList_RPopLPush2(t *testing.T) {
+	_ = os.RemoveAll("testdata")
+	n := Open(&Options{Path: "testdata"})
+	n.RPush("list", []byte("value"))
+	if string(n.RPopLPush("list", "list2")) != "value" {
+		t.Error("RPopLPush failed")
+	}
+	if n.LLen("list2") != 1 {
+		t.Error("LPopRPush failed expected list length 1")
+	}
+}

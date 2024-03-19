@@ -4,20 +4,18 @@ import (
 	"sync"
 
 	"github.com/diiyw/nodis/ds"
-	"github.com/dolthub/swiss"
 	"github.com/kelindar/binary"
+	"github.com/tidwall/btree"
 )
 
 type Set struct {
 	sync.RWMutex
-	data *swiss.Map[string, struct{}]
+	data btree.Set[string]
 }
 
 // NewSet creates a new set
 func NewSet() *Set {
-	return &Set{
-		data: swiss.NewMap[string, struct{}](32),
-	}
+	return &Set{}
 }
 
 // SAdd adds a member to the set
@@ -29,7 +27,7 @@ func (s *Set) SAdd(member ...string) int {
 
 func (s *Set) sAdd(member ...string) int {
 	for _, m := range member {
-		s.data.Put(m, struct{}{})
+		s.data.Insert(m)
 	}
 	return len(member)
 }
@@ -38,7 +36,7 @@ func (s *Set) sAdd(member ...string) int {
 func (s *Set) SCard() int {
 	s.RLock()
 	defer s.RUnlock()
-	return s.data.Count()
+	return s.data.Len()
 }
 
 // SDiff gets the difference between sets.
@@ -46,10 +44,10 @@ func (s *Set) SDiff(sets ...*Set) []string {
 	s.RLock()
 	defer s.RUnlock()
 	diff := make([]string, 0, 32)
-	s.data.Iter(func(member string, _ struct{}) bool {
+	s.data.Scan(func(member string) bool {
 		found := false
 		for _, set := range sets {
-			found = set.data.Has(member)
+			found = set.data.Contains(member)
 			if found {
 				break
 			}
@@ -57,7 +55,7 @@ func (s *Set) SDiff(sets ...*Set) []string {
 		if !found {
 			diff = append(diff, member)
 		}
-		return false
+		return true
 	})
 	return diff
 }
@@ -77,10 +75,10 @@ func (s *Set) SInter(sets ...*Set) []string {
 	s.RLock()
 	defer s.RUnlock()
 	inter := make([]string, 0, 32)
-	s.data.Iter(func(member string, _ struct{}) bool {
+	s.data.Scan(func(member string) bool {
 		found := true
 		for _, set := range sets {
-			found = set.data.Has(member)
+			found = set.data.Contains(member)
 			if !found {
 				break
 			}
@@ -88,7 +86,7 @@ func (s *Set) SInter(sets ...*Set) []string {
 		if found {
 			inter = append(inter, member)
 		}
-		return false
+		return true
 	})
 	return inter
 }
@@ -107,20 +105,14 @@ func (s *Set) SInterStore(destination *Set, sets ...*Set) {
 func (s *Set) SMembers() []string {
 	s.RLock()
 	defer s.RUnlock()
-	var keys = make([]string, 0, s.data.Count())
-	s.data.Iter(func(key string, _ struct{}) bool {
-		keys = append(keys, key)
-		return false
-	})
-	return keys
+	return s.data.Keys()
 }
 
 // SIsMember checks if a member is in the set.
 func (s *Set) SIsMember(member string) bool {
 	s.RLock()
 	defer s.RUnlock()
-	_, ok := s.data.Get(member)
-	return ok
+	return s.data.Contains(member)
 }
 
 // SRem removes a member from the set.
@@ -129,9 +121,8 @@ func (s *Set) SRem(member ...string) int {
 	defer s.Unlock()
 	var removed = 0
 	for _, m := range member {
-		if s.data.Delete(m) {
-			removed++
-		}
+		s.data.Delete(m)
+		removed++
 	}
 	return removed
 }
@@ -140,17 +131,13 @@ func (s *Set) SRem(member ...string) int {
 func (s *Set) SUnion(sets ...*Set) []string {
 	s.RLock()
 	defer s.RUnlock()
-	union := make([]string, 0, 32)
-	s.data.Iter(func(member string, _ struct{}) bool {
-		union = append(union, member)
-		return false
-	})
+	union := s.data.Keys()
 	for _, set := range sets {
-		set.data.Iter(func(member string, _ struct{}) bool {
-			if !s.data.Has(member) {
+		set.data.Scan(func(member string) bool {
+			if !s.data.Contains(member) {
 				union = append(union, member)
 			}
-			return false
+			return true
 		})
 	}
 	return union
@@ -185,7 +172,7 @@ func (s *Set) UnmarshalBinary(data []byte) error {
 		return err
 	}
 	for _, member := range members {
-		s.data.Put(member, struct{}{})
+		s.data.Insert(member)
 	}
 	return nil
 }
