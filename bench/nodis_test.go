@@ -7,16 +7,11 @@ import (
 	"github.com/diiyw/nodis"
 )
 
-var n *nodis.Nodis
-
-func init() {
-	n = nodis.Open(&nodis.Options{
-		Path:     "../testdata",
+func BenchmarkSet(b *testing.B) {
+	n := nodis.Open(&nodis.Options{
+		Path:     "../testdata/set",
 		FileSize: nodis.FileSizeGB,
 	})
-}
-
-func BenchmarkSet(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
@@ -26,7 +21,10 @@ func BenchmarkSet(b *testing.B) {
 }
 
 func BenchmarkGet(b *testing.B) {
-	n.Clear()
+	n := nodis.Open(&nodis.Options{
+		Path:     "../testdata/get",
+		FileSize: nodis.FileSizeGB,
+	})
 	for i := 0; i < 100000; i++ {
 		id := strconv.Itoa(i)
 		n.Set(id, []byte("value"+id), 0)
@@ -40,7 +38,10 @@ func BenchmarkGet(b *testing.B) {
 }
 
 func BenchmarkLPush(b *testing.B) {
-	n.Clear()
+	n := nodis.Open(&nodis.Options{
+		Path:     "../testdata/lPush",
+		FileSize: nodis.FileSizeGB,
+	})
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
@@ -50,7 +51,10 @@ func BenchmarkLPush(b *testing.B) {
 }
 
 func BenchmarkLPop(b *testing.B) {
-	n.Clear()
+	n := nodis.Open(&nodis.Options{
+		Path:     "../testdata/lPop",
+		FileSize: nodis.FileSizeGB,
+	})
 	for i := 0; i < 100000; i++ {
 		id := strconv.Itoa(i)
 		n.LPush(id, []byte("value"+id))
@@ -64,7 +68,10 @@ func BenchmarkLPop(b *testing.B) {
 }
 
 func BenchmarkSAdd(b *testing.B) {
-	n.Clear()
+	n := nodis.Open(&nodis.Options{
+		Path:     "../testdata/sAdd",
+		FileSize: nodis.FileSizeGB,
+	})
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
@@ -74,7 +81,10 @@ func BenchmarkSAdd(b *testing.B) {
 }
 
 func BenchmarkSMembers(b *testing.B) {
-	n.Clear()
+	n := nodis.Open(&nodis.Options{
+		Path:     "../testdata/sMembers",
+		FileSize: nodis.FileSizeGB,
+	})
 	for i := 0; i < 100000; i++ {
 		id := strconv.Itoa(i)
 		n.SAdd(id, "value"+id)
@@ -88,7 +98,10 @@ func BenchmarkSMembers(b *testing.B) {
 }
 
 func BenchmarkZAdd(b *testing.B) {
-	n.Clear()
+	n := nodis.Open(&nodis.Options{
+		Path:     "../testdata/zAdd",
+		FileSize: nodis.FileSizeGB,
+	})
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
@@ -98,7 +111,10 @@ func BenchmarkZAdd(b *testing.B) {
 }
 
 func BenchmarkZRank(b *testing.B) {
-	n.Clear()
+	n := nodis.Open(&nodis.Options{
+		Path:     "../testdata/zRank",
+		FileSize: nodis.FileSizeGB,
+	})
 	for i := 0; i < 100000; i++ {
 		id := strconv.Itoa(i)
 		n.ZAdd(id, "value"+id, float64(i))
@@ -112,7 +128,10 @@ func BenchmarkZRank(b *testing.B) {
 }
 
 func BenchmarkHSet(b *testing.B) {
-	n.Clear()
+	n := nodis.Open(&nodis.Options{
+		Path:     "../testdata/hSet",
+		FileSize: nodis.FileSizeGB,
+	})
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
@@ -122,7 +141,10 @@ func BenchmarkHSet(b *testing.B) {
 }
 
 func BenchmarkHGet(b *testing.B) {
-	n.Clear()
+	n := nodis.Open(&nodis.Options{
+		Path:     "../testdata/hGet",
+		FileSize: nodis.FileSizeGB,
+	})
 	for i := 0; i < 100000; i++ {
 		id := strconv.Itoa(i)
 		n.HSet(id, "field"+id, []byte("value"+id))
