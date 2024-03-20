@@ -61,7 +61,7 @@ BenchmarkSAdd-12    		1204911                1032 ns/op           335 B/op      
 BenchmarkSMembers-12      	7263865               142.0 ns/op             8 B/op          1 allocs/op
 BenchmarkZAdd-12      		1311826               845.4 ns/op           214 B/op          7 allocs/op
 BenchmarkZRank-12   		6371636               160.2 ns/op             7 B/op          0 allocs/op
-BenchmarkHSet-12   			1000000                1079 ns/op           399 B/op          7 allocs/op
+BenchmarkHSet-12   		1000000                1079 ns/op           399 B/op          7 allocs/op
 BenchmarkHGet-12    		6938287               183.0 ns/op             7 B/op          0 allocs/op
 ```
 Linux VM: 2C/8GB
