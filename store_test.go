@@ -2,20 +2,24 @@ package nodis
 
 import (
 	"bytes"
-	"io"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/diiyw/nodis/ds/str"
+	"github.com/diiyw/nodis/fs"
+)
+
+var (
+	driver = &fs.Memory{}
 )
 
 func TestStorePut(t *testing.T) {
 	tempDir := "testdata"
 	os.RemoveAll(tempDir)
 	// Create a new Store instance
-	store := newStore(tempDir, 1024, 0)
+	store := newStore(tempDir, 1024, driver)
 
 	// Generate a random key and value for testing
 	key := "testKey"
@@ -51,13 +55,13 @@ func TestStorePut(t *testing.T) {
 	}
 
 	// Read the value from the aof file
-	aofFile, err := os.Open(filepath.Join(tempDir, "nodis.0.aof"))
+	aofFile, err := driver.OpenFile(filepath.Join(tempDir, "nodis.0.aof"), os.O_RDONLY)
 	if err != nil {
 		t.Fatalf("Failed to open aof file: %v", err)
 	}
 	defer aofFile.Close()
 
-	aofData, err := io.ReadAll(aofFile)
+	aofData, err := aofFile.ReadAll()
 	if err != nil {
 		t.Fatalf("Failed to read aof file: %v", err)
 	}
@@ -71,40 +75,33 @@ func TestStoreGet(t *testing.T) {
 	tempDir := "testdata"
 
 	// Create a new Store instance
-	store := newStore(tempDir, 1024, 0)
+	store := newStore(tempDir, 1024, driver)
 
 	// Generate a random key and value for testing
 	key := "testKey"
 	value := []byte("testValue")
-
-	// Write the value to the aof file
-	aofFile, err := os.Create(filepath.Join(tempDir, "nodis.0.aof"))
+	ds := str.NewString()
+	ds.Set(value)
+	// Call the put method
+	err := store.put(newEntry(key, ds, time.Now().Unix()))
 	if err != nil {
-		t.Fatalf("Failed to create aof file: %v", err)
+		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
-	defer aofFile.Close()
-
-	_, err = aofFile.Write(value)
-	if err != nil {
-		t.Fatalf("Failed to write value to aof file: %v", err)
-	}
-
-	// Create an index entry for the key
-	store.index.Set(key, &index{
-		FileID:    0,
-		Offset:    0,
-		Size:      uint32(len(value)),
-		ExpiredAt: time.Now().Unix(),
-	})
-
 	// Call the get method
 	data, err := store.get(key)
 	if err != nil {
 		t.Fatalf("Failed to get value for key: %v", err)
 	}
-
-	if !bytes.Equal(data, value) {
-		t.Errorf("Expected data to be %v, got %v", value, data)
+	if data == nil {
+		t.Fatalf("Failed to retrieve index for key: %s", key)
+	}
+	e, err := parseDs(data)
+	if err != nil {
+		t.Fatalf("Failed to parse value for key: %v", err)
+	}
+	v := e.Value.(*str.String).Get()
+	if !bytes.Equal(value, v) {
+		t.Errorf("Expected value to be %v, got %v", value, v)
 	}
 }
 
@@ -112,7 +109,7 @@ func TestStoreMultiPut(t *testing.T) {
 	tempDir := "testdata"
 
 	// Create a new Store instance
-	store := newStore(tempDir, 1024, 0)
+	store := newStore(tempDir, 1024, driver)
 
 	var kv = map[string][]byte{
 		"testKey1": []byte("testValue1"),
@@ -158,7 +155,7 @@ func TestStoreMultiFilePut(t *testing.T) {
 	os.RemoveAll(tempDir)
 	os.Mkdir(tempDir, 0755)
 	// Create a new Store instance
-	store := newStore(tempDir, 10, 0)
+	store := newStore(tempDir, 10, driver)
 	result := make(map[string][]byte)
 	var kv = []map[string][]byte{
 		{
@@ -214,7 +211,7 @@ func TestStoreRemove(t *testing.T) {
 	tempDir := "testdata"
 
 	// Create a new Store instance
-	store := newStore(tempDir, 1024, 0)
+	store := newStore(tempDir, 1024, driver)
 
 	// Generate a random key and value for testing
 	key := "testKey"
@@ -241,7 +238,7 @@ func TestStorePutRaw(t *testing.T) {
 	tempDir := "testdata"
 
 	// Create a new Store instance
-	store := newStore(tempDir, 1024, 0)
+	store := newStore(tempDir, 1024, driver)
 
 	// Generate a random key and value for testing
 	key := "testKey"

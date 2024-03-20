@@ -24,11 +24,12 @@ Nodis 是一个简单可嵌入到应用中内存数据库，实现Redis的数据
 - 快速可嵌入的
 - 低内存使用，只有热数据才在内存中
 - 快照和WAL存储的支持
+- 支持自定义存储后端
 
 ## Get Started
 
 ```bash
-go get github.com/diiyw/nodis@v1.1.0-beta.11
+go get github.com/diiyw/nodis@v1.1.0-beta.12
 ```
 
 ```go

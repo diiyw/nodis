@@ -1,7 +1,6 @@
 package nodis
 
 import (
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -9,49 +8,57 @@ import (
 	"sync"
 	"time"
 
+	"github.com/diiyw/nodis/fs"
 	"github.com/kelindar/binary"
 	"github.com/tidwall/btree"
 )
 
 type store struct {
 	sync.RWMutex
-	fileSize  int64
-	fileId    uint32
-	path      string
-	current   string
-	indexFile string
-	aof       *os.File
-	index     btree.Map[string, *index]
+	fileSize   int64
+	fileId     uint32
+	path       string
+	current    string
+	indexFile  string
+	aof        fs.File
+	index      btree.Map[string, *index]
+	filesystem fs.Fs
 }
 
-func newStore(path string, fileSize int64, mode uint8) *store {
+func newStore(path string, fileSize int64, filesystem fs.Fs) *store {
 	s := &store{
 		path:      path,
 		fileSize:  fileSize,
 		indexFile: filepath.Join(path, "nodis.index"),
 	}
-	if mode == HotDataMode {
-		_ = os.MkdirAll(path, 0755)
-		data, _ := os.ReadFile(s.indexFile)
-		if len(data) >= 4 {
-			if len(data[4:]) > 0 {
-				var m map[string]*index
-				err := binary.Unmarshal(data[4:], &m)
-				if err != nil {
-					panic(err)
-				}
-				for k, v := range m {
-					s.index.Set(k, v)
-				}
+
+	_ = filesystem.MkdirAll(path)
+	idxFile, err := filesystem.OpenFile(s.indexFile, os.O_RDWR|os.O_CREATE|os.O_APPEND)
+	if err != nil {
+		panic(err)
+	}
+	data, err := idxFile.ReadAll()
+	if err != nil {
+		panic(err)
+	}
+	if len(data) > 4 {
+		if len(data[4:]) > 0 {
+			var m map[string]*index
+			err := binary.Unmarshal(data[4:], &m)
+			if err != nil {
+				panic(err)
 			}
-			s.fileId = binary.LittleEndian.Uint32(data[:4])
+			for k, v := range m {
+				s.index.Set(k, v)
+			}
 		}
-		s.current = filepath.Join(path, "nodis."+strconv.Itoa(int(s.fileId))+".aof")
-		var err error
-		s.aof, err = os.OpenFile(s.current, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
-		if err != nil {
-			panic(err)
-		}
+		s.fileId = binary.LittleEndian.Uint32(data[:4])
+	}
+	s.filesystem = filesystem
+	s.current = filepath.Join(path, "nodis."+strconv.Itoa(int(s.fileId))+".aof")
+	s.aof, err = s.filesystem.OpenFile(s.current, os.O_RDWR|os.O_CREATE|os.O_APPEND)
+	if err != nil {
+		panic(err)
 	}
 	return s
 }
@@ -64,43 +71,36 @@ type index struct {
 }
 
 func (s *store) check() (int64, error) {
-	stat, err := s.aof.Stat()
+	var offset, err = s.aof.FileSize()
 	if err != nil {
 		return 0, err
 	}
-	var offset = stat.Size()
 	if offset >= s.fileSize {
-		err = s.aof.Sync()
+		err = s.aof.Close()
 		if err != nil {
 			return 0, err
 		}
-		s.aof.Close()
 		// open file with new file id
 		s.fileId++
 		s.current = filepath.Join(s.path, "nodis."+strconv.Itoa(int(s.fileId))+".aof")
-		s.aof, err = os.OpenFile(s.current, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
+		s.aof, err = s.filesystem.OpenFile(s.current, os.O_RDWR|os.O_CREATE|os.O_APPEND)
 		if err != nil {
 			return 0, err
 		}
 		// update index file
-		idxFi, err := os.OpenFile(s.indexFile, os.O_CREATE|os.O_RDWR, 0644)
+		idxFi, err := s.filesystem.OpenFile(s.indexFile, os.O_CREATE|os.O_RDWR)
 		if err != nil {
 			return 0, err
 		}
 		defer func() {
-			err := idxFi.Sync()
+			err := idxFi.Close()
 			if err != nil {
-				log.Println("Index sync error: ", err)
+				log.Println("Close index file error: ", err)
 			}
-			idxFi.Close()
 		}()
-		_, err = idxFi.Seek(0, io.SeekStart)
-		if err != nil {
-			return 0, err
-		}
 		var header = make([]byte, 4)
 		binary.LittleEndian.PutUint32(header, s.fileId)
-		_, err = idxFi.Write(header)
+		_, err = idxFi.WriteAt(header, 0)
 		if err != nil {
 			return 0, err
 		}
@@ -172,7 +172,7 @@ func (s *store) get(key string) ([]byte, error) {
 	}
 	// read from other file
 	file := filepath.Join(s.path, "nodis."+strconv.Itoa(int(idx.FileID))+".aof")
-	f, err := os.Open(file)
+	f, err := s.filesystem.OpenFile(file, os.O_RDONLY)
 	if err != nil {
 		return nil, err
 	}
@@ -197,12 +197,12 @@ func (s *store) snapshot(path string, entries []*Entity) {
 	s.RLock()
 	defer s.RUnlock()
 	snapshotDir := filepath.Join(path, "snapshots", time.Now().Format("20060102_150405"))
-	err := os.MkdirAll(snapshotDir, 0755)
+	err := s.filesystem.MkdirAll(snapshotDir)
 	if err != nil {
 		log.Println("Snapshot mkdir error: ", err)
 		return
 	}
-	ns := newStore(snapshotDir, s.fileSize, 0)
+	ns := newStore(snapshotDir, s.fileSize, s.filesystem)
 	for _, entry := range entries {
 		ns.put(entry)
 	}
@@ -232,25 +232,17 @@ func (s *store) snapshot(path string, entries []*Entity) {
 func (s *store) close() error {
 	s.Lock()
 	defer s.Unlock()
-	err := s.aof.Sync()
+	err := s.aof.Close()
 	if err != nil {
 		return err
 	}
-	err = s.aof.Close()
+	idxFile, err := s.filesystem.OpenFile(s.indexFile+"~", os.O_RDWR|os.O_CREATE|os.O_APPEND)
 	if err != nil {
 		return err
-	}
-	idxFi, err := os.OpenFile(s.indexFile+"~", os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
-	if err != nil {
-		return err
-	}
-	_, err = idxFi.Seek(0, io.SeekStart)
-	if err != nil {
-		return idxFi.Close()
 	}
 	var header = make([]byte, 4)
 	binary.LittleEndian.PutUint32(header, s.fileId)
-	_, err = idxFi.Write(header)
+	_, err = idxFile.Write(header)
 	if err != nil {
 		return err
 	}
@@ -267,17 +259,14 @@ func (s *store) close() error {
 	if err != nil {
 		return err
 	}
-	_, err = idxFi.Write(data)
+	_, err = idxFile.Write(data)
 	if err != nil {
 		return err
 	}
-	if err = idxFi.Sync(); err != nil {
-		return err
-	}
-	if err = idxFi.Close(); err != nil {
+	if err = idxFile.Close(); err != nil {
 		log.Println("Close sync error: ", err)
 	}
-	err = os.Rename(s.indexFile+"~", s.indexFile)
+	err = s.filesystem.Rename(s.indexFile+"~", s.indexFile)
 	if err != nil {
 		return err
 	}
@@ -289,10 +278,6 @@ func (s *store) clear() error {
 	s.Lock()
 	defer s.Unlock()
 	err := s.aof.Truncate(0)
-	if err != nil {
-		return err
-	}
-	err = os.RemoveAll(s.path)
 	if err != nil {
 		return err
 	}

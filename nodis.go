@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/diiyw/nodis/ds"
+	"github.com/diiyw/nodis/fs"
 	"github.com/tidwall/btree"
 )
 
@@ -23,23 +24,24 @@ func Open(opt *Options) *Nodis {
 	if opt.FileSize == 0 {
 		opt.FileSize = FileSizeGB
 	}
+	if opt.Filesystem == nil {
+		opt.Filesystem = &fs.Disk{}
+	}
 	n := &Nodis{
 		options: opt,
 	}
-	if opt.Mode == HotDataMode {
-		stat, err := os.Stat(opt.Path)
-		if err != nil {
-			if os.IsNotExist(err) {
-				err = os.MkdirAll(opt.Path, 0755)
-				if err != nil {
-					panic(err)
-				}
+	stat, err := os.Stat(opt.Path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(opt.Path, 0755)
+			if err != nil {
+				panic(err)
 			}
-		} else if !stat.IsDir() {
-			panic("Path is not a directory")
 		}
+	} else if !stat.IsDir() {
+		panic("Path is not a directory")
 	}
-	n.store = newStore(opt.Path, opt.FileSize, opt.Mode)
+	n.store = newStore(opt.Path, opt.FileSize, opt.Filesystem)
 	go func() {
 		if opt.RecycleDuration != 0 {
 			for {

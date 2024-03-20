@@ -1,14 +1,15 @@
 package nodis
 
-import "time"
+import (
+	"time"
+
+	"github.com/diiyw/nodis/fs"
+)
 
 const (
 	FileSizeKB = 1024
 	FileSizeMB = 1024 * FileSizeKB
 	FileSizeGB = 1024 * FileSizeMB
-
-	HotDataMode = 0
-	MemoryMode  = 1
 )
 
 // Options represents the configuration options for the database.
@@ -28,12 +29,13 @@ type Options struct {
 	// Default 0 for disabling snapshot. and you can call Snapshot manually.
 	SnapshotDuration time.Duration
 
-	// In memory mode, the database will not write to disk and will not be able to recover after a crash.
-	Mode uint8
+	// Filesystem is the filesystem to use. The default is the disk filesystem.
+	Filesystem fs.Fs
 }
 
 var DefaultOptions = &Options{
 	Path:            "data",
 	FileSize:        FileSizeGB,
 	RecycleDuration: 60 * time.Second,
+	Filesystem:      &fs.Disk{},
 }
