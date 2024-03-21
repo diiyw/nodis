@@ -30,15 +30,15 @@ func Open(opt *Options) *Nodis {
 	n := &Nodis{
 		options: opt,
 	}
-	stat, err := os.Stat(opt.Path)
+	isDir, err := opt.Filesystem.IsDir(opt.Path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			err = os.MkdirAll(opt.Path, 0755)
+			err = opt.Filesystem.MkdirAll(opt.Path)
 			if err != nil {
 				panic(err)
 			}
 		}
-	} else if !stat.IsDir() {
+	} else if !isDir {
 		panic("Path is not a directory")
 	}
 	n.store = newStore(opt.Path, opt.FileSize, opt.Filesystem)

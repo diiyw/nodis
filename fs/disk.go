@@ -29,6 +29,14 @@ func (d *Disk) Rename(oldpath, newpath string) error {
 	return os.Rename(oldpath, newpath)
 }
 
+func (d *Disk) IsDir(path string) (bool, error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
+	return fi.IsDir(), nil
+}
+
 func (d *DiskFile) ReadAt(b []byte, off int64) (n int, err error) {
 	n, err = d.File.ReadAt(b, off)
 	if err == io.EOF {

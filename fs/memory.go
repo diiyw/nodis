@@ -36,6 +36,10 @@ func (m *Memory) Rename(oldpath, newpath string) error {
 	return nil
 }
 
+func (m *Memory) IsDir(path string) (bool, error) {
+	return false, nil
+}
+
 type MemoryFile struct {
 	data []byte
 }

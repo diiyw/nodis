@@ -4,6 +4,8 @@ type Fs interface {
 	OpenFile(filename string, flag int) (File, error)
 	MkdirAll(path string) error
 	Rename(oldpath, newpath string) error
+	// if not exist, return false whith os.ErrNotExist
+	IsDir(path string) (bool, error)
 }
 
 type File interface {

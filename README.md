@@ -29,7 +29,7 @@ It is a simple and easy to embed in your application.
 
 ## Get Started
 ```bash
- go get github.com/diiyw/nodis@v1.1.0-beta.12
+ go get github.com/diiyw/nodis@v1.1.0-beta.13
 ```
 ```go
 package main
@@ -82,4 +82,4 @@ BenchmarkHGet-2       	 6019508	     197.3 ns/op	       7 B/op	       0 allocs/o
 ```
 
 ## Note
-Nodis is done by following the Redis data structure. It is not a complete Redis server. It is a simple and easy to embed in your application.
+If you want to persist data, please make sure to call the `Close()` method when your application exits.

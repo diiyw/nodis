@@ -29,7 +29,7 @@ Nodis 是一个简单可嵌入到应用中内存数据库，实现Redis的数据
 ## Get Started
 
 ```bash
-go get github.com/diiyw/nodis@v1.1.0-beta.12
+go get github.com/diiyw/nodis@v1.1.0-beta.13
 ```
 
 ```go
@@ -51,4 +51,4 @@ func main() {
 
 ## Note
 
-Nodis 实现了Redis的数据结构. 但是并不是完整的Redis Server服务，它只是可以方便的切入到各自的应用使用
+如果你想持久化请保证，在你的应用退出时调用`Close()`方法。
