@@ -8,19 +8,20 @@ import (
 	"time"
 
 	"github.com/diiyw/nodis/ds"
+	"github.com/diiyw/nodis/pb"
 )
 
 type Key struct {
-	ExpiredAt int64
-	lastUse   atomic.Uint32
-	Type      ds.DataType
-	changed   atomic.Bool
+	Expiration int64
+	lastUse    atomic.Uint32
+	Type       ds.DataType
+	changed    atomic.Bool
 }
 
 func newKey(typ ds.DataType, seconds int64) *Key {
 	k := &Key{Type: typ}
 	if seconds != 0 {
-		k.ExpiredAt = seconds + time.Now().Unix()
+		k.Expiration = seconds + time.Now().Unix()
 	}
 	k.changed.Store(true)
 	return k
@@ -30,7 +31,7 @@ func (k *Key) expired() bool {
 	if k == nil {
 		return false
 	}
-	return k.ExpiredAt != 0 && k.ExpiredAt <= time.Now().Unix()
+	return k.Expiration != 0 && k.Expiration <= time.Now().Unix()
 }
 
 func (n *Nodis) getKey(key string) (*Key, bool) {
@@ -52,6 +53,7 @@ func (n *Nodis) Del(key string) {
 	n.dataStructs.Delete(key)
 	n.keys.Delete(key)
 	n.store.remove(key)
+	n.notify(pb.NewOp(pb.OpType_Del, key))
 	n.Unlock()
 	d.Unlock()
 }
@@ -70,14 +72,14 @@ func (n *Nodis) exists(key string) (k *Key, ok bool) {
 		// try get from store
 		v, err := n.store.get(key)
 		if err == nil && len(v) > 0 {
-			e, err := parseDs(v)
+			key, d, ttl, err := parseDs(v)
 			if err != nil {
 				log.Println("Parse DataStruct:", err)
 				return
 			}
-			if e != nil {
-				n.dataStructs.Set(key, e.Value)
-				k = newKey(e.Value.GetType(), 0)
+			if d != nil {
+				n.dataStructs.Set(key, d)
+				k = newKey(d.Type(), ttl)
 				k.changed.Store(false)
 				ok = true
 				n.keys.Set(key, k)
@@ -96,8 +98,9 @@ func (n *Nodis) Expire(key string, seconds int64) {
 		n.Unlock()
 		return
 	}
-	k.ExpiredAt += seconds
+	k.Expiration += seconds
 	k.changed.Store(true)
+	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
 	n.Unlock()
 }
 
@@ -109,8 +112,9 @@ func (n *Nodis) ExpireAt(key string, timestamp time.Time) {
 		n.Unlock()
 		return
 	}
-	k.ExpiredAt = timestamp.Unix()
+	k.Expiration = timestamp.Unix()
 	k.changed.Store(true)
+	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
 	n.Unlock()
 }
 
@@ -151,7 +155,7 @@ func (n *Nodis) TTL(key string) time.Duration {
 		return -1
 	}
 	n.RUnlock()
-	return time.Until(time.Unix(k.ExpiredAt, 0))
+	return time.Until(time.Unix(k.Expiration, 0))
 }
 
 // Rename a key
@@ -170,7 +174,12 @@ func (n *Nodis) Rename(key, key2 string) error {
 	n.dataStructs.Delete(key)
 	n.dataStructs.Set(key2, v)
 	n.keys.Delete(key)
-	n.keys.Set(key2, newKey(v.GetType(), 0))
+	n.keys.Set(key2, newKey(v.Type(), 0))
+	n.store.remove(key)
+	n.notify(
+		pb.NewOp(pb.OpType_Del, key),
+		pb.NewOp(pb.OpType_Set, key2).Value(v),
+	)
 	n.Unlock()
 	return nil
 }
@@ -187,13 +196,13 @@ func (n *Nodis) Type(key string) string {
 			n.store.RUnlock()
 			return "none"
 		}
-		e, err := parseDs(v)
+		_, d, _, err := parseDs(v)
 		if err != nil {
 			n.store.RUnlock()
 			return "none"
 		}
 		n.store.RUnlock()
-		return ds.DataTypeMap[e.Value.GetType()]
+		return ds.DataTypeMap[d.Type()]
 	}
 	n.RUnlock()
 	return ds.DataTypeMap[k.Type]

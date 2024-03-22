@@ -16,6 +16,7 @@ func (n *Nodis) newList() ds.DataStruct {
 func (n *Nodis) LPush(key string, values ...[]byte) {
 	k, l := n.getDs(key, n.newList, 0)
 	k.changed.Store(true)
+	n.notify(pb.NewOp(pb.OpType_LPush, key).Ds(l).Values(values...))
 	l.(*list.DoublyLinkedList).LPush(values...)
 }
 

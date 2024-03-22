@@ -8,8 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"encoding/binary"
+
 	"github.com/diiyw/nodis/fs"
-	"github.com/kelindar/binary"
+	"github.com/diiyw/nodis/pb"
 	"github.com/tidwall/btree"
 )
 
@@ -110,7 +112,7 @@ func (s *store) check() (int64, error) {
 }
 
 // put a key-value pair into store
-func (s *store) put(entry *Entity) error {
+func (s *store) put(entry *pb.Entity) error {
 	s.Lock()
 	defer s.Unlock()
 	var idx = &index{}
@@ -125,7 +127,7 @@ func (s *store) put(entry *Entity) error {
 	idx.FileID = s.fileId
 	idx.Offset = offset
 	idx.Size = uint32(len(data))
-	idx.ExpiredAt = entry.ExpiredAt
+	idx.ExpiredAt = entry.Expiration
 	s.index.Set(entry.Key, idx)
 	_, err = s.aof.Write(data)
 	if err != nil {
@@ -193,7 +195,7 @@ func (s *store) remove(key string) {
 }
 
 // snapshot the store
-func (s *store) snapshot(path string, entries []*Entity) {
+func (s *store) snapshot(path string, entries []*pb.Entity) {
 	s.RLock()
 	defer s.RUnlock()
 	snapshotDir := filepath.Join(path, "snapshots", time.Now().Format("20060102_150405"))

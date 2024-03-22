@@ -1,13 +1,11 @@
 package ds
 
 type DataStruct interface {
-	MarshalBinary() ([]byte, error)
-	UnmarshalBinary([]byte) error
 	Lock()
 	Unlock()
 	RLock()
 	RUnlock()
-	GetType() DataType
+	Type() DataType
 }
 
 type DataType uint8

@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/diiyw/nodis/ds"
-	"github.com/kelindar/binary"
+	"github.com/diiyw/nodis/pb"
 	"github.com/tidwall/btree"
 )
 
@@ -22,8 +22,8 @@ func NewSortedSet() *SortedSet {
 	}
 }
 
-// GetType returns the type of the data structure
-func (sortedSet *SortedSet) GetType() ds.DataType {
+// Type returns the type of the data structure
+func (sortedSet *SortedSet) Type() ds.DataType {
 	return ds.ZSet
 }
 
@@ -326,26 +326,21 @@ func (sortedSet *SortedSet) ZIncrBy(member string, score float64) float64 {
 	return element.Score + score
 }
 
-func (sortedSet *SortedSet) MarshalBinary() ([]byte, error) {
-	var m = make(map[string]*Item)
+func (sortedSet *SortedSet) GetValue() []*pb.KeyScore {
 	sortedSet.RLock()
 	defer sortedSet.RUnlock()
-	sortedSet.dict.Scan(func(key string, value *Item) bool {
-		m[key] = value
+	var keyScores = make([]*pb.KeyScore, 0, sortedSet.dict.Len())
+	sortedSet.dict.Scan(func(member string, value *Item) bool {
+		keyScores = append(keyScores, &pb.KeyScore{Member: member, Score: value.Score})
 		return true
 	})
-	return binary.Marshal(m)
+	return keyScores
 }
 
-func (sortedSet *SortedSet) UnmarshalBinary(data []byte) error {
-	var m = make(map[string]*Item)
-	err := binary.Unmarshal(data, &m)
-	if err != nil {
-		return err
-	}
+func (sortedSet *SortedSet) SetValue(keyScores []*pb.KeyScore) error {
 	sortedSet.skiplist = makeSkiplist()
-	for k, v := range m {
-		sortedSet.zAdd(k, v.Score)
+	for _, v := range keyScores {
+		sortedSet.zAdd(v.Member, v.Score)
 	}
 	return nil
 }

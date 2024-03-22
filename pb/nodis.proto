@@ -1,0 +1,96 @@
+syntax = "proto3";
+package pb;
+
+option go_package = "../pb";
+
+enum OpType  {
+  None = 0;
+  BLPop = 1;
+  BRPop = 2;
+  Clear = 3;
+  Del = 4;
+  Expire = 5;
+  ExpireAt = 6;
+  HClear = 7;
+  HDel = 8;
+  HIncrBy = 9;
+  HIncrByFloat = 10;
+  HMSet = 11;
+  HSet = 12;
+  HSetNX = 13;
+  LInsert = 14;
+  LPop = 15;
+  LPopRPush = 16;
+  LPush = 17;
+  LPushX = 18;
+  LRem = 19;
+  LSet = 20;
+  LTrim = 21;
+  RPop = 22;
+  RPopLPush = 23;
+  RPush = 24;
+  RPushX = 25;
+  SAdd = 26;
+  SRem = 27;
+  Set = 28;
+  ZAdd = 29;
+  ZClear = 30;
+  ZIncrBy = 31;
+  ZRem = 32;
+  ZRemRangeByRank = 33;
+  ZRemRangeByScore = 34;
+}
+
+message Operation {
+    OpType Type = 1;
+    string Key = 2;
+    string Member = 3;
+    bytes Value = 4;
+    int64 Expiration = 5;
+    double Score = 6;
+    repeated bytes Values = 7;
+    string DstKey = 8;
+}
+
+message KeyScore {
+    string Member = 1;
+    double Score = 2;
+}
+
+message ZSetValue {
+    repeated KeyScore Values = 2;
+}
+
+message ListValue {
+    repeated bytes Values = 2;
+}
+
+message StringValue {
+    bytes Value = 2;
+}
+
+message MemberBytes {
+    string Member = 1;
+    bytes Value = 2;
+}
+
+message SetValue {
+    repeated string Values = 2;
+}
+
+message HashValue {
+    repeated MemberBytes Values = 2;
+}
+
+message Entity {
+    uint32 Type = 1;
+    string Key = 2;
+    oneof Value {
+        StringValue StringValue = 3;
+        ListValue ListValue = 4;
+        SetValue SetValue = 5;
+        HashValue HashValue = 6;
+        ZSetValue ZSetValue = 7;
+    }
+    int64 Expiration = 8;
+}

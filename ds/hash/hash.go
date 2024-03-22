@@ -6,8 +6,8 @@ import (
 	"sync"
 
 	"github.com/diiyw/nodis/ds"
+	"github.com/diiyw/nodis/pb"
 	"github.com/diiyw/nodis/utils"
-	"github.com/kelindar/binary"
 	"github.com/tidwall/btree"
 )
 
@@ -21,8 +21,8 @@ func NewHashMap() *HashMap {
 	return &HashMap{}
 }
 
-// GetType returns the type of the data structure
-func (s *HashMap) GetType() ds.DataType {
+// Type returns the type of the data structure
+func (s *HashMap) Type() ds.DataType {
 	return ds.Hash
 }
 
@@ -148,20 +148,19 @@ func (s *HashMap) HScan(cursor int, match string, count int) (int, map[string][]
 	return i, values
 }
 
-// Marshal the set to bytes
-func (s *HashMap) MarshalBinary() ([]byte, error) {
-	var data = s.HGetAll()
-	return binary.Marshal(data)
+func (s *HashMap) GetValue() []*pb.MemberBytes {
+	values := make([]*pb.MemberBytes, 0, s.data.Len())
+	s.data.Scan(func(key string, value []byte) bool {
+		values = append(values, &pb.MemberBytes{Member: key, Value: value})
+		return true
+	})
+	return values
 }
 
 // Unmarshal the set from bytes
-func (s *HashMap) UnmarshalBinary(data []byte) error {
-	var values map[string][]byte
-	if err := binary.Unmarshal(data, &values); err != nil {
-		return err
-	}
-	for key, value := range values {
-		s.data.Set(key, value)
+func (s *HashMap) SetValue(values []*pb.MemberBytes) error {
+	for _, v := range values {
+		s.data.Set(v.Member, v.Value)
 	}
 	return nil
 }
