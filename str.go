@@ -3,6 +3,7 @@ package nodis
 import (
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/str"
+	"github.com/diiyw/nodis/pb"
 )
 
 func (n *Nodis) newStr() ds.DataStruct {
@@ -13,6 +14,7 @@ func (n *Nodis) newStr() ds.DataStruct {
 func (n *Nodis) Set(key string, value []byte, ttl int64) {
 	k, s := n.getDs(key, n.newStr, ttl)
 	k.changed.Store(true)
+	n.notify(pb.NewOp(pb.OpType_Set, key).Value(value))
 	s.(*str.String).Set(value)
 }
 

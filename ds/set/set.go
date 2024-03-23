@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	"github.com/diiyw/nodis/ds"
-	"github.com/kelindar/binary"
 	"github.com/tidwall/btree"
 )
 
@@ -153,26 +152,19 @@ func (s *Set) SUnionStore(destination *Set, sets ...*Set) {
 	}
 }
 
-// GetType returns the type of the data structure
-func (s *Set) GetType() ds.DataType {
+// Type returns the type of the data structure
+func (s *Set) Type() ds.DataType {
 	return ds.Set
 }
 
-// MarshalBinary the string to bytes
-func (s *Set) MarshalBinary() ([]byte, error) {
-	members := s.SMembers()
-	return binary.Marshal(members)
+// GetValue the string to bytes
+func (s *Set) GetValue() []string {
+	return s.SMembers()
 }
 
-// UnmarshalBinary the bytes to string
-func (s *Set) UnmarshalBinary(data []byte) error {
-	var members []string
-	err := binary.Unmarshal(data, &members)
-	if err != nil {
-		return err
-	}
+// SetValue the bytes to string
+func (s *Set) SetValue(members []string) {
 	for _, member := range members {
 		s.data.Insert(member)
 	}
-	return nil
 }

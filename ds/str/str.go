@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	"github.com/diiyw/nodis/ds"
-	"github.com/kelindar/binary"
 )
 
 type String struct {
@@ -16,8 +15,8 @@ func NewString() *String {
 	return &String{}
 }
 
-// GetType returns the type of the data structure
-func (s *String) GetType() ds.DataType {
+// Type returns the type of the data structure
+func (s *String) Type() ds.DataType {
 	return ds.String
 }
 
@@ -35,14 +34,14 @@ func (s *String) Get() []byte {
 	return s.V
 }
 
-// MarshalBinary the string to bytes
-func (s *String) MarshalBinary() ([]byte, error) {
+// GetValue the string to bytes
+func (s *String) GetValue() []byte {
 	s.RLock()
 	defer s.RUnlock()
-	return binary.Marshal(s.V)
+	return s.V
 }
 
-// UnmarshalBinary the bytes to string
-func (s *String) UnmarshalBinary(data []byte) error {
-	return binary.Unmarshal(data, &s.V)
+// SetValue the bytes to string
+func (s *String) SetValue(data []byte) {
+	s.V = data
 }

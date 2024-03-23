@@ -17,7 +17,7 @@ var (
 
 func TestStorePut(t *testing.T) {
 	tempDir := "testdata"
-	os.RemoveAll(tempDir)
+	_ = driver.RemoveAll(tempDir)
 	// Create a new Store instance
 	store := newStore(tempDir, 1024, driver)
 
@@ -26,9 +26,9 @@ func TestStorePut(t *testing.T) {
 	value := []byte("testValue")
 	ds := str.NewString()
 	ds.Set(value)
-	e := newEntry(key, ds, time.Now().Unix())
+	e := newEntity(key, ds, time.Now().Unix())
 	// Call the put method
-	err := store.put(newEntry(key, ds, time.Now().Unix()))
+	err := store.put(newEntity(key, ds, time.Now().Unix()))
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
@@ -40,18 +40,18 @@ func TestStorePut(t *testing.T) {
 	}
 
 	// Verify the index values
-	if idx.FileID != 0 {
-		t.Errorf("Expected FileID to be 0, got %d", idx.FileID)
+	if idx.fileID != 0 {
+		t.Errorf("Expected fileID to be 0, got %d", idx.fileID)
 	}
-	if idx.Offset != 0 {
-		t.Errorf("Expected Offset to be 0, got %d", idx.Offset)
+	if idx.offset != 0 {
+		t.Errorf("Expected offset to be 0, got %d", idx.offset)
 	}
 	v, _ := e.Marshal()
-	if idx.Size != uint32(len(v)) {
-		t.Errorf("Expected Size to be %d, got %d", len(v), idx.Size)
+	if idx.size != uint32(len(v)) {
+		t.Errorf("Expected size to be %d, got %d", len(v), idx.size)
 	}
-	if idx.ExpiredAt <= 0 {
-		t.Errorf("Expected ExpiredAt to be greater than 0, got %d", idx.ExpiredAt)
+	if idx.expiration <= 0 {
+		t.Errorf("Expected expiration to be greater than 0, got %d", idx.expiration)
 	}
 
 	// Read the value from the aof file
@@ -83,7 +83,7 @@ func TestStoreGet(t *testing.T) {
 	ds := str.NewString()
 	ds.Set(value)
 	// Call the put method
-	err := store.put(newEntry(key, ds, time.Now().Unix()))
+	err := store.put(newEntity(key, ds, time.Now().Unix()))
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
@@ -95,11 +95,11 @@ func TestStoreGet(t *testing.T) {
 	if data == nil {
 		t.Fatalf("Failed to retrieve index for key: %s", key)
 	}
-	e, err := parseDs(data)
-	if err != nil {
+	_, d, _, err := parseDs(data)
+	if err != nil || d == nil {
 		t.Fatalf("Failed to parse value for key: %v", err)
 	}
-	v := e.Value.(*str.String).Get()
+	v := d.(*str.String).Get()
 	if !bytes.Equal(value, v) {
 		t.Errorf("Expected value to be %v, got %v", value, v)
 	}
@@ -107,7 +107,7 @@ func TestStoreGet(t *testing.T) {
 
 func TestStoreMultiPut(t *testing.T) {
 	tempDir := "testdata"
-
+	_ = driver.RemoveAll(tempDir)
 	// Create a new Store instance
 	store := newStore(tempDir, 1024, driver)
 
@@ -123,7 +123,7 @@ func TestStoreMultiPut(t *testing.T) {
 		ds := str.NewString()
 		ds.Set(value)
 		// Call the put method
-		e := newEntry(key, ds, time.Now().Unix()+3600)
+		e := newEntity(key, ds, time.Now().Unix()+3600)
 		data, _ := e.Marshal()
 		result[key] = data
 		err := store.put(e)
@@ -152,7 +152,7 @@ func TestStoreMultiPut(t *testing.T) {
 
 func TestStoreMultiFilePut(t *testing.T) {
 	tempDir := "testdata"
-	os.RemoveAll(tempDir)
+	_ = driver.RemoveAll(tempDir)
 	os.Mkdir(tempDir, 0755)
 	// Create a new Store instance
 	store := newStore(tempDir, 10, driver)
@@ -180,7 +180,7 @@ func TestStoreMultiFilePut(t *testing.T) {
 			ds := str.NewString()
 			ds.Set(value)
 			// Call the put method
-			e := newEntry(key, ds, time.Now().Unix()+3600)
+			e := newEntity(key, ds, time.Now().Unix()+3600)
 			data, _ := e.Marshal()
 			result[key] = data
 			err := store.put(e)
@@ -209,7 +209,7 @@ func TestStoreMultiFilePut(t *testing.T) {
 
 func TestStoreRemove(t *testing.T) {
 	tempDir := "testdata"
-
+	_ = driver.RemoveAll(tempDir)
 	// Create a new Store instance
 	store := newStore(tempDir, 1024, driver)
 
@@ -219,7 +219,7 @@ func TestStoreRemove(t *testing.T) {
 	ds := str.NewString()
 	ds.Set(value)
 	// Call the put method
-	err := store.put(newEntry(key, ds, time.Now().Unix()+3600))
+	err := store.put(newEntity(key, ds, time.Now().Unix()+3600))
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
@@ -245,13 +245,13 @@ func TestStorePutRaw(t *testing.T) {
 	value := []byte("testValue")
 	d := str.NewString()
 	d.Set(value)
-	var e = newEntry(key, d, time.Now().Unix()+3600)
+	var e = newEntity(key, d, time.Now().Unix()+3600)
 	data, err := e.Marshal()
 	if err != nil {
 		t.Fatalf("Failed to marshal data: %v", err)
 	}
 	// Call the putRaw method
-	err = store.putRaw(key, data, e.ExpiredAt)
+	err = store.putRaw(key, data, e.Expiration)
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
@@ -268,11 +268,11 @@ func TestStorePutRaw(t *testing.T) {
 	if !bytes.Equal(nd, data) {
 		t.Errorf("Expected value to be %v, got %v", data, nd)
 	}
-	e, err = parseDs(nd)
+	_, dv, _, err := parseDs(data)
 	if err != nil {
 		t.Fatalf("Failed to parse value for key: %v", err)
 	}
-	v := e.Value.(*str.String).Get()
+	v := dv.(*str.String).Get()
 	if !bytes.Equal(value, v) {
 		t.Errorf("Expected value to be %v, got %v", value, v)
 	}

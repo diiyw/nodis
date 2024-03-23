@@ -1,6 +1,7 @@
 package nodis
 
 import (
+	"github.com/diiyw/nodis/pb"
 	"time"
 
 	"github.com/diiyw/nodis/ds"
@@ -15,6 +16,7 @@ func (n *Nodis) HSet(key string, field string, value []byte) {
 	k, h := n.getDs(key, n.newHash, 0)
 	k.changed.Store(true)
 	h.(*hash.HashMap).HSet(field, value)
+	n.notify(pb.NewOp(pb.OpType_HSet, key).Field(field).Value(value))
 }
 
 func (n *Nodis) HGet(key string, field string) []byte {
@@ -36,6 +38,7 @@ func (n *Nodis) HDel(key string, field string) {
 		n.dataStructs.Delete(key)
 		n.keys.Delete(key)
 	}
+	n.notify(pb.NewOp(pb.OpType_HDel, key).Field(field))
 }
 
 func (n *Nodis) HLen(key string) int {
@@ -73,12 +76,14 @@ func (n *Nodis) HGetAll(key string) map[string][]byte {
 func (n *Nodis) HIncrBy(key string, field string, value int64) int64 {
 	k, h := n.getDs(key, n.newHash, 0)
 	k.changed.Store(true)
+	n.notify(pb.NewOp(pb.OpType_HIncrBy, key).Field(field).Increment(float64(value)))
 	return h.(*hash.HashMap).HIncrBy(field, value)
 }
 
 func (n *Nodis) HIncrByFloat(key string, field string, value float64) float64 {
 	k, h := n.getDs(key, n.newHash, 0)
 	k.changed.Store(true)
+	n.notify(pb.NewOp(pb.OpType_HIncrByFloat, key).Field(field).Increment(value))
 	return h.(*hash.HashMap).HIncrByFloat(field, value)
 }
 
@@ -89,17 +94,24 @@ func (n *Nodis) HSetNX(key string, field string, value []byte) bool {
 	}
 	h = n.newHash()
 	n.dataStructs.Set(key, h)
-	k := newKey(h.GetType(), 0)
+	k := newKey(h.Type(), 0)
 	k.lastUse.Store(uint32(time.Now().Unix()))
 	n.keys.Set(key, k)
 	k.changed.Store(true)
 	n.HSet(key, field, value)
+	n.notify(pb.NewOp(pb.OpType_HSetNX, key).Field(field).Value(value))
 	return true
 }
 
 func (n *Nodis) HMSet(key string, fields map[string][]byte) {
 	k, h := n.getDs(key, n.newHash, 0)
 	k.changed.Store(true)
+	var ops = make([]*pb.Op, 0, len(fields))
+	for field, value := range fields {
+		h.(*hash.HashMap).HSet(field, value)
+		ops = append(ops, pb.NewOp(pb.OpType_HSet, key).Field(field).Value(value))
+	}
+	n.notify(ops...)
 	h.(*hash.HashMap).HMSet(fields)
 }
 

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/diiyw/nodis/ds"
-	"github.com/kelindar/binary"
 )
 
 type Node struct {
@@ -21,8 +20,8 @@ type DoublyLinkedList struct {
 	tail *Node
 }
 
-// GetType returns the type of the data structure
-func (l *DoublyLinkedList) GetType() ds.DataType {
+// Type returns the type of the data structure
+func (l *DoublyLinkedList) Type() ds.DataType {
 	return ds.List
 }
 
@@ -308,19 +307,14 @@ func (l *DoublyLinkedList) LTrim(start, end int) {
 	}
 }
 
-// MarshalBinary returns the byte slice of the list
-func (l *DoublyLinkedList) MarshalBinary() ([]byte, error) {
-	return binary.Marshal(l.LRange(0, -1))
+// GetValue returns the byte slice of the list
+func (l *DoublyLinkedList) GetValue() [][]byte {
+	return l.LRange(0, -1)
 }
 
-// UnmarshalBinary restores the list from the byte slice
-func (l *DoublyLinkedList) UnmarshalBinary(data []byte) error {
-	var list [][]byte
-	if err := binary.Unmarshal(data, &list); err != nil {
-		return err
-	}
+// SetValue restores the list from the byte slice
+func (l *DoublyLinkedList) SetValue(list [][]byte) {
 	for _, item := range list {
 		l.RPush(item)
 	}
-	return nil
 }

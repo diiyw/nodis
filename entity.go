@@ -2,7 +2,6 @@ package nodis
 
 import (
 	"errors"
-	"hash/crc32"
 
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/hash"
@@ -10,75 +9,51 @@ import (
 	"github.com/diiyw/nodis/ds/set"
 	"github.com/diiyw/nodis/ds/str"
 	"github.com/diiyw/nodis/ds/zset"
-	"github.com/kelindar/binary"
+	"github.com/diiyw/nodis/pb"
 )
 
 var (
 	ErrCorruptedData = errors.New("corrupted data")
 )
 
-type Entity struct {
-	Key       string
-	Value     ds.DataStruct
-	ExpiredAt int64
-}
-
-type dataEntity struct {
-	Crc32 uint32
-	Type  ds.DataType
-	Body  []byte
-}
-
-// newEntry creates a new entry
-func newEntry(key string, value ds.DataStruct, expiredAt int64) *Entity {
-	return &Entity{
-		Key:       key,
-		Value:     value,
-		ExpiredAt: expiredAt,
+// newEntity creates a new entity
+func newEntity(key string, dataStruct ds.DataStruct, expiration int64) *pb.Entity {
+	e := &pb.Entity{
+		Key:        key,
+		Expiration: expiration,
+		Type:       uint32(dataStruct.Type()),
 	}
-}
-
-// Marshal marshals the entry
-func (e *Entity) Marshal() ([]byte, error) {
-	var err error
-	data, err := binary.Marshal(e)
-	if err != nil {
-		return nil, err
-	}
-	var buf = make([]byte, len(data)+1)
-	buf[0] = byte(e.Value.GetType())
-	copy(buf[1:], data)
-	var block = dataEntity{
-		Crc32: crc32.ChecksumIEEE(buf),
-		Type:  e.Value.GetType(),
-		Body:  data,
-	}
-	return binary.Marshal(block)
-}
-
-// Unmarshal the entry
-func (e *Entity) Unmarshal(data []byte) error {
-	var block dataEntity
-	if err := binary.Unmarshal(data, &block); err != nil {
-		return err
-	}
-	var buf = make([]byte, len(block.Body)+1)
-	buf[0] = byte(block.Type)
-	copy(buf[1:], block.Body)
-	if block.Crc32 != crc32.ChecksumIEEE(buf) {
-		return ErrCorruptedData
-	}
-	switch block.Type {
+	switch dataStruct.Type() {
 	case ds.String:
-		e.Value = str.NewString()
+		e.Value = &pb.Entity_StringValue{
+			StringValue: &pb.StringValue{
+				Value: dataStruct.(*str.String).GetValue(),
+			},
+		}
 	case ds.ZSet:
-		e.Value = zset.NewSortedSet()
+		e.Value = &pb.Entity_ZSetValue{
+			ZSetValue: &pb.ZSetValue{
+				Values: dataStruct.(*zset.SortedSet).GetValue(),
+			},
+		}
 	case ds.List:
-		e.Value = list.NewDoublyLinkedList()
+		e.Value = &pb.Entity_ListValue{
+			ListValue: &pb.ListValue{
+				Values: dataStruct.(*list.DoublyLinkedList).GetValue(),
+			},
+		}
 	case ds.Hash:
-		e.Value = hash.NewHashMap()
+		e.Value = &pb.Entity_HashValue{
+			HashValue: &pb.HashValue{
+				Values: dataStruct.(*hash.HashMap).GetValue(),
+			},
+		}
 	case ds.Set:
-		e.Value = set.NewSet()
+		e.Value = &pb.Entity_SetValue{
+			SetValue: &pb.SetValue{
+				Values: dataStruct.(*set.Set).GetValue(),
+			},
+		}
 	}
-	return binary.Unmarshal(block.Body, e)
+	return e
 }

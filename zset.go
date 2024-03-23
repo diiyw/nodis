@@ -3,6 +3,7 @@ package nodis
 import (
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/zset"
+	"github.com/diiyw/nodis/pb"
 )
 
 func (n *Nodis) newZSet() ds.DataStruct {
@@ -12,6 +13,7 @@ func (n *Nodis) newZSet() ds.DataStruct {
 func (n *Nodis) ZAdd(key string, member string, score float64) {
 	k, s := n.getDs(key, n.newZSet, 0)
 	k.changed.Store(true)
+	n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
 	s.(*zset.SortedSet).ZAdd(member, score)
 }
 
@@ -50,6 +52,7 @@ func (n *Nodis) ZScore(key string, member string) float64 {
 func (n *Nodis) ZIncrBy(key string, member string, score float64) float64 {
 	k, s := n.getDs(key, n.newZSet, 0)
 	k.changed.Store(true)
+	n.notify(pb.NewOp(pb.OpType_ZIncrBy, key).Member(member).Score(score))
 	return s.(*zset.SortedSet).ZIncrBy(member, score)
 }
 
@@ -155,6 +158,9 @@ func (n *Nodis) ZRem(key string, members ...string) int64 {
 		}
 	}
 	k.changed.Store(removed > 0)
+	if removed > 0 {
+		n.notify(pb.NewOp(pb.OpType_ZRem, key).Members(members))
+	}
 	return removed
 }
 
@@ -165,6 +171,9 @@ func (n *Nodis) ZRemRangeByRank(key string, start int64, stop int64) int64 {
 	}
 	removed := s.(*zset.SortedSet).ZRemRangeByRank(start, stop)
 	k.changed.Store(removed > 0)
+	if removed > 0 {
+		n.notify(pb.NewOp(pb.OpType_ZRemRangeByRank, key).Start(start).Stop(stop))
+	}
 	return removed
 }
 
@@ -175,6 +184,9 @@ func (n *Nodis) ZRemRangeByScore(key string, min float64, max float64) int64 {
 	}
 	removed := s.(*zset.SortedSet).ZRemRangeByScore(min, max)
 	k.changed.Store(removed > 0)
+	if removed > 0 {
+		n.notify(pb.NewOp(pb.OpType_ZRemRangeByScore, key).Min(min).Max(max))
+	}
 	return removed
 }
 

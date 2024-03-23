@@ -100,7 +100,7 @@ func TestKey_Type(t *testing.T) {
 		Path:            "testdata",
 		RecycleDuration: 60 * time.Second,
 	})
-	n.Set("test1", []byte("test1"), 1)
+	n.Set("test1", []byte("test1"), 0)
 	n.LPush("test2", []byte("test2"))
 	n.ZAdd("test3", "test3", 10)
 	n.SAdd("test4", "test4")
@@ -120,7 +120,10 @@ func TestKey_Type(t *testing.T) {
 	if n.Type("test5") != "hash" {
 		t.Errorf("Type() = %v, want %v", n.Type("test5"), "bool")
 	}
-	n.Close()
+	err := n.Close()
+	if err != nil {
+		t.Fatalf("Close() = %v, want %v", err, nil)
+	}
 	n = Open(&Options{
 		Path:            "testdata",
 		RecycleDuration: 60 * time.Second,
