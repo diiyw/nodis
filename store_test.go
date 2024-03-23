@@ -17,7 +17,7 @@ var (
 
 func TestStorePut(t *testing.T) {
 	tempDir := "testdata"
-	os.RemoveAll(tempDir)
+	_ = driver.RemoveAll(tempDir)
 	// Create a new Store instance
 	store := newStore(tempDir, 1024, driver)
 
@@ -40,18 +40,18 @@ func TestStorePut(t *testing.T) {
 	}
 
 	// Verify the index values
-	if idx.FileID != 0 {
-		t.Errorf("Expected FileID to be 0, got %d", idx.FileID)
+	if idx.fileID != 0 {
+		t.Errorf("Expected fileID to be 0, got %d", idx.fileID)
 	}
-	if idx.Offset != 0 {
-		t.Errorf("Expected Offset to be 0, got %d", idx.Offset)
+	if idx.offset != 0 {
+		t.Errorf("Expected offset to be 0, got %d", idx.offset)
 	}
 	v, _ := e.Marshal()
-	if idx.Size != uint32(len(v)) {
-		t.Errorf("Expected Size to be %d, got %d", len(v), idx.Size)
+	if idx.size != uint32(len(v)) {
+		t.Errorf("Expected size to be %d, got %d", len(v), idx.size)
 	}
-	if idx.ExpiredAt <= 0 {
-		t.Errorf("Expected ExpiredAt to be greater than 0, got %d", idx.ExpiredAt)
+	if idx.expiration <= 0 {
+		t.Errorf("Expected expiration to be greater than 0, got %d", idx.expiration)
 	}
 
 	// Read the value from the aof file
@@ -107,7 +107,7 @@ func TestStoreGet(t *testing.T) {
 
 func TestStoreMultiPut(t *testing.T) {
 	tempDir := "testdata"
-
+	_ = driver.RemoveAll(tempDir)
 	// Create a new Store instance
 	store := newStore(tempDir, 1024, driver)
 
@@ -152,7 +152,7 @@ func TestStoreMultiPut(t *testing.T) {
 
 func TestStoreMultiFilePut(t *testing.T) {
 	tempDir := "testdata"
-	os.RemoveAll(tempDir)
+	_ = driver.RemoveAll(tempDir)
 	os.Mkdir(tempDir, 0755)
 	// Create a new Store instance
 	store := newStore(tempDir, 10, driver)
@@ -209,7 +209,7 @@ func TestStoreMultiFilePut(t *testing.T) {
 
 func TestStoreRemove(t *testing.T) {
 	tempDir := "testdata"
-
+	_ = driver.RemoveAll(tempDir)
 	// Create a new Store instance
 	store := newStore(tempDir, 1024, driver)
 

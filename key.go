@@ -177,8 +177,7 @@ func (n *Nodis) Rename(key, key2 string) error {
 	n.keys.Set(key2, newKey(v.Type(), 0))
 	n.store.remove(key)
 	n.notify(
-		pb.NewOp(pb.OpType_Del, key),
-		pb.NewOp(pb.OpType_Set, key2).Value(v),
+		pb.NewOp(pb.OpType_Rename, key).DstKey(key2),
 	)
 	n.Unlock()
 	return nil
@@ -192,7 +191,7 @@ func (n *Nodis) Type(key string) string {
 		n.RUnlock()
 		n.store.RLock()
 		v, err := n.store.get(key)
-		if err != nil {
+		if err != nil || len(v) == 0 {
 			n.store.RUnlock()
 			return "none"
 		}

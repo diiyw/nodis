@@ -313,9 +313,8 @@ func (l *DoublyLinkedList) GetValue() [][]byte {
 }
 
 // SetValue restores the list from the byte slice
-func (l *DoublyLinkedList) SetValue(list [][]byte) error {
+func (l *DoublyLinkedList) SetValue(list [][]byte) {
 	for _, item := range list {
 		l.RPush(item)
 	}
-	return nil
 }

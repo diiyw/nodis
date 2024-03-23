@@ -337,10 +337,9 @@ func (sortedSet *SortedSet) GetValue() []*pb.KeyScore {
 	return keyScores
 }
 
-func (sortedSet *SortedSet) SetValue(keyScores []*pb.KeyScore) error {
+func (sortedSet *SortedSet) SetValue(keyScores []*pb.KeyScore) {
 	sortedSet.skiplist = makeSkiplist()
 	for _, v := range keyScores {
 		sortedSet.zAdd(v.Member, v.Score)
 	}
-	return nil
 }

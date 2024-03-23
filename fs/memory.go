@@ -40,6 +40,13 @@ func (m *Memory) IsDir(path string) (bool, error) {
 	return false, nil
 }
 
+func (m *Memory) RemoveAll(path string) error {
+	m.Lock()
+	defer m.Unlock()
+	m.files.Clear()
+	return nil
+}
+
 type MemoryFile struct {
 	data []byte
 }

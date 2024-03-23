@@ -223,7 +223,7 @@ func (n *Nodis) notify(ops ...*pb.Op) {
 		n.watchers.Scan(func(key string, w *watch.Watcher) bool {
 			for _, op := range ops {
 				if w.Matched(op.Key) {
-					w.Push(op)
+					w.Push(op.Operation)
 				}
 			}
 			return true

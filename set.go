@@ -3,6 +3,7 @@ package nodis
 import (
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/set"
+	"github.com/diiyw/nodis/pb"
 )
 
 func (n *Nodis) newSet() ds.DataStruct {
@@ -13,6 +14,7 @@ func (n *Nodis) newSet() ds.DataStruct {
 func (n *Nodis) SAdd(key string, members ...string) int {
 	k, s := n.getDs(key, n.newSet, 0)
 	k.changed.Store(true)
+	n.notify(pb.NewOp(pb.OpType_SAdd, key).Members(members))
 	return s.(*set.Set).SAdd(members...)
 }
 
@@ -97,5 +99,6 @@ func (n *Nodis) SRem(key string, members ...string) int {
 		return 0
 	}
 	k.changed.Store(true)
+	n.notify(pb.NewOp(pb.OpType_SRem, key).Members(members))
 	return s.(*set.Set).SRem(members...)
 }

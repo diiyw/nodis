@@ -157,10 +157,9 @@ func (s *HashMap) GetValue() []*pb.MemberBytes {
 	return values
 }
 
-// Unmarshal the set from bytes
-func (s *HashMap) SetValue(values []*pb.MemberBytes) error {
+// SetValue the set from bytes
+func (s *HashMap) SetValue(values []*pb.MemberBytes) {
 	for _, v := range values {
 		s.data.Set(v.Member, v.Value)
 	}
-	return nil
 }

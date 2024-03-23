@@ -10,6 +10,7 @@ type Disk struct {
 
 type DiskFile struct {
 	*os.File
+	flag int
 }
 
 func (d *Disk) OpenFile(filename string, flag int) (File, error) {
@@ -17,8 +18,7 @@ func (d *Disk) OpenFile(filename string, flag int) (File, error) {
 	if err != nil {
 		return nil, err
 	}
-	fi.Fd()
-	return &DiskFile{File: fi}, nil
+	return &DiskFile{File: fi, flag: flag}, nil
 }
 
 func (d *Disk) MkdirAll(path string) error {
@@ -37,6 +37,9 @@ func (d *Disk) IsDir(path string) (bool, error) {
 	return fi.IsDir(), nil
 }
 
+func (d *Disk) RemoveAll(path string) error {
+	return os.RemoveAll(path)
+}
 func (d *DiskFile) ReadAt(b []byte, off int64) (n int, err error) {
 	n, err = d.File.ReadAt(b, off)
 	if err == io.EOF {
@@ -66,7 +69,16 @@ func (d *DiskFile) FileSize() (int64, error) {
 }
 
 func (d *DiskFile) Truncate(size int64) error {
-	return d.File.Truncate(size)
+	err := d.File.Close()
+	if err != nil {
+		return err
+	}
+	err = os.Truncate(d.Name(), size)
+	if err != nil {
+		return err
+	}
+	d.File, err = os.OpenFile(d.Name(), d.flag, 0644)
+	return err
 }
 
 func (d *DiskFile) ReadAll() ([]byte, error) {

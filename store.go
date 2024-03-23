@@ -1,6 +1,7 @@
 package nodis
 
 import (
+	"google.golang.org/protobuf/proto"
 	"log"
 	"os"
 	"path/filepath"
@@ -18,7 +19,7 @@ import (
 type store struct {
 	sync.RWMutex
 	fileSize   int64
-	fileId     uint32
+	fileId     uint16
 	path       string
 	current    string
 	indexFile  string
@@ -43,18 +44,24 @@ func newStore(path string, fileSize int64, filesystem fs.Fs) *store {
 	if err != nil {
 		panic(err)
 	}
-	if len(data) > 4 {
-		if len(data[4:]) > 0 {
-			var m map[string]*index
-			err := binary.Unmarshal(data[4:], &m)
+	err = idxFile.Close()
+	if err != nil {
+		panic(err)
+	}
+	if len(data) > 2 {
+		if len(data[2:]) > 0 {
+			var idx = &pb.Index{}
+			err = proto.Unmarshal(data[2:], idx)
 			if err != nil {
 				panic(err)
 			}
-			for k, v := range m {
-				s.index.Set(k, v)
+			for _, v := range idx.Items {
+				var i = &index{}
+				i.unmarshal(v.Data)
+				s.index.Set(v.Key, i)
 			}
 		}
-		s.fileId = binary.LittleEndian.Uint32(data[:4])
+		s.fileId = binary.LittleEndian.Uint16(data[:2])
 	}
 	s.filesystem = filesystem
 	s.current = filepath.Join(path, "nodis."+strconv.Itoa(int(s.fileId))+".aof")
@@ -66,10 +73,28 @@ func newStore(path string, fileSize int64, filesystem fs.Fs) *store {
 }
 
 type index struct {
-	FileID    uint32
-	Offset    int64
-	Size      uint32
-	ExpiredAt int64
+	offset     int64
+	expiration int64
+	size       uint32
+	fileID     uint16
+}
+
+// marshal index to bytes
+func (i *index) marshal() []byte {
+	var b [22]byte
+	binary.LittleEndian.PutUint64(b[0:8], uint64(i.offset))
+	binary.LittleEndian.PutUint64(b[8:16], uint64(i.expiration))
+	binary.LittleEndian.PutUint32(b[16:20], i.size)
+	binary.LittleEndian.PutUint16(b[20:22], i.fileID)
+	return b[:]
+}
+
+// unmarshal bytes to index
+func (i *index) unmarshal(b []byte) {
+	i.offset = int64(binary.LittleEndian.Uint64(b[0:8]))
+	i.expiration = int64(binary.LittleEndian.Uint64(b[8:16]))
+	i.size = binary.LittleEndian.Uint32(b[16:20])
+	i.fileID = binary.LittleEndian.Uint16(b[20:22])
 }
 
 func (s *store) check() (int64, error) {
@@ -101,7 +126,7 @@ func (s *store) check() (int64, error) {
 			}
 		}()
 		var header = make([]byte, 4)
-		binary.LittleEndian.PutUint32(header, s.fileId)
+		binary.LittleEndian.PutUint16(header, s.fileId)
 		_, err = idxFi.WriteAt(header, 0)
 		if err != nil {
 			return 0, err
@@ -124,10 +149,10 @@ func (s *store) put(entry *pb.Entity) error {
 	if err != nil {
 		return err
 	}
-	idx.FileID = s.fileId
-	idx.Offset = offset
-	idx.Size = uint32(len(data))
-	idx.ExpiredAt = entry.Expiration
+	idx.fileID = s.fileId
+	idx.offset = offset
+	idx.size = uint32(len(data))
+	idx.expiration = entry.Expiration
 	s.index.Set(entry.Key, idx)
 	_, err = s.aof.Write(data)
 	if err != nil {
@@ -136,7 +161,7 @@ func (s *store) put(entry *pb.Entity) error {
 	return nil
 }
 
-func (s *store) putRaw(key string, data []byte, expiredAt int64) error {
+func (s *store) putRaw(key string, data []byte, expiration int64) error {
 	s.Lock()
 	defer s.Unlock()
 	var idx = &index{}
@@ -144,10 +169,10 @@ func (s *store) putRaw(key string, data []byte, expiredAt int64) error {
 	if err != nil {
 		return err
 	}
-	idx.FileID = s.fileId
-	idx.Offset = offset
-	idx.Size = uint32(len(data))
-	idx.ExpiredAt = expiredAt
+	idx.fileID = s.fileId
+	idx.offset = offset
+	idx.size = uint32(len(data))
+	idx.expiration = expiration
 	s.index.Set(key, idx)
 	_, err = s.aof.Write(data)
 	if err != nil {
@@ -164,23 +189,28 @@ func (s *store) get(key string) ([]byte, error) {
 	if !ok {
 		return nil, nil
 	}
-	if idx.FileID == s.fileId {
-		data := make([]byte, idx.Size)
-		_, err := s.aof.ReadAt(data, idx.Offset)
+	if idx.fileID == s.fileId {
+		data := make([]byte, idx.size)
+		_, err := s.aof.ReadAt(data, idx.offset)
 		if err != nil {
 			return nil, err
 		}
 		return data, nil
 	}
 	// read from other file
-	file := filepath.Join(s.path, "nodis."+strconv.Itoa(int(idx.FileID))+".aof")
+	file := filepath.Join(s.path, "nodis."+strconv.Itoa(int(idx.fileID))+".aof")
 	f, err := s.filesystem.OpenFile(file, os.O_RDONLY)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	data := make([]byte, idx.Size)
-	_, err = f.ReadAt(data, idx.Offset)
+	defer func() {
+		err = f.Close()
+		if err != nil {
+			log.Println("Close file error: ", err)
+		}
+	}()
+	data := make([]byte, idx.size)
+	_, err = f.ReadAt(data, idx.offset)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +236,11 @@ func (s *store) snapshot(path string, entries []*pb.Entity) {
 	}
 	ns := newStore(snapshotDir, s.fileSize, s.filesystem)
 	for _, entry := range entries {
-		ns.put(entry)
+		err = ns.put(entry)
+		if err != nil {
+			log.Println("Snapshot put error: ", err)
+			return
+		}
 	}
 	s.index.Scan(func(key string, index *index) bool {
 		if _, ok := ns.index.Get(key); !ok {
@@ -217,7 +251,7 @@ func (s *store) snapshot(path string, entries []*pb.Entity) {
 			log.Println("Snapshot get error: ", err)
 			return true
 		}
-		err = ns.putRaw(key, data, index.ExpiredAt)
+		err = ns.putRaw(key, data, index.expiration)
 		if err != nil {
 			log.Println("Snapshot put error: ", err)
 			return true
@@ -242,22 +276,23 @@ func (s *store) close() error {
 	if err != nil {
 		return err
 	}
-	var header = make([]byte, 4)
-	binary.LittleEndian.PutUint32(header, s.fileId)
+	var header = make([]byte, 2)
+	binary.LittleEndian.PutUint16(header, s.fileId)
 	_, err = idxFile.Write(header)
 	if err != nil {
 		return err
 	}
-	var indexData = make(map[string][]byte, 0)
-	s.index.Scan(func(key string, value *index) bool {
-		data, err := binary.Marshal(value)
-		if err != nil {
-			return false
-		}
-		indexData[key] = data
+	indexData := &pb.Index{
+		Items: make([]*pb.Index_Item, 0, s.index.Len()),
+	}
+	s.index.Scan(func(key string, i *index) bool {
+		indexData.Items = append(indexData.Items, &pb.Index_Item{
+			Key:  key,
+			Data: i.marshal(),
+		})
 		return true
 	})
-	data, err := binary.Marshal(indexData)
+	data, err := proto.Marshal(indexData)
 	if err != nil {
 		return err
 	}

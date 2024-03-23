@@ -42,7 +42,6 @@ func (s *String) GetValue() []byte {
 }
 
 // SetValue the bytes to string
-func (s *String) SetValue(data []byte) error {
+func (s *String) SetValue(data []byte) {
 	s.V = data
-	return nil
 }
