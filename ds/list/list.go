@@ -239,11 +239,11 @@ func (l *DoublyLinkedList) RPushX(data []byte) int {
 }
 
 // LRem removes the first count occurrences of elements equal to value from the list
-func (l *DoublyLinkedList) LRem(count int, value []byte) int {
+func (l *DoublyLinkedList) LRem(count int64, value []byte) int64 {
 	l.Lock()
 	defer l.Unlock()
 	currentNode := l.head
-	removed := 0
+	var removed int64 = 0
 	for currentNode != nil {
 		if bytes.Equal(currentNode.data, value) {
 			if count > 0 && removed == count {
@@ -267,11 +267,11 @@ func (l *DoublyLinkedList) LRem(count int, value []byte) int {
 }
 
 // LSet sets the list element at index to value
-func (l *DoublyLinkedList) LSet(index int, value []byte) bool {
+func (l *DoublyLinkedList) LSet(index int64, value []byte) bool {
 	l.Lock()
 	defer l.Unlock()
 	currentNode := l.head
-	currentIndex := 0
+	var currentIndex int64 = 0
 	for currentNode != nil {
 		if currentIndex == index {
 			currentNode.data = value
@@ -284,11 +284,11 @@ func (l *DoublyLinkedList) LSet(index int, value []byte) bool {
 }
 
 // LTrim trims an existing list so that it will contain only the specified range of elements specified
-func (l *DoublyLinkedList) LTrim(start, end int) {
+func (l *DoublyLinkedList) LTrim(start, end int64) {
 	l.Lock()
 	defer l.Unlock()
 	currentNode := l.head
-	index := 0
+	var index int64 = 0
 	for currentNode != nil {
 		if index < start || index > end {
 			if currentNode.prev != nil {

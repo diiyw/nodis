@@ -77,7 +77,7 @@ func (n *Nodis) LIndex(key string, index int) []byte {
 func (n *Nodis) LInsert(key string, pivot, data []byte, before bool) int {
 	k, l := n.getDs(key, n.newList, 0)
 	k.changed.Store(true)
-	n.notify(pb.NewOp(pb.OpType_LInsert, key).Value(data).Pivot(pivot))
+	n.notify(pb.NewOp(pb.OpType_LInsert, key).Value(data).Pivot(pivot).Before(before))
 	return l.(*list.DoublyLinkedList).LInsert(pivot, data, before)
 }
 
@@ -95,7 +95,7 @@ func (n *Nodis) RPushX(key string, data []byte) int {
 	return l.(*list.DoublyLinkedList).RPushX(data)
 }
 
-func (n *Nodis) LRem(key string, count int, data []byte) int {
+func (n *Nodis) LRem(key string, count int64, data []byte) int64 {
 	k, l := n.getDs(key, nil, 0)
 	if l == nil {
 		return 0
@@ -105,14 +105,14 @@ func (n *Nodis) LRem(key string, count int, data []byte) int {
 	return l.(*list.DoublyLinkedList).LRem(count, data)
 }
 
-func (n *Nodis) LSet(key string, index int, data []byte) bool {
+func (n *Nodis) LSet(key string, index int64, data []byte) bool {
 	k, l := n.getDs(key, n.newList, 0)
 	k.changed.Store(true)
 	n.notify(pb.NewOp(pb.OpType_LSet, key).Value(data).Index(index))
 	return l.(*list.DoublyLinkedList).LSet(index, data)
 }
 
-func (n *Nodis) LTrim(key string, start, stop int) {
+func (n *Nodis) LTrim(key string, start, stop int64) {
 	k, l := n.getDs(key, nil, 0)
 	if l == nil {
 		return
@@ -182,7 +182,7 @@ func (n *Nodis) BLPop(key string, timeout time.Duration) []byte {
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
 		n.Del(key)
 	}
-	n.notify(pb.NewOp(pb.OpType_BLPop, key))
+	n.notify(pb.NewOp(pb.OpType_LPop, key))
 	return v
 }
 
@@ -193,6 +193,6 @@ func (n *Nodis) BRPop(key string, timeout time.Duration) []byte {
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
 		n.Del(key)
 	}
-	n.notify(pb.NewOp(pb.OpType_BRPop, key))
+	n.notify(pb.NewOp(pb.OpType_RPop, key))
 	return v
 }

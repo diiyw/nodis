@@ -76,14 +76,14 @@ func (n *Nodis) HGetAll(key string) map[string][]byte {
 func (n *Nodis) HIncrBy(key string, field string, value int64) int64 {
 	k, h := n.getDs(key, n.newHash, 0)
 	k.changed.Store(true)
-	n.notify(pb.NewOp(pb.OpType_HIncrBy, key).Field(field).Increment(float64(value)))
+	n.notify(pb.NewOp(pb.OpType_HIncrBy, key).Field(field).IncrInt(value))
 	return h.(*hash.HashMap).HIncrBy(field, value)
 }
 
 func (n *Nodis) HIncrByFloat(key string, field string, value float64) float64 {
 	k, h := n.getDs(key, n.newHash, 0)
 	k.changed.Store(true)
-	n.notify(pb.NewOp(pb.OpType_HIncrByFloat, key).Field(field).Increment(value))
+	n.notify(pb.NewOp(pb.OpType_HIncrByFloat, key).Field(field).IncrFloat(value))
 	return h.(*hash.HashMap).HIncrByFloat(field, value)
 }
 

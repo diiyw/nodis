@@ -5,41 +5,39 @@ option go_package = "../pb";
 
 enum OpType  {
   None = 0;
-  BLPop = 1;
-  BRPop = 2;
-  Clear = 3;
-  Del = 4;
-  Expire = 5;
-  ExpireAt = 6;
-  HClear = 7;
-  HDel = 8;
-  HIncrBy = 9;
-  HIncrByFloat = 10;
-  HMSet = 11;
-  HSet = 12;
-  HSetNX = 13;
-  LInsert = 14;
-  LPop = 15;
-  LPopRPush = 16;
-  LPush = 17;
-  LPushX = 18;
-  LRem = 19;
-  LSet = 20;
-  LTrim = 21;
-  RPop = 22;
-  RPopLPush = 23;
-  RPush = 24;
-  RPushX = 25;
-  SAdd = 26;
-  SRem = 27;
-  Set = 28;
-  ZAdd = 29;
-  ZClear = 30;
-  ZIncrBy = 31;
-  ZRem = 32;
-  ZRemRangeByRank = 33;
-  ZRemRangeByScore = 34;
-  Rename = 35;
+  Clear = 1;
+  Del = 2;
+  Expire = 3;
+  ExpireAt = 4;
+  HClear = 5;
+  HDel = 6;
+  HIncrBy = 7;
+  HIncrByFloat = 8;
+  HMSet = 9;
+  HSet = 10;
+  HSetNX = 11;
+  LInsert = 12;
+  LPop = 13;
+  LPopRPush = 14;
+  LPush = 15;
+  LPushX = 16;
+  LRem = 17;
+  LSet = 18;
+  LTrim = 19;
+  RPop = 20;
+  RPopLPush = 21;
+  RPush = 22;
+  RPushX = 23;
+  SAdd = 24;
+  SRem = 25;
+  Set = 26;
+  ZAdd = 27;
+  ZClear = 28;
+  ZIncrBy = 29;
+  ZRem = 30;
+  ZRemRangeByRank = 31;
+  ZRemRangeByScore = 32;
+  Rename = 33;
 }
 
 message Operation {
@@ -60,7 +58,9 @@ message Operation {
   double min = 15;
   double max = 16;
   string Field = 17;
-  double Increment = 18;
+  double IncrFloat = 18;
+  int64 IncrInt = 19;
+  bool  Before = 20;
 }
 
 message KeyScore {

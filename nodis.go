@@ -233,3 +233,78 @@ func (n *Nodis) notify(ops ...*pb.Op) {
 		})
 	}()
 }
+
+func (n *Nodis) Patch(ops ...*pb.Op) {
+	for _, op := range ops {
+		n.patch(op)
+	}
+}
+
+func (n *Nodis) patch(op *pb.Op) {
+	switch op.Operation.Type {
+	case pb.OpType_Clear:
+		n.Clear()
+	case pb.OpType_Del:
+		n.Del(op.Key)
+	case pb.OpType_Expire:
+		n.Expire(op.Key, op.Operation.Expiration)
+	case pb.OpType_ExpireAt:
+		n.ExpireAt(op.Key, time.Unix(op.Operation.Expiration, 0))
+	case pb.OpType_HClear:
+		n.HClear(op.Key)
+	case pb.OpType_HDel:
+		n.HDel(op.Key, op.Operation.Field)
+	case pb.OpType_HIncrBy:
+		n.HIncrBy(op.Key, op.Operation.Field, op.Operation.IncrInt)
+	case pb.OpType_HIncrByFloat:
+		n.HIncrByFloat(op.Key, op.Operation.Field, op.Operation.IncrFloat)
+	case pb.OpType_HSet:
+		n.HSet(op.Key, op.Operation.Field, op.Operation.Value)
+	case pb.OpType_HSetNX:
+		n.HSetNX(op.Key, op.Operation.Field, op.Operation.Value)
+	case pb.OpType_LInsert:
+		n.LInsert(op.Key, op.Operation.Pivot, op.Operation.Value, op.Operation.Before)
+	case pb.OpType_LPop:
+		n.LPop(op.Key)
+	case pb.OpType_LPopRPush:
+		n.LPopRPush(op.Key, op.Operation.DstKey)
+	case pb.OpType_LPush:
+		n.LPush(op.Key, op.Operation.Values...)
+	case pb.OpType_LPushX:
+		n.LPushX(op.Key, op.Operation.Value)
+	case pb.OpType_LRem:
+		n.LRem(op.Key, op.Operation.Count, op.Operation.Value)
+	case pb.OpType_LSet:
+		n.LSet(op.Key, op.Operation.Index, op.Operation.Value)
+	case pb.OpType_LTrim:
+		n.LTrim(op.Key, op.Operation.Start, op.Operation.Stop)
+	case pb.OpType_RPop:
+		n.RPop(op.Key)
+	case pb.OpType_RPopLPush:
+		n.RPopLPush(op.Key, op.Operation.DstKey)
+	case pb.OpType_RPush:
+		n.RPush(op.Key, op.Operation.Values...)
+	case pb.OpType_RPushX:
+		n.RPushX(op.Key, op.Operation.Value)
+	case pb.OpType_SAdd:
+		n.SAdd(op.Key, op.Operation.Members...)
+	case pb.OpType_SRem:
+		n.SRem(op.Key, op.Operation.Members...)
+	case pb.OpType_Set:
+		n.Set(op.Key, op.Operation.Value, op.Operation.Expiration)
+	case pb.OpType_ZAdd:
+		n.ZAdd(op.Key, op.Operation.Member, op.Operation.Score)
+	case pb.OpType_ZClear:
+		n.ZClear(op.Key)
+	case pb.OpType_ZIncrBy:
+		n.ZIncrBy(op.Key, op.Operation.Member, op.Operation.Score)
+	case pb.OpType_ZRem:
+		n.ZRem(op.Key, op.Operation.Member)
+	case pb.OpType_ZRemRangeByRank:
+		n.ZRemRangeByRank(op.Key, op.Operation.Start, op.Operation.Stop)
+	case pb.OpType_ZRemRangeByScore:
+		n.ZRemRangeByScore(op.Key, op.Operation.Min, op.Operation.Max)
+	case pb.OpType_Rename:
+		_ = n.Rename(op.Key, op.Operation.DstKey)
+	}
+}

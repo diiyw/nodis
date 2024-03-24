@@ -55,14 +55,14 @@ func (o *Op) Pivot(pivot []byte) *Op {
 }
 
 // Count set the count
-func (o *Op) Count(count int) *Op {
-	o.Operation.Count = int64(count)
+func (o *Op) Count(count int64) *Op {
+	o.Operation.Count = count
 	return o
 }
 
 // Index set the index
-func (o *Op) Index(index int) *Op {
-	o.Operation.Index = int64(index)
+func (o *Op) Index(index int64) *Op {
+	o.Operation.Index = index
 	return o
 }
 
@@ -102,8 +102,20 @@ func (o *Op) Field(field string) *Op {
 	return o
 }
 
-// Increment set the increment
-func (o *Op) Increment(increment float64) *Op {
-	o.Operation.Increment = increment
+// IncrFloat set the increment
+func (o *Op) IncrFloat(i float64) *Op {
+	o.Operation.IncrFloat = i
+	return o
+}
+
+// IncrInt set the increment
+func (o *Op) IncrInt(i int64) *Op {
+	o.Operation.IncrInt = i
+	return o
+}
+
+// Before set the before
+func (o *Op) Before(before bool) *Op {
+	o.Operation.Before = before
 	return o
 }

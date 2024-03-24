@@ -1,6 +1,7 @@
 package nodis
 
 import (
+	"github.com/diiyw/nodis/pb"
 	"os"
 	"strconv"
 	"testing"
@@ -184,4 +185,72 @@ func TestNodis_Clear(t *testing.T) {
 		t.Errorf("Get() = %v, want %v", v, nil)
 	}
 	n.Close()
+}
+
+func TestNodis_Patch(t *testing.T) {
+	_ = os.RemoveAll("testdata")
+	opt := &Options{
+		Path: "testdata",
+	}
+	var ops = []*pb.Op{
+		{
+			Operation: &pb.Operation{
+				Type:  pb.OpType_Set,
+				Key:   "string",
+				Value: []byte("string"),
+			},
+		},
+		{
+			Operation: &pb.Operation{
+				Type:   pb.OpType_ZAdd,
+				Key:    "zset",
+				Member: "zset",
+				Score:  10,
+			},
+		},
+		{
+			Operation: &pb.Operation{
+				Type:   pb.OpType_LPush,
+				Key:    "lpush",
+				Values: [][]byte{[]byte("lpush3"), []byte("lpush2"), []byte("lpush")},
+			},
+		},
+		{
+			Operation: &pb.Operation{
+				Type:    pb.OpType_SAdd,
+				Key:     "set",
+				Members: []string{"member", "member2", "member3"},
+			},
+		},
+		{
+			Operation: &pb.Operation{
+				Type:  pb.OpType_HSet,
+				Key:   "hash",
+				Field: "field",
+				Value: []byte("value"),
+			},
+		},
+	}
+	n := Open(opt)
+	n.Patch(ops...)
+	v := n.Get("string")
+	if string(v) != "string" {
+		t.Errorf("Get() = %v, want %v", v, "test_new")
+	}
+	s := n.ZScore("zset", "zset")
+	if s != 10 {
+		t.Errorf("ZScore() = %v, want %v", s, 10)
+	}
+	v = n.LPop("lpush")
+	if string(v) != "lpush" {
+		t.Errorf("LPop() = %s, want %v", v, "lpush")
+	}
+	b := n.SIsMember("set", "member")
+	if !b {
+		t.Errorf("SIsMember() = %v, want %v", b, true)
+	}
+	v = n.HGet("hash", "field")
+	if string(v) != "value" {
+		t.Errorf("HGet() = %v, want %v", v, "value")
+	}
 }
