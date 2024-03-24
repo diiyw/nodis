@@ -95,14 +95,6 @@ func TestStoreGet(t *testing.T) {
 	if data == nil {
 		t.Fatalf("Failed to retrieve index for key: %s", key)
 	}
-	_, d, _, err := parseDs(data)
-	if err != nil || d == nil {
-		t.Fatalf("Failed to parse value for key: %v", err)
-	}
-	v := d.(*str.String).Get()
-	if !bytes.Equal(value, v) {
-		t.Errorf("Expected value to be %v, got %v", value, v)
-	}
 }
 
 func TestStoreMultiPut(t *testing.T) {
@@ -267,13 +259,5 @@ func TestStorePutRaw(t *testing.T) {
 	}
 	if !bytes.Equal(nd, data) {
 		t.Errorf("Expected value to be %v, got %v", data, nd)
-	}
-	_, dv, _, err := parseDs(data)
-	if err != nil {
-		t.Fatalf("Failed to parse value for key: %v", err)
-	}
-	v := dv.(*str.String).Get()
-	if !bytes.Equal(value, v) {
-		t.Errorf("Expected value to be %v, got %v", value, v)
 	}
 }

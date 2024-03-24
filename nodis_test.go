@@ -1,6 +1,7 @@
 package nodis
 
 import (
+	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/pb"
 	"os"
 	"strconv"
@@ -21,7 +22,7 @@ func TestNodis_Open(t *testing.T) {
 }
 
 func TestNodis_Sync(t *testing.T) {
-	os.RemoveAll("testdata")
+	_ = os.RemoveAll("testdata")
 	opt := Options{
 		Path:            "testdata",
 		RecycleDuration: 60 * time.Second,
@@ -33,7 +34,7 @@ func TestNodis_Sync(t *testing.T) {
 	if keys == nil {
 		t.Errorf("Sync() = %v, want %v", keys, nil)
 	}
-	n.Close()
+	_ = n.Close()
 }
 
 func TestNodis_OpenAndSync(t *testing.T) {
@@ -50,7 +51,7 @@ func TestNodis_OpenAndSync(t *testing.T) {
 	if keys == nil {
 		t.Errorf("Sync() = %v, want %v", keys, nil)
 	}
-	n.Close()
+	_ = n.Close()
 	n = Open(opt)
 	v := n.Get("set")
 	if v == nil {
@@ -132,7 +133,7 @@ func TestNodis_Snapshot(t *testing.T) {
 	n := Open(opt)
 	n.Set("test", []byte("test"), 0)
 	n.Snapshot("testdata")
-	n.Close()
+	_ = n.Close()
 }
 
 func TestNodis_SnapshotChanged(t *testing.T) {
@@ -146,7 +147,7 @@ func TestNodis_SnapshotChanged(t *testing.T) {
 	time.Sleep(time.Second)
 	n.Set("test", []byte("test_new"), 0)
 	n.Snapshot(opt.Path)
-	n.Close()
+	_ = n.Close()
 }
 
 func TestNodis_Recycle(t *testing.T) {
@@ -169,7 +170,7 @@ func TestNodis_Recycle(t *testing.T) {
 	if v == nil {
 		t.Errorf("Get() = %v, want %v", v, "test")
 	}
-	n.Close()
+	_ = n.Close()
 }
 
 func TestNodis_Clear(t *testing.T) {
@@ -184,7 +185,7 @@ func TestNodis_Clear(t *testing.T) {
 	if v != nil {
 		t.Errorf("Get() = %v, want %v", v, nil)
 	}
-	n.Close()
+	_ = n.Close()
 }
 
 func TestNodis_Patch(t *testing.T) {
@@ -253,4 +254,49 @@ func TestNodis_Patch(t *testing.T) {
 	if string(v) != "value" {
 		t.Errorf("HGet() = %v, want %v", v, "value")
 	}
+}
+
+func TestNodis_SetEntity(t *testing.T) {
+	_ = os.RemoveAll("testdata")
+	opt := &Options{
+		Path: "testdata",
+	}
+	n := Open(opt)
+	n.Set("test", []byte("test"), 0)
+	data := n.GetEntity("test")
+	n.Clear()
+	v := n.Get("test")
+	if v != nil {
+		t.Errorf("Get() = %v, want %v", v, nil)
+		return
+	}
+	err := n.SetEntity(data)
+	if err != nil {
+		t.Errorf("SetEntity() = %v, want %v", err, nil)
+	}
+	v = n.Get("test")
+	if string(v) != "test" {
+		t.Errorf("Get() = %s, want %v", v, "test")
+	}
+}
+
+func TestNodis_parseDs(t *testing.T) {
+	_ = os.RemoveAll("testdata")
+	opt := &Options{
+		Path: "testdata",
+	}
+	n := Open(opt)
+	n.Set("test", []byte("test"), 0)
+	data := n.GetEntity("test")
+	k, d, _, err := n.parseDs(data)
+	if err != nil {
+		t.Errorf("parseDs() = %v, want %v", err, nil)
+	}
+	if k != "test" {
+		t.Errorf("parseDs() = %v, want %v", k, "test")
+	}
+	if d.Type() != ds.String {
+		t.Errorf("parseDs() = %v, want %v", d.Type(), ds.String)
+	}
+	_ = n.Close()
 }

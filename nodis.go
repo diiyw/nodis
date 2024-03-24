@@ -182,17 +182,45 @@ func (n *Nodis) Clear() {
 	}
 }
 
-// parseDs the data
-func parseDs(data []byte) (key string, dataStruct ds.DataStruct, expiration int64, err error) {
+// SetEntity sets an entity
+func (n *Nodis) SetEntity(data []byte) error {
+	entity, err := n.parseEntity(data)
+	if err != nil {
+		return err
+	}
+	return n.store.put(entity)
+}
+
+func (n *Nodis) parseEntity(data []byte) (*pb.Entity, error) {
 	c32 := binary.LittleEndian.Uint32(data)
 	if c32 != crc32.ChecksumIEEE(data[4:]) {
-		return "", nil, 0, ErrCorruptedData
+		return nil, ErrCorruptedData
 	}
 	var entity pb.Entity
 	if err := proto.Unmarshal(data[4:], &entity); err != nil {
+		return nil, err
+	}
+	return &entity, nil
+}
+
+// GetEntity gets an entity
+func (n *Nodis) GetEntity(key string) []byte {
+	k, d := n.getDs(key, nil, 0)
+	if d == nil {
+		return nil
+	}
+	var entity = newEntity(key, d, k.Expiration)
+	data, _ := entity.Marshal()
+	return data
+}
+
+// parseDs the data
+func (n *Nodis) parseDs(data []byte) (string, ds.DataStruct, int64, error) {
+	var entity, err = n.parseEntity(data)
+	if err != nil {
 		return "", nil, 0, err
 	}
-	key, expiration = entity.Key, entity.Expiration
+	var dataStruct ds.DataStruct
 	switch ds.DataType(entity.Type) {
 	case ds.String:
 		s := str.NewString()
@@ -215,7 +243,7 @@ func parseDs(data []byte) (key string, dataStruct ds.DataStruct, expiration int6
 		s.SetValue(entity.GetSetValue().Values)
 		dataStruct = s
 	}
-	return
+	return entity.Key, dataStruct, entity.Expiration, nil
 }
 
 func (n *Nodis) notify(ops ...*pb.Op) {

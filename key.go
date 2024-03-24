@@ -72,7 +72,7 @@ func (n *Nodis) exists(key string) (k *Key, ok bool) {
 		// try get from store
 		v, err := n.store.get(key)
 		if err == nil && len(v) > 0 {
-			key, d, ttl, err := parseDs(v)
+			key, d, ttl, err := n.parseDs(v)
 			if err != nil {
 				log.Println("Parse DataStruct:", err)
 				return
@@ -195,7 +195,7 @@ func (n *Nodis) Type(key string) string {
 			n.store.RUnlock()
 			return "none"
 		}
-		_, d, _, err := parseDs(v)
+		_, d, _, err := n.parseDs(v)
 		if err != nil {
 			n.store.RUnlock()
 			return "none"
