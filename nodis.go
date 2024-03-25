@@ -29,7 +29,7 @@ type Nodis struct {
 	options     *Options
 	store       *store
 	closed      bool
-	watchers    btree.Map[string, *watch.Watcher]
+	watchers    []*watch.Watcher
 }
 
 func Open(opt *Options) *Nodis {
@@ -247,19 +247,23 @@ func (n *Nodis) parseDs(data []byte) (string, ds.DataStruct, int64, error) {
 }
 
 func (n *Nodis) notify(ops ...*pb.Op) {
-	if n.watchers.Len() == 0 {
+	if len(n.watchers) == 0 {
 		return
 	}
 	go func() {
-		n.watchers.Scan(func(key string, w *watch.Watcher) bool {
+		for _, w := range n.watchers {
 			for _, op := range ops {
 				if w.Matched(op.Key) {
 					w.Push(op.Operation)
 				}
 			}
-			return true
-		})
+		}
 	}()
+}
+
+func (n *Nodis) Watch(pattern []string, fn func(op *pb.Operation)) {
+	w := watch.NewWatcher(pattern, fn)
+	n.watchers = append(n.watchers, w)
 }
 
 func (n *Nodis) Patch(ops ...*pb.Op) {

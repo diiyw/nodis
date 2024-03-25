@@ -1,13 +1,14 @@
 package watch
 
 import (
-	"github.com/diiyw/nodis/pb"
 	"testing"
+
+	"github.com/diiyw/nodis/pb"
 )
 
 func TestWatcher_Matched(t *testing.T) {
 	pattern := []string{"test"}
-	w := NewWatcher(pattern, 0)
+	w := NewWatcher(pattern, nil)
 	if w == nil {
 		t.Errorf("NewWatcher() = %v, want %v", w, "Watcher{}")
 	}
@@ -18,23 +19,13 @@ func TestWatcher_Matched(t *testing.T) {
 
 func TestWatcher_Push(t *testing.T) {
 	pattern := []string{"test"}
-	w := NewWatcher(pattern, 1)
+	w := NewWatcher(pattern, func(op *pb.Operation) {
+		if op.Key != "test" {
+			t.Errorf("Push() = %v, want %v", op.Key, "test")
+		}
+	})
 	if w == nil {
 		t.Errorf("NewWatcher() = %v, want %v", w, "Watcher{}")
 	}
-	w.Push(nil)
-	op := w.Pop()
-	if op != nil {
-		t.Errorf("Pop() = %v, want %v", op, nil)
-	}
-	w.Push(&pb.Operation{
-		Key: "test",
-	})
-	op = w.Pop()
-	if op == nil {
-		t.Errorf("Pop() = %v, want %v", op, "Operation{}")
-	}
-	if op.Key != "test" {
-		t.Errorf("Pop() = %v, want %v", op.Key, "test")
-	}
+	w.Push(&pb.Operation{Key: "test"})
 }

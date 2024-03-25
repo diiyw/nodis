@@ -1,12 +1,13 @@
 package nodis
 
 import (
-	"github.com/diiyw/nodis/ds"
-	"github.com/diiyw/nodis/pb"
 	"os"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/diiyw/nodis/ds"
+	"github.com/diiyw/nodis/pb"
 )
 
 func TestNodis_Open(t *testing.T) {
@@ -299,4 +300,19 @@ func TestNodis_parseDs(t *testing.T) {
 		t.Errorf("parseDs() = %v, want %v", d.Type(), ds.String)
 	}
 	_ = n.Close()
+}
+
+func TestNodis_Watch(t *testing.T) {
+	_ = os.RemoveAll("testdata")
+	opt := &Options{
+		Path: "testdata",
+	}
+	n := Open(opt)
+	n.Set("test", []byte("test"), 0)
+	n.Watch([]string{"test"}, func(op *pb.Operation) {
+		if op == nil || op.Key != "test_new" {
+			t.Errorf("Watch() = %v, want %v", op, "test_new")
+		}
+	})
+	n.Set("test", []byte("test_new"), 0)
 }

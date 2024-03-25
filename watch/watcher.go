@@ -8,13 +8,13 @@ import (
 
 type Watcher struct {
 	pattern []string
-	queue   chan *pb.Operation
+	fn      func(op *pb.Operation)
 }
 
-func NewWatcher(pattern []string, capacity int) *Watcher {
+func NewWatcher(pattern []string, fn func(op *pb.Operation)) *Watcher {
 	return &Watcher{
 		pattern: pattern,
-		queue:   make(chan *pb.Operation, capacity),
+		fn:      fn,
 	}
 }
 
@@ -32,12 +32,7 @@ func (w *Watcher) Matched(key string) bool {
 	return false
 }
 
-// Push pushs a operation into the watch queue
+// Push sends the operation to the watcher
 func (w *Watcher) Push(op *pb.Operation) {
-	w.queue <- op
-}
-
-// Pop pops a operation from the watch queue
-func (w *Watcher) Pop() *pb.Operation {
-	return <-w.queue
+	w.fn(op)
 }
