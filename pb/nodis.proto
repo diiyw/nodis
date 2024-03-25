@@ -53,10 +53,10 @@ message Operation {
   int64 Count = 10;
   int64 Index = 11;
   repeated string Members = 12;
-  int64 start = 13;
-  int64 stop = 14;
-  double min = 15;
-  double max = 16;
+  int64 Start = 13;
+  int64 Stop = 14;
+  double Min = 15;
+  double Max = 16;
   string Field = 17;
   double IncrFloat = 18;
   int64 IncrInt = 19;

@@ -26,6 +26,7 @@ It is a simple and easy to embed in your application.
 - Low memory used, only hot data stored in memory
 - Snapshot and WAL for data storage.
 - Support custom data storage as backend.(e.g. S3, Browser, etc.)
+- Runing on browser with WebAssembly.
 
 ## Get Started
 ```bash

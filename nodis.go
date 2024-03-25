@@ -1,6 +1,7 @@
 package nodis
 
 import (
+	"errors"
 	"hash/crc32"
 	"log"
 	"os"
@@ -20,6 +21,10 @@ import (
 	"github.com/diiyw/nodis/watch"
 	"github.com/tidwall/btree"
 	"google.golang.org/protobuf/proto"
+)
+
+var (
+	ErrUnknownOperation = errors.New("unknown operation")
 )
 
 type Nodis struct {
@@ -261,18 +266,29 @@ func (n *Nodis) notify(ops ...*pb.Op) {
 	}()
 }
 
-func (n *Nodis) Watch(pattern []string, fn func(op *pb.Operation)) {
+func (n *Nodis) Watch(pattern []string, fn func(op *pb.Operation)) int {
 	w := watch.NewWatcher(pattern, fn)
 	n.watchers = append(n.watchers, w)
+	return len(n.watchers) - 1
 }
 
-func (n *Nodis) Patch(ops ...*pb.Op) {
+func (n *Nodis) UnWatch(id int) {
+	n.Lock()
+	n.watchers = append(n.watchers[:id], n.watchers[id+1:]...)
+	n.Unlock()
+}
+
+func (n *Nodis) Patch(ops ...*pb.Op) error {
 	for _, op := range ops {
-		n.patch(op)
+		err := n.patch(op)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-func (n *Nodis) patch(op *pb.Op) {
+func (n *Nodis) patch(op *pb.Op) error {
 	switch op.Operation.Type {
 	case pb.OpType_Clear:
 		n.Clear()
@@ -338,5 +354,8 @@ func (n *Nodis) patch(op *pb.Op) {
 		n.ZRemRangeByScore(op.Key, op.Operation.Min, op.Operation.Max)
 	case pb.OpType_Rename:
 		_ = n.Rename(op.Key, op.Operation.DstKey)
+	default:
+		return ErrUnknownOperation
 	}
+	return nil
 }

@@ -37,7 +37,7 @@ func (m *Memory) Rename(oldpath, newpath string) error {
 }
 
 func (m *Memory) IsDir(path string) (bool, error) {
-	return false, nil
+	return true, nil
 }
 
 func (m *Memory) RemoveAll(path string) error {
