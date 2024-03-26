@@ -4,6 +4,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/diiyw/nodis/fs"
 )
 
 func TestKey_Expire(t *testing.T) {
@@ -99,6 +101,7 @@ func TestKey_Type(t *testing.T) {
 	n := Open(&Options{
 		Path:            "testdata",
 		RecycleDuration: 60 * time.Second,
+		Filesystem:      &fs.Disk{},
 	})
 	n.Set("test1", []byte("test1"), 0)
 	n.LPush("test2", []byte("test2"))
@@ -127,6 +130,7 @@ func TestKey_Type(t *testing.T) {
 	n = Open(&Options{
 		Path:            "testdata",
 		RecycleDuration: 60 * time.Second,
+		Filesystem:      &fs.Disk{},
 	})
 	if n.Type("test1") != "string" {
 		t.Errorf("Type() = %v, want %v", n.Type("test1"), "string")
@@ -141,7 +145,7 @@ func TestKey_Type(t *testing.T) {
 		t.Errorf("Type() = %v, want %v", n.Type("test4"), "string")
 	}
 	if n.Type("test5") != "hash" {
-		t.Errorf("Type() = %v, want %v", n.Type("test5"), "bool")
+		t.Errorf("Type() = %v, want %v", n.Type("test5"), "hash")
 	}
 }
 
