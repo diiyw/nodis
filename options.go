@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/diiyw/nodis/fs"
+	"github.com/diiyw/nodis/sync"
 )
 
 const (
@@ -31,11 +32,13 @@ type Options struct {
 
 	// Filesystem is the filesystem to use. The default is the disk filesystem.
 	Filesystem fs.Fs
+
+	// Synchronizer is the synchronizer to use. The default is the websocket synchronizer.
+	Synchronizer sync.Synchronizer
 }
 
 var DefaultOptions = &Options{
 	Path:            "data",
 	FileSize:        FileSizeGB,
 	RecycleDuration: 60 * time.Second,
-	Filesystem:      &fs.Disk{},
 }

@@ -26,9 +26,9 @@ func TestStorePut(t *testing.T) {
 	value := []byte("testValue")
 	ds := str.NewString()
 	ds.Set(value)
-	e := newEntity(key, ds, time.Now().Unix())
+	e := newEntry(key, ds, time.Now().Unix())
 	// Call the put method
-	err := store.put(newEntity(key, ds, time.Now().Unix()))
+	err := store.put(newEntry(key, ds, time.Now().Unix()))
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestStoreGet(t *testing.T) {
 	ds := str.NewString()
 	ds.Set(value)
 	// Call the put method
-	err := store.put(newEntity(key, ds, time.Now().Unix()))
+	err := store.put(newEntry(key, ds, time.Now().Unix()))
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestStoreMultiPut(t *testing.T) {
 		ds := str.NewString()
 		ds.Set(value)
 		// Call the put method
-		e := newEntity(key, ds, time.Now().Unix()+3600)
+		e := newEntry(key, ds, time.Now().Unix()+3600)
 		data, _ := e.Marshal()
 		result[key] = data
 		err := store.put(e)
@@ -172,7 +172,7 @@ func TestStoreMultiFilePut(t *testing.T) {
 			ds := str.NewString()
 			ds.Set(value)
 			// Call the put method
-			e := newEntity(key, ds, time.Now().Unix()+3600)
+			e := newEntry(key, ds, time.Now().Unix()+3600)
 			data, _ := e.Marshal()
 			result[key] = data
 			err := store.put(e)
@@ -211,7 +211,7 @@ func TestStoreRemove(t *testing.T) {
 	ds := str.NewString()
 	ds.Set(value)
 	// Call the put method
-	err := store.put(newEntity(key, ds, time.Now().Unix()+3600))
+	err := store.put(newEntry(key, ds, time.Now().Unix()+3600))
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
@@ -237,7 +237,7 @@ func TestStorePutRaw(t *testing.T) {
 	value := []byte("testValue")
 	d := str.NewString()
 	d.Set(value)
-	var e = newEntity(key, d, time.Now().Unix()+3600)
+	var e = newEntry(key, d, time.Now().Unix()+3600)
 	data, err := e.Marshal()
 	if err != nil {
 		t.Fatalf("Failed to marshal data: %v", err)

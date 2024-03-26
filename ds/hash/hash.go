@@ -4,10 +4,10 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"unsafe"
 
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/pb"
-	"github.com/diiyw/nodis/utils"
 	"github.com/tidwall/btree"
 )
 
@@ -78,7 +78,7 @@ func (s *HashMap) HIncrBy(key string, value int64) int64 {
 		s.data.Set(key, []byte(strconv.FormatInt(value, 10)))
 		return 0
 	}
-	vi, _ := strconv.ParseInt(utils.Byte2String(v), 10, 64)
+	vi, _ := strconv.ParseInt(*(*string)(unsafe.Pointer(&v)), 10, 64)
 	i := vi + value
 	s.data.Set(key, []byte(strconv.FormatInt(i, 10)))
 	return i
@@ -91,7 +91,7 @@ func (s *HashMap) HIncrByFloat(key string, value float64) float64 {
 		s.data.Set(key, []byte(strconv.FormatFloat(value, 'f', -1, 64)))
 		return 0
 	}
-	vf, _ := strconv.ParseFloat(utils.Byte2String(v), 64)
+	vf, _ := strconv.ParseFloat(*(*string)(unsafe.Pointer(&v)), 64)
 	f := vf + value
 	s.data.Set(key, []byte(strconv.FormatFloat(f, 'f', -1, 64)))
 	return f

@@ -1,13 +1,14 @@
 package nodis
 
 import (
-	"google.golang.org/protobuf/proto"
 	"log"
 	"os"
 	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
+
+	"google.golang.org/protobuf/proto"
 
 	"encoding/binary"
 
@@ -137,7 +138,7 @@ func (s *store) check() (int64, error) {
 }
 
 // put a key-value pair into store
-func (s *store) put(entry *pb.Entity) error {
+func (s *store) put(entry *pb.Entry) error {
 	s.Lock()
 	defer s.Unlock()
 	var idx = &index{}
@@ -225,7 +226,7 @@ func (s *store) remove(key string) {
 }
 
 // snapshot the store
-func (s *store) snapshot(path string, entries []*pb.Entity) {
+func (s *store) snapshot(path string, entries []*pb.Entry) {
 	s.RLock()
 	defer s.RUnlock()
 	snapshotDir := filepath.Join(path, "snapshots", time.Now().Format("20060102_150405"))

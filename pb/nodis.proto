@@ -93,7 +93,7 @@ message HashValue {
   repeated MemberBytes Values = 2;
 }
 
-message Entity {
+message Entry {
   uint32 Type = 1;
   string Key = 2;
   oneof Value {

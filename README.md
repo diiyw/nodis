@@ -34,7 +34,7 @@ It is a simple and easy to embed in your application.
 ```
 Or
 ```bash
- go get github.com/diiyw/nodis@v1.2.0.beta.2
+ go get github.com/diiyw/nodis@v1.2.0.beta.5
 ```
 ```go
 package main

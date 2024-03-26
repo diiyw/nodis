@@ -7,7 +7,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func (e *Entity) Marshal() ([]byte, error) {
+func (e *Entry) Marshal() ([]byte, error) {
 	data, err := proto.Marshal(e)
 	if err != nil {
 		return nil, err

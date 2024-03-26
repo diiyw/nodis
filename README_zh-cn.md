@@ -25,6 +25,7 @@ Nodis 是一个简单可嵌入到应用中内存数据库，实现Redis的数据
 - 低内存使用，只有热数据才在内存中
 - 快照和WAL存储的支持
 - 支持自定义存储后端
+- 通用Wasm运行在浏览器中
 
 ## Get Started
 
@@ -33,7 +34,7 @@ Nodis 是一个简单可嵌入到应用中内存数据库，实现Redis的数据
 ```
 Or
 ```bash
- go get github.com/diiyw/nodis@v1.2.0.beta.2
+ go get github.com/diiyw/nodis@v1.2.0.beta.5
 ```
 
 ```go

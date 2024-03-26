@@ -18,6 +18,7 @@ import (
 	"github.com/diiyw/nodis/ds/zset"
 	"github.com/diiyw/nodis/fs"
 	"github.com/diiyw/nodis/pb"
+	nSync "github.com/diiyw/nodis/sync"
 	"github.com/diiyw/nodis/watch"
 	"github.com/tidwall/btree"
 	"google.golang.org/protobuf/proto"
@@ -42,7 +43,7 @@ func Open(opt *Options) *Nodis {
 		opt.FileSize = FileSizeGB
 	}
 	if opt.Filesystem == nil {
-		opt.Filesystem = &fs.Disk{}
+		opt.Filesystem = &fs.Memory{}
 	}
 	n := &Nodis{
 		options: opt,
@@ -109,7 +110,7 @@ func (n *Nodis) Recycle() {
 			if ok {
 				k.changed.Store(false)
 				// save to disk
-				err := n.store.put(newEntity(key, d, k.Expiration))
+				err := n.store.put(newEntry(key, d, k.Expiration))
 				if err != nil {
 					log.Println("Recycle: ", err)
 				}
@@ -120,8 +121,8 @@ func (n *Nodis) Recycle() {
 }
 
 // getChangedEntries returns all keys that have been getChangedEntries
-func (n *Nodis) getChangedEntries() []*pb.Entity {
-	entries := make([]*pb.Entity, 0)
+func (n *Nodis) getChangedEntries() []*pb.Entry {
+	entries := make([]*pb.Entry, 0)
 	n.keys.Scan(func(key string, k *Key) bool {
 		if !k.changed.Load() || k.expired() {
 			return true
@@ -130,7 +131,7 @@ func (n *Nodis) getChangedEntries() []*pb.Entity {
 		if !ok {
 			return true
 		}
-		entries = append(entries, newEntity(key, d, k.Expiration))
+		entries = append(entries, newEntry(key, d, k.Expiration))
 		return true
 	})
 	return entries
@@ -196,12 +197,12 @@ func (n *Nodis) SetEntity(data []byte) error {
 	return n.store.put(entity)
 }
 
-func (n *Nodis) parseEntity(data []byte) (*pb.Entity, error) {
+func (n *Nodis) parseEntity(data []byte) (*pb.Entry, error) {
 	c32 := binary.LittleEndian.Uint32(data)
 	if c32 != crc32.ChecksumIEEE(data[4:]) {
 		return nil, ErrCorruptedData
 	}
-	var entity pb.Entity
+	var entity pb.Entry
 	if err := proto.Unmarshal(data[4:], &entity); err != nil {
 		return nil, err
 	}
@@ -214,7 +215,7 @@ func (n *Nodis) GetEntity(key string) []byte {
 	if d == nil {
 		return nil
 	}
-	var entity = newEntity(key, d, k.Expiration)
+	var entity = newEntry(key, d, k.Expiration)
 	data, _ := entity.Marshal()
 	return data
 }
@@ -267,8 +268,10 @@ func (n *Nodis) notify(ops ...*pb.Op) {
 }
 
 func (n *Nodis) Watch(pattern []string, fn func(op *pb.Operation)) int {
+	n.Lock()
 	w := watch.NewWatcher(pattern, fn)
 	n.watchers = append(n.watchers, w)
+	n.Unlock()
 	return len(n.watchers) - 1
 }
 
@@ -358,4 +361,24 @@ func (n *Nodis) patch(op *pb.Op) error {
 		return ErrUnknownOperation
 	}
 	return nil
+}
+
+func (n *Nodis) Publish(addr string, pattern []string) error {
+	n.options.Synchronizer.Publish(addr, func(s nSync.Conn) {
+		id := n.Watch(pattern, func(op *pb.Operation) {
+			err := s.Send(&pb.Op{Operation: op})
+			if err != nil {
+				log.Println("Publish: ", err)
+			}
+		})
+		s.Wait()
+		n.UnWatch(id)
+	})
+	return nil
+}
+
+func (n *Nodis) Subscribe(addr string) error {
+	return n.options.Synchronizer.Subscribe(addr, func(o *pb.Op) {
+		n.Patch(o)
+	})
 }
