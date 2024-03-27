@@ -188,16 +188,16 @@ func (n *Nodis) Clear() {
 	}
 }
 
-// SetEntity sets an entity
-func (n *Nodis) SetEntity(data []byte) error {
-	entity, err := n.parseEntity(data)
+// SetEntry sets an entity
+func (n *Nodis) SetEntry(data []byte) error {
+	entity, err := n.parseEntry(data)
 	if err != nil {
 		return err
 	}
 	return n.store.put(entity)
 }
 
-func (n *Nodis) parseEntity(data []byte) (*pb.Entry, error) {
+func (n *Nodis) parseEntry(data []byte) (*pb.Entry, error) {
 	c32 := binary.LittleEndian.Uint32(data)
 	if c32 != crc32.ChecksumIEEE(data[4:]) {
 		return nil, ErrCorruptedData
@@ -209,8 +209,8 @@ func (n *Nodis) parseEntity(data []byte) (*pb.Entry, error) {
 	return &entity, nil
 }
 
-// GetEntity gets an entity
-func (n *Nodis) GetEntity(key string) []byte {
+// GetEntry gets an entity
+func (n *Nodis) GetEntry(key string) []byte {
 	k, d := n.getDs(key, nil, 0)
 	if d == nil {
 		return nil
@@ -222,7 +222,7 @@ func (n *Nodis) GetEntity(key string) []byte {
 
 // parseDs the data
 func (n *Nodis) parseDs(data []byte) (string, ds.DataStruct, int64, error) {
-	var entity, err = n.parseEntity(data)
+	var entity, err = n.parseEntry(data)
 	if err != nil {
 		return "", nil, 0, err
 	}
@@ -364,7 +364,7 @@ func (n *Nodis) patch(op *pb.Op) error {
 }
 
 func (n *Nodis) Publish(addr string, pattern []string) error {
-	n.options.Synchronizer.Publish(addr, func(s nSync.Conn) {
+	return n.options.Synchronizer.Publish(addr, func(s nSync.Conn) {
 		id := n.Watch(pattern, func(op *pb.Operation) {
 			err := s.Send(&pb.Op{Operation: op})
 			if err != nil {
@@ -374,7 +374,6 @@ func (n *Nodis) Publish(addr string, pattern []string) error {
 		s.Wait()
 		n.UnWatch(id)
 	})
-	return nil
 }
 
 func (n *Nodis) Subscribe(addr string) error {

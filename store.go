@@ -77,7 +77,7 @@ type index struct {
 	offset     int64
 	expiration int64
 	size       uint32
-	fileID     uint16
+	fileId     uint16
 }
 
 // marshal index to bytes
@@ -86,7 +86,7 @@ func (i *index) marshal() []byte {
 	binary.LittleEndian.PutUint64(b[0:8], uint64(i.offset))
 	binary.LittleEndian.PutUint64(b[8:16], uint64(i.expiration))
 	binary.LittleEndian.PutUint32(b[16:20], i.size)
-	binary.LittleEndian.PutUint16(b[20:22], i.fileID)
+	binary.LittleEndian.PutUint16(b[20:22], i.fileId)
 	return b[:]
 }
 
@@ -95,7 +95,7 @@ func (i *index) unmarshal(b []byte) {
 	i.offset = int64(binary.LittleEndian.Uint64(b[0:8]))
 	i.expiration = int64(binary.LittleEndian.Uint64(b[8:16]))
 	i.size = binary.LittleEndian.Uint32(b[16:20])
-	i.fileID = binary.LittleEndian.Uint16(b[20:22])
+	i.fileId = binary.LittleEndian.Uint16(b[20:22])
 }
 
 func (s *store) check() (int64, error) {
@@ -150,7 +150,7 @@ func (s *store) put(entry *pb.Entry) error {
 	if err != nil {
 		return err
 	}
-	idx.fileID = s.fileId
+	idx.fileId = s.fileId
 	idx.offset = offset
 	idx.size = uint32(len(data))
 	idx.expiration = entry.Expiration
@@ -170,7 +170,7 @@ func (s *store) putRaw(key string, data []byte, expiration int64) error {
 	if err != nil {
 		return err
 	}
-	idx.fileID = s.fileId
+	idx.fileId = s.fileId
 	idx.offset = offset
 	idx.size = uint32(len(data))
 	idx.expiration = expiration
@@ -190,7 +190,7 @@ func (s *store) get(key string) ([]byte, error) {
 	if !ok {
 		return nil, nil
 	}
-	if idx.fileID == s.fileId {
+	if idx.fileId == s.fileId {
 		data := make([]byte, idx.size)
 		_, err := s.aof.ReadAt(data, idx.offset)
 		if err != nil {
@@ -199,7 +199,7 @@ func (s *store) get(key string) ([]byte, error) {
 		return data, nil
 	}
 	// read from other file
-	file := filepath.Join(s.path, "nodis."+strconv.Itoa(int(idx.fileID))+".aof")
+	file := filepath.Join(s.path, "nodis."+strconv.Itoa(int(idx.fileId))+".aof")
 	f, err := s.filesystem.OpenFile(file, os.O_RDONLY)
 	if err != nil {
 		return nil, err

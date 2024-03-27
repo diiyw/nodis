@@ -30,10 +30,10 @@ type Options struct {
 	// Default 0 for disabling snapshot. and you can call Snapshot manually.
 	SnapshotDuration time.Duration
 
-	// Filesystem is the filesystem to use. The default is the disk filesystem.
+	// Filesystem is the filesystem to use. The default is the memory filesystem.
 	Filesystem fs.Fs
 
-	// Synchronizer is the synchronizer to use. The default is the websocket synchronizer.
+	// Synchronizer is the synchronizer to use. The default is nil and no synchronization is performed.
 	Synchronizer sync.Synchronizer
 }
 

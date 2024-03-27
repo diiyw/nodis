@@ -13,6 +13,7 @@ Nodis 是一个简单可嵌入到应用中内存数据库，实现Redis的数据
 
 ## 支持的类型
 
+- Bitmap
 - String
 - List
 - Hash
@@ -34,7 +35,7 @@ Nodis 是一个简单可嵌入到应用中内存数据库，实现Redis的数据
 ```
 Or
 ```bash
- go get github.com/diiyw/nodis@v1.2.0.beta.5
+ go get github.com/diiyw/nodis@v1.2.0.beta.6
 ```
 
 ```go
@@ -46,7 +47,7 @@ func main() {
 	// Create a new Nodis instance
 	opt := nodis.DefaultOptions
 	n := nodis.Open(opt)
-
+	defer m.Close()
 	// Set a key-value pair
 	n.Set("key", []byte("value"), 0)
 	n.LPush("list", []byte("value1"))

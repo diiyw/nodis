@@ -40,8 +40,8 @@ func TestStorePut(t *testing.T) {
 	}
 
 	// Verify the index values
-	if idx.fileID != 0 {
-		t.Errorf("Expected fileID to be 0, got %d", idx.fileID)
+	if idx.fileId != 0 {
+		t.Errorf("Expected fileID to be 0, got %d", idx.fileId)
 	}
 	if idx.offset != 0 {
 		t.Errorf("Expected offset to be 0, got %d", idx.offset)

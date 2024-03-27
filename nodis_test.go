@@ -264,14 +264,14 @@ func TestNodis_SetEntity(t *testing.T) {
 	}
 	n := Open(opt)
 	n.Set("test", []byte("test"), 0)
-	data := n.GetEntity("test")
+	data := n.GetEntry("test")
 	n.Clear()
 	v := n.Get("test")
 	if v != nil {
 		t.Errorf("Get() = %v, want %v", v, nil)
 		return
 	}
-	err := n.SetEntity(data)
+	err := n.SetEntry(data)
 	if err != nil {
 		t.Errorf("SetEntity() = %v, want %v", err, nil)
 	}
@@ -288,7 +288,7 @@ func TestNodis_parseDs(t *testing.T) {
 	}
 	n := Open(opt)
 	n.Set("test", []byte("test"), 0)
-	data := n.GetEntity("test")
+	data := n.GetEntry("test")
 	k, d, _, err := n.parseDs(data)
 	if err != nil {
 		t.Errorf("parseDs() = %v, want %v", err, nil)

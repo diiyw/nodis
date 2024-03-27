@@ -14,6 +14,7 @@ It is a simple and easy to embed in your application.
 
 ## Supported Data Types
 
+- Bitmap
 - String
 - List
 - Hash
@@ -26,7 +27,8 @@ It is a simple and easy to embed in your application.
 - Low memory used, only hot data stored in memory
 - Snapshot and WAL for data storage.
 - Support custom data storage as backend.(e.g. S3, Browser, etc.)
-- Runing on browser with WebAssembly.
+- Runing on browser with WebAssembly. (^v1.2.0)
+- Support watch changes from remote. (^v1.2.0)
 
 ## Get Started
 ```bash
@@ -34,7 +36,7 @@ It is a simple and easy to embed in your application.
 ```
 Or
 ```bash
- go get github.com/diiyw/nodis@v1.2.0.beta.5
+ go get github.com/diiyw/nodis@v1.2.0.beta.6
 ```
 ```go
 package main
@@ -45,13 +47,75 @@ func main() {
 	// Create a new Nodis instance
 	opt := nodis.DefaultOptions
 	n := nodis.Open(opt)
-
+	defer m.Close()
 	// Set a key-value pair
 	n.Set("key", []byte("value"), 0)
 	n.LPush("list", []byte("value1"))
 }
 ```
+Watch changes from remote
+Server 
+```go
+package main
 
+import (
+	"fmt"
+	"github.com/diiyw/nodis"
+	"github.com/diiyw/nodis/pb"
+	"github.com/diiyw/nodis/sync"
+	"time"
+)
+
+func main() {
+	var opt = nodis.DefaultOptions
+	n := nodis.Open(opt)
+	opt.Synchronizer = sync.NewWebsocket()
+	n.Watch([]string{"*"}, func(op *pb.Operation) {
+		fmt.Println("Server:", op.Key, string(op.Value))
+	})
+	go func() {
+		for {
+			time.Sleep(time.Second)
+			n.Set("test", []byte(time.Now().Format("2006-01-02 15:04:05")), 0)
+		}
+	}()
+	err := n.Publish("127.0.0.1:6380", []string{"*"})
+	if err != nil {
+		panic(err)
+	}
+}
+```
+Browser client built with WebAssembly
+
+```bash
+GOOS=js GOARCH=wasm go build -o test.wasm
+```
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/diiyw/nodis"
+	"github.com/diiyw/nodis/fs"
+	"github.com/diiyw/nodis/pb"
+	"github.com/diiyw/nodis/sync"
+)
+
+func main() {
+	var opt = nodis.DefaultOptions
+	opt.Filesystem = &fs.Memory{}
+	opt.Synchronizer = sync.NewWebsocket()
+	n := nodis.Open(opt)
+	n.Watch([]string{"*"}, func(op *pb.Operation) {
+		fmt.Println("Subscribe: ", op.Key)
+	})
+	err := n.Subscribe("ws://127.0.0.1:6380")
+	if err != nil {
+		panic(err)
+	}
+	select {}
+}
+```
 ## Benchmark
 Windows 11: 12C/32G
 ```bash
