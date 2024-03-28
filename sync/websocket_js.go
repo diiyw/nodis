@@ -2,7 +2,6 @@ package sync
 
 import (
 	"errors"
-	"fmt"
 	"syscall/js"
 
 	"github.com/diiyw/nodis/pb"
@@ -35,7 +34,7 @@ func (ws *Websocket) Subscribe(addr string, fn func(*pb.Op)) error {
 				var op = &pb.Operation{}
 				err := proto.Unmarshal(data, op)
 				if err != nil {
-					fmt.Println("Subscribe:", err)
+					println("Subscribe:", err.Error())
 				}
 				fn(&pb.Op{Operation: op})
 			}
