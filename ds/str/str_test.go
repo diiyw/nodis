@@ -12,36 +12,40 @@ func BenchmarkSet_Set(b *testing.B) {
 // TestSetBit_SetBit tests the SetBit method
 func TestSetBit_SetBit(t *testing.T) {
 	s := NewString()
-	var m = map[int64]int{
-		0:  1,
-		2:  1,
-		10: 1,
-		20: 0,
-		30: 1,
+	var m = map[int64]bool{
+		0:  true,
+		2:  true,
+		10: true,
+		20: false,
+		30: true,
 	}
 	for k, v := range m {
 		s.SetBit(k, v)
-		if s.GetBit(k) != v {
-			t.Errorf("expected %d, got %d", v, s.GetBit(k))
+		r := 0
+		if v {
+			r = 1
+		}
+		if s.GetBit(k) != r {
+			t.Errorf("expected %v, got %v", v, s.GetBit(k))
 		}
 	}
 }
 
 func TestSetBit_BitCount(t *testing.T) {
 	s := NewString()
-	var m = map[int64]int{
-		0:  1,
-		2:  1,
-		10: 1,
-		20: 0,
-		30: 1,
-		8:  1,
-		15: 1,
+	var m = map[int64]bool{
+		0:  true,
+		2:  true,
+		10: true,
+		20: false,
+		30: true,
+		8:  true,
+		15: true,
 	}
 	for k, v := range m {
 		s.SetBit(k, v)
 	}
-	if s.BitCount() != 6 {
-		t.Errorf("expected 6, got %d", s.BitCount())
+	if s.BitCount(0, 0) != 6 {
+		t.Errorf("expected 6, got %d", s.BitCount(0, 0))
 	}
 }

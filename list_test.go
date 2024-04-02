@@ -13,7 +13,7 @@ func TestList_LPush(t *testing.T) {
 	n.LPush("list", []byte("value1"))
 	n.LPush("list", []byte("value2"))
 	n.LPush("list", []byte("value3"))
-	if string(n.LPop("list")) != "value3" {
+	if string(n.LPop("list", 1)[0]) != "value3" {
 		t.Error("LPush failed")
 	}
 	if n.LLen("list") != 3 {
@@ -29,7 +29,7 @@ func TestList_RPush(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{Path: "testdata"})
 	n.RPush("list", []byte("value"))
-	if string(n.RPop("list")) != "value" {
+	if string(n.RPop("list", 1)[0]) != "value" {
 		t.Error("RPush failed")
 	}
 }
@@ -38,7 +38,7 @@ func TestList_LPop(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{Path: "testdata"})
 	n.LPush("list", []byte("value"))
-	if string(n.LPop("list")) != "value" {
+	if string(n.LPop("list", 1)[0]) != "value" {
 		t.Error("LPop failed")
 	}
 }
@@ -47,7 +47,7 @@ func TestList_RPop(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{Path: "testdata"})
 	n.RPush("list", []byte("value"))
-	if string(n.RPop("list")) != "value" {
+	if string(n.RPop("list", 1)[0]) != "value" {
 		t.Error("RPop failed")
 	}
 }
@@ -145,8 +145,9 @@ func TestList_LPushX(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{Path: "testdata"})
 	n.LPushX("list", []byte("value"))
-	if string(n.LPop("list")) == "value" {
-		t.Error("LPushX failed excepted value got nil")
+	v := n.LPop("list", 1)
+	if len(v) > 0 && string(v[0]) == "value" {
+		t.Error("LPushX failed excepted value nil")
 	}
 }
 
@@ -154,26 +155,9 @@ func TestList_RPushX(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{Path: "testdata"})
 	n.RPushX("list", []byte("value"))
-	if string(n.RPop("list")) == "value" {
-		t.Error("RPushX failed excepted value got nil")
-	}
-}
-
-func TestList_LPopX(t *testing.T) {
-	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
-	n.LPushX("list", []byte("value"))
-	if string(n.LPop("list")) == "value" {
-		t.Error("LPopX failed")
-	}
-}
-
-func TestList_RPopX(t *testing.T) {
-	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
-	n.RPushX("list", []byte("value"))
-	if string(n.RPop("list")) == "value" {
-		t.Error("RPopX failed")
+	v := n.RPop("list", 1)
+	if len(v) > 0 && string(v[0]) == "value" {
+		t.Error("RPushX failed excepted value nil")
 	}
 }
 

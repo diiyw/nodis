@@ -18,24 +18,24 @@ func NewSet() *Set {
 }
 
 // SAdd adds a member to the set
-func (s *Set) SAdd(member ...string) int {
+func (s *Set) SAdd(member ...string) int64 {
 	s.Lock()
 	defer s.Unlock()
 	return s.sAdd(member...)
 }
 
-func (s *Set) sAdd(member ...string) int {
+func (s *Set) sAdd(member ...string) int64 {
 	for _, m := range member {
 		s.data.Insert(m)
 	}
-	return len(member)
+	return int64(len(member))
 }
 
 // SCard gets the set members count.
-func (s *Set) SCard() int {
+func (s *Set) SCard() int64 {
 	s.RLock()
 	defer s.RUnlock()
-	return s.data.Len()
+	return int64(s.data.Len())
 }
 
 // SDiff gets the difference between sets.
@@ -115,10 +115,10 @@ func (s *Set) SIsMember(member string) bool {
 }
 
 // SRem removes a member from the set.
-func (s *Set) SRem(member ...string) int {
+func (s *Set) SRem(member ...string) int64 {
 	s.Lock()
 	defer s.Unlock()
-	var removed = 0
+	var removed int64 = 0
 	for _, m := range member {
 		s.data.Delete(m)
 		removed++

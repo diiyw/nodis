@@ -11,7 +11,7 @@ func (n *Nodis) newSet() ds.DataStruct {
 }
 
 // SAdd adds the specified members to the set stored at key.
-func (n *Nodis) SAdd(key string, members ...string) int {
+func (n *Nodis) SAdd(key string, members ...string) int64 {
 	k, s := n.getDs(key, n.newSet, 0)
 	k.changed.Store(true)
 	n.notify(pb.NewOp(pb.OpType_SAdd, key).Members(members))
@@ -19,19 +19,22 @@ func (n *Nodis) SAdd(key string, members ...string) int {
 }
 
 // SCard gets the set members count.
-func (n *Nodis) SCard(key string) int {
+func (n *Nodis) SCard(key string) int64 {
 	_, s := n.getDs(key, nil, 0)
 	return s.(*set.Set).SCard()
 }
 
 // SDiff gets the difference between sets.
-func (n *Nodis) SDiff(key string, sets ...string) []string {
-	_, s := n.getDs(key, n.newSet, 0)
+func (n *Nodis) SDiff(keys ...string) []string {
+	if len(keys) == 0 {
+		return nil
+	}
+	_, s := n.getDs(keys[0], nil, 0)
 	if s == nil {
 		return nil
 	}
-	otherSets := make([]*set.Set, len(sets))
-	for i, s := range sets {
+	otherSets := make([]*set.Set, len(keys)-1)
+	for i, s := range keys[1:] {
 		_, setDs := n.getDs(s, nil, 0)
 		if setDs == nil {
 			continue
@@ -50,13 +53,16 @@ func (n *Nodis) SDiff(key string, sets ...string) []string {
 }
 
 // SInter gets the intersection between sets.
-func (n *Nodis) SInter(key string, sets ...string) []string {
-	_, s := n.getDs(key, nil, 0)
+func (n *Nodis) SInter(keys ...string) []string {
+	if len(keys) == 0 {
+		return nil
+	}
+	_, s := n.getDs(keys[0], nil, 0)
 	if s == nil {
 		return nil
 	}
-	otherSets := make([]*set.Set, len(sets))
-	for i, s := range sets {
+	otherSets := make([]*set.Set, len(keys)-1)
+	for i, s := range keys[1:] {
 		_, setDs := n.getDs(s, nil, 0)
 		if setDs == nil {
 			continue
@@ -93,7 +99,7 @@ func (n *Nodis) SMembers(key string) []string {
 }
 
 // SRem removes the specified members from the set stored at key.
-func (n *Nodis) SRem(key string, members ...string) int {
+func (n *Nodis) SRem(key string, members ...string) int64 {
 	k, s := n.getDs(key, nil, 0)
 	if s == nil {
 		return 0

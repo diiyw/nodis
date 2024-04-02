@@ -17,6 +17,22 @@ func (n *Nodis) ZAdd(key string, member string, score float64) {
 	s.(*zset.SortedSet).ZAdd(member, score)
 }
 
+func (n *Nodis) ZAddXX(key string, member string, score float64) {
+	k, s := n.getDs(key, n.newZSet, 0)
+	if s.(*zset.SortedSet).ZAddXX(member, score) {
+		k.changed.Store(true)
+		n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
+	}
+}
+
+func (n *Nodis) ZAddNX(key string, member string, score float64) {
+	k, s := n.getDs(key, n.newZSet, 0)
+	if s.(*zset.SortedSet).ZAddNX(member, score) {
+		k.changed.Store(true)
+		n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
+	}
+}
+
 func (n *Nodis) ZCard(key string) int64 {
 	_, s := n.getDs(key, nil, 0)
 	if s == nil {

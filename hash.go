@@ -1,8 +1,9 @@
 package nodis
 
 import (
-	"github.com/diiyw/nodis/pb"
 	"time"
+
+	"github.com/diiyw/nodis/pb"
 
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/hash"
@@ -16,7 +17,7 @@ func (n *Nodis) HSet(key string, field string, value []byte) {
 	k, h := n.getDs(key, n.newHash, 0)
 	k.changed.Store(true)
 	h.(*hash.HashMap).HSet(field, value)
-	n.notify(pb.NewOp(pb.OpType_HSet, key).Field(field).Value(value))
+	n.notify(pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
 }
 
 func (n *Nodis) HGet(key string, field string) []byte {
@@ -27,21 +28,22 @@ func (n *Nodis) HGet(key string, field string) []byte {
 	return h.(*hash.HashMap).HGet(field)
 }
 
-func (n *Nodis) HDel(key string, field string) {
+func (n *Nodis) HDel(key string, fields ...string) int64 {
 	k, h := n.getDs(key, nil, 0)
 	if h == nil {
-		return
+		return 0
 	}
 	k.changed.Store(true)
-	h.(*hash.HashMap).HDel(field)
+	h.(*hash.HashMap).HDel(fields...)
 	if h.(*hash.HashMap).HLen() == 0 {
 		n.dataStructs.Delete(key)
 		n.keys.Delete(key)
 	}
-	n.notify(pb.NewOp(pb.OpType_HDel, key).Field(field))
+	n.notify(pb.NewOp(pb.OpType_HDel, key).Fields(fields...))
+	return int64(len(fields))
 }
 
-func (n *Nodis) HLen(key string) int {
+func (n *Nodis) HLen(key string) int64 {
 	_, h := n.getDs(key, nil, 0)
 	if h == nil {
 		return 0
@@ -76,20 +78,20 @@ func (n *Nodis) HGetAll(key string) map[string][]byte {
 func (n *Nodis) HIncrBy(key string, field string, value int64) int64 {
 	k, h := n.getDs(key, n.newHash, 0)
 	k.changed.Store(true)
-	n.notify(pb.NewOp(pb.OpType_HIncrBy, key).Field(field).IncrInt(value))
+	n.notify(pb.NewOp(pb.OpType_HIncrBy, key).Fields(field).IncrInt(value))
 	return h.(*hash.HashMap).HIncrBy(field, value)
 }
 
 func (n *Nodis) HIncrByFloat(key string, field string, value float64) float64 {
 	k, h := n.getDs(key, n.newHash, 0)
 	k.changed.Store(true)
-	n.notify(pb.NewOp(pb.OpType_HIncrByFloat, key).Field(field).IncrFloat(value))
+	n.notify(pb.NewOp(pb.OpType_HIncrByFloat, key).Fields(field).IncrFloat(value))
 	return h.(*hash.HashMap).HIncrByFloat(field, value)
 }
 
 func (n *Nodis) HSetNX(key string, field string, value []byte) bool {
 	_, h := n.getDs(key, nil, 0)
-	if h != nil {
+	if h != nil && h.(*hash.HashMap).HExists(field) {
 		return false
 	}
 	h = n.newHash()
@@ -99,7 +101,7 @@ func (n *Nodis) HSetNX(key string, field string, value []byte) bool {
 	n.keys.Set(key, k)
 	k.changed.Store(true)
 	n.HSet(key, field, value)
-	n.notify(pb.NewOp(pb.OpType_HSetNX, key).Field(field).Value(value))
+	n.notify(pb.NewOp(pb.OpType_HSetNX, key).Fields(field).Value(value))
 	return true
 }
 
@@ -109,7 +111,7 @@ func (n *Nodis) HMSet(key string, fields map[string][]byte) {
 	var ops = make([]*pb.Op, 0, len(fields))
 	for field, value := range fields {
 		h.(*hash.HashMap).HSet(field, value)
-		ops = append(ops, pb.NewOp(pb.OpType_HSet, key).Field(field).Value(value))
+		ops = append(ops, pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
 	}
 	n.notify(ops...)
 	h.(*hash.HashMap).HMSet(fields)
@@ -127,7 +129,7 @@ func (n *Nodis) HClear(key string) {
 	n.Del(key)
 }
 
-func (n *Nodis) HScan(key string, cursor int, match string, count int) (int, map[string][]byte) {
+func (n *Nodis) HScan(key string, cursor int64, match string, count int64) (int64, map[string][]byte) {
 	_, h := n.getDs(key, nil, 0)
 	if h == nil {
 		return 0, nil

@@ -41,13 +41,15 @@ func (s *HashMap) HGet(key string) []byte {
 }
 
 // HDel deletes the value of a hash
-func (s *HashMap) HDel(key string) {
-	s.data.Delete(key)
+func (s *HashMap) HDel(key ...string) {
+	for _, k := range key {
+		s.data.Delete(k)
+	}
 }
 
 // HLen gets the length of a hash
-func (s *HashMap) HLen() int {
-	return s.data.Len()
+func (s *HashMap) HLen() int64 {
+	return int64(s.data.Len())
 }
 
 // HKeys gets the keys of a hash
@@ -134,9 +136,9 @@ func (s *HashMap) HVals() [][]byte {
 }
 
 // HScan scans the values of a hash
-func (s *HashMap) HScan(cursor int, match string, count int) (int, map[string][]byte) {
+func (s *HashMap) HScan(cursor int64, match string, count int64) (int64, map[string][]byte) {
 	values := make(map[string][]byte, s.data.Len())
-	i := 0
+	var i int64 = 0
 	s.data.Scan(func(key string, value []byte) bool {
 		matched, _ := filepath.Match(match, key)
 		if matched && i >= cursor {

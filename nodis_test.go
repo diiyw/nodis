@@ -66,7 +66,7 @@ func TestNodis_OpenAndSync(t *testing.T) {
 	if v == nil {
 		t.Errorf("HGet() = %s, want %v", v, "hset")
 	}
-	v = n.LPop("lpush")
+	v = n.LPop("lpush", 1)[0]
 	if v == nil {
 		t.Errorf("LPop() = %s, want %v", v, "lpush")
 	}
@@ -119,7 +119,7 @@ func TestNodis_OpenAndSyncBigdata10000(t *testing.T) {
 		}
 	}
 	for i := 0; i < 10000; i++ {
-		v := n.LPop("lpush")
+		v := n.LPop("lpush", 1)[0]
 		if string(v) != strconv.Itoa(39999-i) {
 			t.Errorf("LPop() = %s, want %v", v, strconv.Itoa(9999-i))
 		}
@@ -243,7 +243,7 @@ func TestNodis_Patch(t *testing.T) {
 	if s != 10 {
 		t.Errorf("ZScore() = %v, want %v", s, 10)
 	}
-	v = n.LPop("lpush")
+	v = n.LPop("lpush", 1)[0]
 	if string(v) != "lpush" {
 		t.Errorf("LPop() = %s, want %v", v, "lpush")
 	}

@@ -50,10 +50,10 @@ func TestKey_TTL(t *testing.T) {
 		Path:            "testdata",
 		RecycleDuration: 60 * time.Second,
 	})
-	n.Set("test", []byte("test1"), 1)
+	n.Set("test", []byte("test1"), 0)
 	n.Expire("test", 300)
 	v := n.TTL("test")
-	if v <= 0 {
+	if v < 299 {
 		t.Errorf("TTL() = %v, want > %v", v, 0)
 	}
 	time.Sleep(2 * time.Second)
@@ -211,11 +211,11 @@ func TestKey_Exists(t *testing.T) {
 		RecycleDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"), 1)
-	if !n.Exists("test") {
+	if n.Exists("test") != 1 {
 		t.Errorf("Exists() = %v, want %v", n.Exists("test"), true)
 	}
 	n.Del("test")
-	if n.Exists("test") {
+	if n.Exists("test") == 1 {
 		t.Errorf("Exists() = %v, want %v", n.Exists("test"), false)
 	}
 }

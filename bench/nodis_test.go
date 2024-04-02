@@ -63,7 +63,7 @@ func BenchmarkLPop(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		id := strconv.Itoa(i)
-		n.LPop(id)
+		n.LPop(id, 1)
 	}
 }
 

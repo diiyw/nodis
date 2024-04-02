@@ -102,6 +102,12 @@ func (o *Op) Field(field string) *Op {
 	return o
 }
 
+// Fields set the field
+func (o *Op) Fields(fields ...string) *Op {
+	o.Operation.Fields = fields
+	return o
+}
+
 // IncrFloat set the increment
 func (o *Op) IncrFloat(i float64) *Op {
 	o.Operation.IncrFloat = i

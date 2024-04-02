@@ -43,7 +43,7 @@ func main() {
 	// Create a new Nodis instance
 	opt := nodis.DefaultOptions
 	n := nodis.Open(opt)
-	defer m.Close()
+	defer n.Close()
 	// Set a key-value pair
 	n.Set("key", []byte("value"), 0)
 	n.LPush("list", []byte("value1"))

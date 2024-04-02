@@ -35,7 +35,7 @@ func (s *String) Get() []byte {
 }
 
 // SetBit set a bit in a key
-func (s *String) SetBit(offset int64, value int) int {
+func (s *String) SetBit(offset int64, value bool) int {
 	s.Lock()
 	defer s.Unlock()
 	if offset < 0 {
@@ -47,7 +47,7 @@ func (s *String) SetBit(offset int64, value int) int {
 	}
 	by := s.V[i]
 	bit := byte(1 << uint(offset%8))
-	if value == 1 {
+	if value {
 		s.V[i] = by | bit
 	} else {
 		s.V[i] = by &^ bit
@@ -56,9 +56,13 @@ func (s *String) SetBit(offset int64, value int) int {
 }
 
 // GetBit get a bit in a key
-func (s *String) GetBit(offset int64) int {
+func (s *String) GetBit(offset int64) int64 {
 	s.RLock()
 	defer s.RUnlock()
+	return s.getBit(offset)
+}
+
+func (s *String) getBit(offset int64) int64 {
 	i := offset / 8
 	if offset < 0 || i > int64(len(s.V)) {
 		return 0
@@ -72,15 +76,23 @@ func (s *String) GetBit(offset int64) int {
 }
 
 // BitCount counts the number of bits set to 1
-func (s *String) BitCount() int {
+func (s *String) BitCount(start, end int64) int64 {
 	s.RLock()
 	defer s.RUnlock()
-	count := 0
-	for _, b := range s.V {
-		for i := 0; i < 8; i++ {
-			if b&(1<<uint(i)) != 0 {
-				count++
-			}
+	var count int64 = 0
+	if start < 0 {
+		start = 0
+	}
+	bl := int64(len(s.V)) * 8
+	if end <= 0 {
+		end = bl
+	}
+	if end > int64(len(s.V))*8 {
+		end = bl
+	}
+	for i := start; i < end; i++ {
+		if s.getBit(i) == 1 {
+			count++
 		}
 	}
 	return count

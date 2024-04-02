@@ -73,46 +73,58 @@ func (l *DoublyLinkedList) rPush(data ...[]byte) {
 }
 
 // LPop returns the first element of the list
-func (l *DoublyLinkedList) LPop() []byte {
+func (l *DoublyLinkedList) LPop(count int64) [][]byte {
 	l.Lock()
 	defer l.Unlock()
 	if l.head == nil {
 		return nil // 链表为空
 	}
-	data := l.head.data
-	l.head = l.head.next
-	if l.head != nil {
-		l.head.prev = nil
-	} else {
-		l.tail = nil
+	var result [][]byte
+	for i := int64(0); i < count; i++ {
+		if l.head == nil {
+			break
+		}
+		result = append(result, l.head.data)
+		l.head = l.head.next
+		if l.head != nil {
+			l.head.prev = nil
+		} else {
+			l.tail = nil
+		}
 	}
-	return data
+	return result
 }
 
 // RPop returns the last element of the list
-func (l *DoublyLinkedList) RPop() []byte {
+func (l *DoublyLinkedList) RPop(count int64) [][]byte {
 	l.Lock()
 	defer l.Unlock()
 	if l.tail == nil {
-		return nil // 链表为空
+		return nil
 	}
-	data := l.tail.data
-	l.tail = l.tail.prev
-	if l.tail != nil {
-		l.tail.next = nil
-	} else {
-		l.head = nil
+	var result [][]byte
+	for i := int64(0); i < count; i++ {
+		if l.tail == nil {
+			break
+		}
+		result = append(result, l.tail.data)
+		l.tail = l.tail.prev
+		if l.tail != nil {
+			l.tail.next = nil
+		} else {
+			l.head = nil
+		}
 	}
-	return data
+	return result
 }
 
 // LRange returns a range of elements from the list
-func (l *DoublyLinkedList) LRange(start, end int) [][]byte {
+func (l *DoublyLinkedList) LRange(start, end int64) [][]byte {
 	l.RLock()
 	defer l.RUnlock()
 	var result [][]byte
 	currentNode := l.head
-	index := 0
+	var index int64 = 0
 	if end < 0 {
 		end = l.size() + end
 	}
@@ -129,9 +141,9 @@ func (l *DoublyLinkedList) LRange(start, end int) [][]byte {
 	return result
 }
 
-func (l *DoublyLinkedList) size() int {
+func (l *DoublyLinkedList) size() int64 {
 	currentNode := l.head
-	length := 0
+	var length int64 = 0
 	for currentNode != nil {
 		length++
 		currentNode = currentNode.next
@@ -140,7 +152,7 @@ func (l *DoublyLinkedList) size() int {
 }
 
 // LLen returns the length of the list
-func (l *DoublyLinkedList) LLen() int {
+func (l *DoublyLinkedList) LLen() int64 {
 	l.RLock()
 	defer l.RUnlock()
 	return l.size()
@@ -153,7 +165,11 @@ func (l *DoublyLinkedList) BLPop(timeout time.Duration) []byte {
 		l.RUnlock()
 		time.Sleep(timeout)
 	}
-	return l.LPop()
+	reslut := l.LPop(1)
+	if len(reslut) == 0 {
+		return nil
+	}
+	return reslut[0]
 }
 
 // BRPop removes and returns the last element of the list
@@ -163,15 +179,19 @@ func (l *DoublyLinkedList) BRPop(timeout time.Duration) []byte {
 		l.RUnlock()
 		time.Sleep(timeout)
 	}
-	return l.RPop()
+	result := l.RPop(1)
+	if len(result) == 0 {
+		return nil
+	}
+	return result[0]
 }
 
 // LIndex returns the element at index in the list
-func (l *DoublyLinkedList) LIndex(index int) []byte {
+func (l *DoublyLinkedList) LIndex(index int64) []byte {
 	l.RLock()
 	defer l.RUnlock()
 	currentNode := l.head
-	currentIndex := 0
+	var currentIndex int64 = 0
 	for currentNode != nil {
 		if currentIndex == index {
 			return currentNode.data
@@ -183,7 +203,7 @@ func (l *DoublyLinkedList) LIndex(index int) []byte {
 }
 
 // LInsert inserts the element before or after the pivot element
-func (l *DoublyLinkedList) LInsert(pivot, data []byte, before bool) int {
+func (l *DoublyLinkedList) LInsert(pivot, data []byte, before bool) int64 {
 	l.Lock()
 	defer l.Unlock()
 	currentNode := l.head
@@ -217,7 +237,7 @@ func (l *DoublyLinkedList) LInsert(pivot, data []byte, before bool) int {
 }
 
 // LPushX adds an element to the head of the list if the list exists
-func (l *DoublyLinkedList) LPushX(data []byte) int {
+func (l *DoublyLinkedList) LPushX(data []byte) int64 {
 	l.Lock()
 	defer l.Unlock()
 	if l.head == nil {
@@ -228,7 +248,7 @@ func (l *DoublyLinkedList) LPushX(data []byte) int {
 }
 
 // RPushX adds an element to the end of the list if the list exists
-func (l *DoublyLinkedList) RPushX(data []byte) int {
+func (l *DoublyLinkedList) RPushX(data []byte) int64 {
 	l.Lock()
 	defer l.Unlock()
 	if l.tail == nil {

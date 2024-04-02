@@ -61,6 +61,7 @@ message Operation {
   double IncrFloat = 18;
   int64 IncrInt = 19;
   bool  Before = 20;
+  repeated string Fields = 21;
 }
 
 message KeyScore {

@@ -34,6 +34,30 @@ func (sortedSet *SortedSet) ZAdd(member string, score float64) bool {
 	return sortedSet.zAdd(member, score)
 }
 
+// ZAddXX Only update elements that already exist. Don't add new elements.
+func (sortedSet *SortedSet) ZAddXX(member string, score float64) bool {
+	sortedSet.Lock()
+	defer sortedSet.Unlock()
+	_, ok := sortedSet.dict.Get(member)
+	if ok {
+		sortedSet.zAdd(member, score)
+		return true
+	}
+	return false
+}
+
+// ZAddNX Only add new elements. Don't update already existing elements.
+func (sortedSet *SortedSet) ZAddNX(member string, score float64) bool {
+	sortedSet.Lock()
+	defer sortedSet.Unlock()
+	_, ok := sortedSet.dict.Get(member)
+	if !ok {
+		sortedSet.zAdd(member, score)
+		return true
+	}
+	return false
+}
+
 // zAdd puts member into set,  and returns whether it has inserted new node
 func (sortedSet *SortedSet) zAdd(member string, score float64) bool {
 	element, ok := sortedSet.dict.Get(member)

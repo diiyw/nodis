@@ -2,6 +2,7 @@ package nodis
 
 import (
 	"errors"
+	"fmt"
 	"hash/crc32"
 	"log"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"encoding/binary"
+	"encoding/json"
 
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/hash"
@@ -18,6 +20,7 @@ import (
 	"github.com/diiyw/nodis/ds/zset"
 	"github.com/diiyw/nodis/fs"
 	"github.com/diiyw/nodis/pb"
+	"github.com/diiyw/nodis/redis"
 	nSync "github.com/diiyw/nodis/sync"
 	"github.com/diiyw/nodis/watch"
 	"github.com/tidwall/btree"
@@ -304,7 +307,7 @@ func (n *Nodis) patch(op *pb.Op) error {
 	case pb.OpType_HClear:
 		n.HClear(op.Key)
 	case pb.OpType_HDel:
-		n.HDel(op.Key, op.Operation.Field)
+		n.HDel(op.Key, op.Operation.Fields...)
 	case pb.OpType_HIncrBy:
 		n.HIncrBy(op.Key, op.Operation.Field, op.Operation.IncrInt)
 	case pb.OpType_HIncrByFloat:
@@ -316,7 +319,7 @@ func (n *Nodis) patch(op *pb.Op) error {
 	case pb.OpType_LInsert:
 		n.LInsert(op.Key, op.Operation.Pivot, op.Operation.Value, op.Operation.Before)
 	case pb.OpType_LPop:
-		n.LPop(op.Key)
+		n.LPop(op.Key, op.Operation.Count)
 	case pb.OpType_LPopRPush:
 		n.LPopRPush(op.Key, op.Operation.DstKey)
 	case pb.OpType_LPush:
@@ -330,7 +333,7 @@ func (n *Nodis) patch(op *pb.Op) error {
 	case pb.OpType_LTrim:
 		n.LTrim(op.Key, op.Operation.Start, op.Operation.Stop)
 	case pb.OpType_RPop:
-		n.RPop(op.Key)
+		n.RPop(op.Key, op.Operation.Count)
 	case pb.OpType_RPopLPush:
 		n.RPopLPush(op.Key, op.Operation.DstKey)
 	case pb.OpType_RPush:
@@ -379,5 +382,18 @@ func (n *Nodis) Publish(addr string, pattern []string) error {
 func (n *Nodis) Subscribe(addr string) error {
 	return n.options.Synchronizer.Subscribe(addr, func(o *pb.Op) {
 		n.Patch(o)
+	})
+}
+
+func (n *Nodis) Serve(addr string) error {
+	log.Println("Nodis listen on", addr)
+	return redis.Serve(addr, func(cmd string, args []redis.Value) redis.Value {
+		c, ok := redisHandlers[cmd]
+		if !ok {
+			data, _ := json.Marshal(args)
+			fmt.Printf("%s\n", data)
+			return redis.ErrorValue("Unsupported command")
+		}
+		return c(n, args)
 	})
 }

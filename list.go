@@ -1,8 +1,9 @@
 package nodis
 
 import (
-	"github.com/diiyw/nodis/pb"
 	"time"
+
+	"github.com/diiyw/nodis/pb"
 
 	"github.com/diiyw/nodis/ds"
 
@@ -14,51 +15,53 @@ func (n *Nodis) newList() ds.DataStruct {
 	return list.NewDoublyLinkedList()
 }
 
-func (n *Nodis) LPush(key string, values ...[]byte) {
+func (n *Nodis) LPush(key string, values ...[]byte) int64 {
 	k, l := n.getDs(key, n.newList, 0)
 	k.changed.Store(true)
 	l.(*list.DoublyLinkedList).LPush(values...)
 	n.notify(pb.NewOp(pb.OpType_LPush, key).Values(values))
+	return int64(len(values))
 }
 
-func (n *Nodis) RPush(key string, values ...[]byte) {
+func (n *Nodis) RPush(key string, values ...[]byte) int64 {
 	k, l := n.getDs(key, n.newList, 0)
 	k.changed.Store(true)
 	for _, v := range values {
 		l.(*list.DoublyLinkedList).RPush(v)
 	}
 	n.notify(pb.NewOp(pb.OpType_RPush, key).Values(values))
+	return int64(len(values))
 }
 
-func (n *Nodis) LPop(key string) []byte {
+func (n *Nodis) LPop(key string, count int64) [][]byte {
 	k, l := n.getDs(key, nil, 0)
 	if l == nil {
 		return nil
 	}
 	k.changed.Store(true)
-	v := l.(*list.DoublyLinkedList).LPop()
+	v := l.(*list.DoublyLinkedList).LPop(count)
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
 		n.Del(key)
 	}
-	n.notify(pb.NewOp(pb.OpType_LPop, key))
+	n.notify(pb.NewOp(pb.OpType_LPop, key).Count(count))
 	return v
 }
 
-func (n *Nodis) RPop(key string) []byte {
+func (n *Nodis) RPop(key string, count int64) [][]byte {
 	k, l := n.getDs(key, nil, 0)
 	if l == nil {
 		return nil
 	}
 	k.changed.Store(true)
-	v := l.(*list.DoublyLinkedList).RPop()
+	v := l.(*list.DoublyLinkedList).RPop(count)
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
 		n.Del(key)
 	}
-	n.notify(pb.NewOp(pb.OpType_RPop, key))
+	n.notify(pb.NewOp(pb.OpType_RPop, key).Count(count))
 	return v
 }
 
-func (n *Nodis) LLen(key string) int {
+func (n *Nodis) LLen(key string) int64 {
 	_, l := n.getDs(key, nil, 0)
 	if l == nil {
 		return 0
@@ -66,7 +69,7 @@ func (n *Nodis) LLen(key string) int {
 	return l.(*list.DoublyLinkedList).LLen()
 }
 
-func (n *Nodis) LIndex(key string, index int) []byte {
+func (n *Nodis) LIndex(key string, index int64) []byte {
 	_, l := n.getDs(key, nil, 0)
 	if l == nil {
 		return nil
@@ -74,21 +77,21 @@ func (n *Nodis) LIndex(key string, index int) []byte {
 	return l.(*list.DoublyLinkedList).LIndex(index)
 }
 
-func (n *Nodis) LInsert(key string, pivot, data []byte, before bool) int {
+func (n *Nodis) LInsert(key string, pivot, data []byte, before bool) int64 {
 	k, l := n.getDs(key, n.newList, 0)
 	k.changed.Store(true)
 	n.notify(pb.NewOp(pb.OpType_LInsert, key).Value(data).Pivot(pivot).Before(before))
 	return l.(*list.DoublyLinkedList).LInsert(pivot, data, before)
 }
 
-func (n *Nodis) LPushX(key string, data []byte) int {
+func (n *Nodis) LPushX(key string, data []byte) int64 {
 	k, l := n.getDs(key, n.newList, 0)
 	k.changed.Store(true)
 	n.notify(pb.NewOp(pb.OpType_LPushX, key).Value(data))
 	return l.(*list.DoublyLinkedList).LPushX(data)
 }
 
-func (n *Nodis) RPushX(key string, data []byte) int {
+func (n *Nodis) RPushX(key string, data []byte) int64 {
 	k, l := n.getDs(key, n.newList, 0)
 	k.changed.Store(true)
 	n.notify(pb.NewOp(pb.OpType_RPushX, key).Value(data))
@@ -121,7 +124,7 @@ func (n *Nodis) LTrim(key string, start, stop int64) {
 	l.(*list.DoublyLinkedList).LTrim(start, stop)
 }
 
-func (n *Nodis) LRange(key string, start, stop int) [][]byte {
+func (n *Nodis) LRange(key string, start, stop int64) [][]byte {
 	_, l := n.getDs(key, nil, 0)
 	if l == nil {
 		return nil
@@ -135,7 +138,10 @@ func (n *Nodis) LPopRPush(source, destination string) []byte {
 		return nil
 	}
 	k.changed.Store(true)
-	v := l.(*list.DoublyLinkedList).LPop()
+	v := l.(*list.DoublyLinkedList).LPop(1)
+	if v == nil {
+		return nil
+	}
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
 		n.Del(source)
 	}
@@ -147,9 +153,9 @@ func (n *Nodis) LPopRPush(source, destination string) []byte {
 	}
 	destinationKey.changed.Store(true)
 	l, _ = n.dataStructs.Get(destination)
-	l.(*list.DoublyLinkedList).RPush(v)
+	l.(*list.DoublyLinkedList).RPush(v...)
 	n.notify(pb.NewOp(pb.OpType_LPopRPush, source).DstKey(destination))
-	return v
+	return v[0]
 }
 
 func (n *Nodis) RPopLPush(source, destination string) []byte {
@@ -158,7 +164,10 @@ func (n *Nodis) RPopLPush(source, destination string) []byte {
 		return nil
 	}
 	k.changed.Store(true)
-	v := l.(*list.DoublyLinkedList).RPop()
+	v := l.(*list.DoublyLinkedList).RPop(1)
+	if v == nil {
+		return nil
+	}
 	if l.(*list.DoublyLinkedList).LLen() == 0 {
 		n.Del(source)
 	}
@@ -170,9 +179,9 @@ func (n *Nodis) RPopLPush(source, destination string) []byte {
 	}
 	destinationKey.changed.Store(true)
 	l, _ = n.dataStructs.Get(destination)
-	l.(*list.DoublyLinkedList).LPush(v)
+	l.(*list.DoublyLinkedList).LPush(v...)
 	n.notify(pb.NewOp(pb.OpType_RPopLPush, source).DstKey(destination))
-	return v
+	return v[0]
 }
 
 func (n *Nodis) BLPop(key string, timeout time.Duration) []byte {

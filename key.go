@@ -46,23 +46,37 @@ func (n *Nodis) getKey(key string) (*Key, bool) {
 }
 
 // Del a key
-func (n *Nodis) Del(key string) {
-	_, d := n.getDs(key, nil, 0)
-	d.Lock()
-	n.Lock()
-	n.dataStructs.Delete(key)
-	n.keys.Delete(key)
-	n.store.remove(key)
-	n.notify(pb.NewOp(pb.OpType_Del, key))
-	n.Unlock()
-	d.Unlock()
+func (n *Nodis) Del(keys ...string) int64 {
+	var c int64 = 0
+	for _, key := range keys {
+		_, d := n.getDs(key, nil, 0)
+		if d == nil {
+			continue
+		}
+		d.Lock()
+		n.Lock()
+		n.dataStructs.Delete(key)
+		n.keys.Delete(key)
+		n.Unlock()
+		n.store.remove(key)
+		n.notify(pb.NewOp(pb.OpType_Del, key))
+		d.Unlock()
+		c++
+	}
+	return c
 }
 
-func (n *Nodis) Exists(key string) bool {
+func (n *Nodis) Exists(keys ...string) int64 {
 	n.RLock()
-	_, ok := n.exists(key)
+	var num int64
+	for _, key := range keys {
+		_, ok := n.exists(key)
+		if ok {
+			num++
+		}
+	}
 	n.RUnlock()
-	return ok
+	return num
 }
 
 // exists checks if a key exists
@@ -91,31 +105,36 @@ func (n *Nodis) exists(key string) (k *Key, ok bool) {
 }
 
 // Expire the keys
-func (n *Nodis) Expire(key string, seconds int64) {
+func (n *Nodis) Expire(key string, seconds int64) int64 {
 	n.Lock()
 	k, ok := n.getKey(key)
 	if !ok {
 		n.Unlock()
-		return
+		return -1
+	}
+	if k.Expiration == 0 {
+		k.Expiration = time.Now().Unix()
 	}
 	k.Expiration += seconds
 	k.changed.Store(true)
 	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
 	n.Unlock()
+	return 1
 }
 
 // ExpireAt the keys
-func (n *Nodis) ExpireAt(key string, timestamp time.Time) {
+func (n *Nodis) ExpireAt(key string, timestamp time.Time) int64 {
 	n.Lock()
 	k, ok := n.getKey(key)
 	if !ok {
 		n.Unlock()
-		return
+		return -1
 	}
 	k.Expiration = timestamp.Unix()
 	k.changed.Store(true)
 	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
 	n.Unlock()
+	return 1
 }
 
 // Keys gets the keys
@@ -155,6 +174,9 @@ func (n *Nodis) TTL(key string) time.Duration {
 		return -1
 	}
 	n.RUnlock()
+	if k.Expiration == 0 {
+		return -1
+	}
 	return time.Until(time.Unix(k.Expiration, 0))
 }
 
@@ -208,7 +230,7 @@ func (n *Nodis) Type(key string) string {
 }
 
 // Scan the keys
-func (n *Nodis) Scan(cursor int, match string, count int) (int, []string) {
+func (n *Nodis) Scan(cursor int64, match string, count int64) (int64, []string) {
 	n.RLock()
 	keys := make([]string, 0, n.keys.Len())
 	n.keys.Scan(func(key string, k *Key) bool {
@@ -222,14 +244,18 @@ func (n *Nodis) Scan(cursor int, match string, count int) (int, []string) {
 	if len(keys) == 0 {
 		return 0, nil
 	}
-	if cursor >= len(keys) {
+	lk := int64(len(keys))
+	if cursor >= lk {
 		return 0, nil
 	}
-	if count > len(keys) {
-		count = len(keys)
+	if count > lk {
+		count = lk
 	}
-	if cursor+count > len(keys) {
-		count = len(keys) - cursor
+	if cursor+count > lk {
+		count = lk - cursor
+	}
+	if count == 0 {
+		count = lk
 	}
 	return cursor + count, keys[cursor : cursor+count]
 }

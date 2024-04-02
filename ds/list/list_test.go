@@ -34,14 +34,14 @@ func TestList_LPop(t *testing.T) {
 		l.LPush([]byte(is))
 	}
 	for i := 0; i < 100; i++ {
-		v := l.LPop()
+		v := l.LPop(1)
 		if i == 0 {
-			if string(v) != "99" {
+			if string(v[0]) != "99" {
 				t.Errorf("pop error expect 0 go %d", v)
 			}
 		}
 		is := strconv.Itoa(99 - i)
-		if string(v) != is {
+		if string(v[0]) != is {
 			t.Errorf("pop error")
 		}
 	}
@@ -53,8 +53,8 @@ func TestList_RPop(t *testing.T) {
 		is := strconv.Itoa(i)
 		l.LPush([]byte(is))
 	}
-	v := l.RPop()
-	if string(v) != "0" {
+	v := l.RPop(1)
+	if string(v[0]) != "0" {
 		t.Errorf("pop error expect 0 go %d", v)
 	}
 }
@@ -179,6 +179,6 @@ func BenchmarkDoublyLinkedList_LPop(b *testing.B) {
 		l.LPush([]byte(is))
 	}
 	for i := 0; i < b.N; i++ {
-		l.LPop()
+		l.LPop(1)
 	}
 }

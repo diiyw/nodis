@@ -28,14 +28,14 @@ func (n *Nodis) Get(key string) []byte {
 }
 
 // SetBit set a bit in a key
-func (n *Nodis) SetBit(key string, offset int64, value int) int {
+func (n *Nodis) SetBit(key string, offset int64, value bool) int {
 	_, s := n.getDs(key, n.newStr, 0)
 	k := s.(*str.String)
 	return k.SetBit(offset, value)
 }
 
 // GetBit get a bit in a key
-func (n *Nodis) GetBit(key string, offset int64) int {
+func (n *Nodis) GetBit(key string, offset int64) int64 {
 	_, s := n.getDs(key, nil, 0)
 	if s == nil {
 		return 0
@@ -44,10 +44,10 @@ func (n *Nodis) GetBit(key string, offset int64) int {
 }
 
 // BitCount returns the number of bits set to 1
-func (n *Nodis) BitCount(key string) int {
+func (n *Nodis) BitCount(key string, start, end int64) int64 {
 	_, s := n.getDs(key, nil, 0)
 	if s == nil {
 		return 0
 	}
-	return s.(*str.String).BitCount()
+	return s.(*str.String).BitCount(start, end)
 }
