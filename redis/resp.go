@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -14,15 +15,22 @@ const (
 	BULK    = '$'
 	ARRAY   = '*'
 	MAP     = '%'
+	DOUBLE  = ','
 )
 
 type Value struct {
-	typ     string
-	Str     string
-	Integer int64
-	Bulk    string
-	Array   []Value
-	Map     map[string]Value
+	typ        string
+	Str        string
+	Integer    int64
+	Bulk       string
+	Double     float64
+	Array      []Value
+	Map        map[string]Value
+	XX, NX     bool
+	LT, GT     bool
+	WITHSCORES bool
+	INCR       bool
+	CH         bool
 }
 
 func StringValue(v string) Value {
@@ -41,7 +49,11 @@ func IntegerValue(v int64) Value {
 	return Value{typ: "integer", Integer: v}
 }
 
-func ArrayValue(v []Value) Value {
+func DoubleValue(v float64) Value {
+	return Value{typ: "double", Double: v}
+}
+
+func ArrayValue(v ...Value) Value {
 	return Value{typ: "array", Array: v}
 }
 
@@ -146,6 +158,22 @@ func (r *Resp) readBulk() (Value, error) {
 	r.reader.Read(bulk)
 
 	v.Bulk = string(bulk)
+	b := strings.ToUpper(v.Bulk)
+	if b == "XX" {
+		v.XX = true
+	} else if b == "NX" {
+		v.NX = true
+	} else if b == "LT" {
+		v.LT = true
+	} else if b == "GT" {
+		v.GT = true
+	} else if b == "WITHSCORES" {
+		v.WITHSCORES = true
+	} else if b == "INCR" {
+		v.INCR = true
+	} else if b == "CH" {
+		v.CH = true
+	}
 
 	// Read the trailing CRLF
 	r.readLine()
@@ -170,6 +198,8 @@ func (v Value) Marshal() []byte {
 		return v.marshallInteger()
 	case "map":
 		return v.marshallMap()
+	case "double":
+		return v.marshallDouble()
 	default:
 		return []byte{}
 	}
@@ -226,6 +256,14 @@ func (v Value) marshallInteger() []byte {
 	var bytes []byte
 	bytes = append(bytes, INTEGER)
 	bytes = append(bytes, strconv.FormatInt(v.Integer, 10)...)
+	bytes = append(bytes, '\r', '\n')
+	return bytes
+}
+
+func (v Value) marshallDouble() []byte {
+	var bytes []byte
+	bytes = append(bytes, DOUBLE)
+	bytes = append(bytes, strconv.FormatFloat(v.Double, 'f', -1, 64)...)
 	bytes = append(bytes, '\r', '\n')
 	return bytes
 }

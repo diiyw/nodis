@@ -9,58 +9,72 @@ import (
 )
 
 var redisHandlers = map[string]func(*Nodis, []redis.Value) redis.Value{
-	"PING":         ping,
-	"DEL":          del,
-	"EXISTS":       exists,
-	"EXPIRE":       expire,
-	"EXPIREAT":     expireAt,
-	"KEYS":         keys,
-	"TTL":          ttl,
-	"RENAME":       rename,
-	"TYPE":         typ,
-	"SCAN":         scan,
-	"SET":          setString,
-	"GET":          getString,
-	"SETBIT":       setBit,
-	"GETBIT":       getBit,
-	"BITCOUNT":     bitCount,
-	"SADD":         sAdd,
-	"SCARD":        scard,
-	"SDIFF":        sDiff,
-	"SINTER":       sInter,
-	"SISMEMBER":    sIsMember,
-	"SMEMBERS":     sMembers,
-	"SREM":         sRem,
-	"HSET":         hSet,
-	"HGET":         hGet,
-	"HDEL":         hDel,
-	"HLEN":         hLen,
-	"HKEYS":        hKeys,
-	"HEXISTS":      hExists,
-	"HGETALL":      hGetAll,
-	"HINCRBY":      hIncrBy,
-	"HINCRBYFLOAT": hIncrByFloat,
-	"HSETNX":       hSetNX,
-	"HMGET":        hMGet,
-	"HMSET":        hMSet,
-	"HCLEAR":       hClear,
-	"HSCAN":        hScan,
-	"HVALS":        hVals,
-	"LPUSH":        lPush,
-	"RPUSH":        rPush,
-	"LPOP":         lPop,
-	"RPOP":         rPop,
-	"LLEN":         llen,
-	"LINDEX":       lIndex,
-	"LINSERT":      lInsert,
-	"LPUSHX":       lPushx,
-	"RPUSHX":       rPushx,
-	"LREM":         lRem,
-	"LSET":         lSet,
-	"LRANGE":       lRange,
-	"LPOPRPUSH":    lPopRPush,
-	"RPOPLPUSH":    rPopLPush,
-	"ZADD":         zAdd,
+	"PING":             ping,
+	"DEL":              del,
+	"EXISTS":           exists,
+	"EXPIRE":           expire,
+	"EXPIREAT":         expireAt,
+	"KEYS":             keys,
+	"TTL":              ttl,
+	"RENAME":           rename,
+	"TYPE":             typ,
+	"SCAN":             scan,
+	"SET":              setString,
+	"GET":              getString,
+	"SETBIT":           setBit,
+	"GETBIT":           getBit,
+	"BITCOUNT":         bitCount,
+	"SADD":             sAdd,
+	"SCARD":            scard,
+	"SDIFF":            sDiff,
+	"SINTER":           sInter,
+	"SISMEMBER":        sIsMember,
+	"SMEMBERS":         sMembers,
+	"SREM":             sRem,
+	"HSET":             hSet,
+	"HGET":             hGet,
+	"HDEL":             hDel,
+	"HLEN":             hLen,
+	"HKEYS":            hKeys,
+	"HEXISTS":          hExists,
+	"HGETALL":          hGetAll,
+	"HINCRBY":          hIncrBy,
+	"HINCRBYFLOAT":     hIncrByFloat,
+	"HSETNX":           hSetNX,
+	"HMGET":            hMGet,
+	"HMSET":            hMSet,
+	"HCLEAR":           hClear,
+	"HSCAN":            hScan,
+	"HVALS":            hVals,
+	"LPUSH":            lPush,
+	"RPUSH":            rPush,
+	"LPOP":             lPop,
+	"RPOP":             rPop,
+	"LLEN":             llen,
+	"LINDEX":           lIndex,
+	"LINSERT":          lInsert,
+	"LPUSHX":           lPushx,
+	"RPUSHX":           rPushx,
+	"LREM":             lRem,
+	"LSET":             lSet,
+	"LRANGE":           lRange,
+	"LPOPRPUSH":        lPopRPush,
+	"RPOPLPUSH":        rPopLPush,
+	"ZADD":             zAdd,
+	"ZCARD":            zCard,
+	"ZRANK":            zRank,
+	"ZREVRANK":         zRevRank,
+	"ZSCORE":           zScore,
+	"ZINCRBY":          zIncrBy,
+	"ZRANGE":           zRange,
+	"ZREVRANGE":        zRevRange,
+	"ZRANGEBYSCORE":    zRangeByScore,
+	"ZREVRANGEBYSCORE": zRevRangeByScore,
+	"ZREM":             zRem,
+	"ZREMRANGEBYRANK":  zRemRangeByRank,
+	"ZREMRANGEBYSCORE": zRemRangeByScore,
+	"ZCLEAR":           zClear,
+	"ZEXISTS":          zExists,
 }
 
 func ping(n *Nodis, args []redis.Value) redis.Value {
@@ -120,7 +134,7 @@ func keys(n *Nodis, args []redis.Value) redis.Value {
 	for _, v := range keys {
 		k = append(k, redis.StringValue(v))
 	}
-	return redis.ArrayValue(k)
+	return redis.ArrayValue(k...)
 }
 
 func ttl(n *Nodis, args []redis.Value) redis.Value {
@@ -170,7 +184,7 @@ func scan(n *Nodis, args []redis.Value) redis.Value {
 	for _, v := range keys {
 		k = append(k, redis.StringValue(v))
 	}
-	return redis.ArrayValue(k)
+	return redis.ArrayValue(k...)
 }
 
 func setString(n *Nodis, args []redis.Value) redis.Value {
@@ -260,7 +274,7 @@ func sDiff(n *Nodis, args []redis.Value) redis.Value {
 	for _, v := range results {
 		r = append(r, redis.StringValue(v))
 	}
-	return redis.ArrayValue(r)
+	return redis.ArrayValue(r...)
 }
 
 func sInter(n *Nodis, args []redis.Value) redis.Value {
@@ -276,7 +290,7 @@ func sInter(n *Nodis, args []redis.Value) redis.Value {
 	for _, v := range results {
 		r = append(r, redis.StringValue(v))
 	}
-	return redis.ArrayValue(r)
+	return redis.ArrayValue(r...)
 }
 
 func sIsMember(n *Nodis, args []redis.Value) redis.Value {
@@ -303,7 +317,7 @@ func sMembers(n *Nodis, args []redis.Value) redis.Value {
 	for _, v := range results {
 		r = append(r, redis.StringValue(v))
 	}
-	return redis.ArrayValue(r)
+	return redis.ArrayValue(r...)
 }
 
 func sRem(n *Nodis, args []redis.Value) redis.Value {
@@ -380,7 +394,7 @@ func hKeys(n *Nodis, args []redis.Value) redis.Value {
 	for _, v := range results {
 		r = append(r, redis.StringValue(v))
 	}
-	return redis.ArrayValue(r)
+	return redis.ArrayValue(r...)
 }
 
 func hExists(n *Nodis, args []redis.Value) redis.Value {
@@ -458,7 +472,7 @@ func hMGet(n *Nodis, args []redis.Value) redis.Value {
 	for _, v := range results {
 		r = append(r, redis.StringValue(string(v)))
 	}
-	return redis.ArrayValue(r)
+	return redis.ArrayValue(r...)
 }
 
 func hMSet(n *Nodis, args []redis.Value) redis.Value {
@@ -502,7 +516,7 @@ func hScan(n *Nodis, args []redis.Value) redis.Value {
 	for k, v := range results {
 		r = append(r, redis.StringValue(k), redis.StringValue(string(v)))
 	}
-	return redis.ArrayValue(r)
+	return redis.ArrayValue(r...)
 }
 
 func hVals(n *Nodis, args []redis.Value) redis.Value {
@@ -515,7 +529,7 @@ func hVals(n *Nodis, args []redis.Value) redis.Value {
 	for _, v := range results {
 		r = append(r, redis.StringValue(string(v)))
 	}
-	return redis.ArrayValue(r)
+	return redis.ArrayValue(r...)
 }
 
 func lPush(n *Nodis, args []redis.Value) redis.Value {
@@ -563,7 +577,7 @@ func lPop(n *Nodis, args []redis.Value) redis.Value {
 	for _, vv := range v {
 		r = append(r, redis.StringValue(string(vv)))
 	}
-	return redis.ArrayValue(r)
+	return redis.ArrayValue(r...)
 }
 
 func rPop(n *Nodis, args []redis.Value) redis.Value {
@@ -586,7 +600,7 @@ func rPop(n *Nodis, args []redis.Value) redis.Value {
 	for _, vv := range v {
 		r = append(r, redis.StringValue(string(vv)))
 	}
-	return redis.ArrayValue(r)
+	return redis.ArrayValue(r...)
 }
 
 func llen(n *Nodis, args []redis.Value) redis.Value {
@@ -672,7 +686,7 @@ func lRange(n *Nodis, args []redis.Value) redis.Value {
 	for _, v := range results {
 		r = append(r, redis.StringValue(string(v)))
 	}
-	return redis.ArrayValue(r)
+	return redis.ArrayValue(r...)
 }
 
 func lPopRPush(n *Nodis, args []redis.Value) redis.Value {
@@ -726,4 +740,171 @@ func zCard(n *Nodis, args []redis.Value) redis.Value {
 	}
 	key := args[0].Bulk
 	return redis.IntegerValue(n.ZCard(key))
+}
+
+func zRank(n *Nodis, args []redis.Value) redis.Value {
+	if len(args) == 0 {
+		return redis.ErrorValue("ZRANK requires at least two argument")
+	}
+	key := args[0].Bulk
+	member := args[1].Bulk
+	if len(args) > 2 {
+		rank, el := n.ZRankWithScore(key, member)
+		if el != nil {
+			return redis.ArrayValue(redis.IntegerValue(rank), redis.BulkValue(el.Member))
+		}
+		return redis.NullValue()
+	}
+	return redis.IntegerValue(n.ZRank(key, member))
+}
+
+func zRevRank(n *Nodis, args []redis.Value) redis.Value {
+	if len(args) == 0 {
+		return redis.ErrorValue("ZREVRANK requires at least two argument")
+	}
+	key := args[0].Bulk
+	member := args[1].Bulk
+	if len(args) > 2 {
+		rank, el := n.ZRevRankWithScore(key, member)
+		if el != nil {
+			return redis.ArrayValue(redis.IntegerValue(rank), redis.BulkValue(el.Member))
+		}
+		return redis.NullValue()
+	}
+	return redis.IntegerValue(n.ZRevRank(key, member))
+}
+
+func zScore(n *Nodis, args []redis.Value) redis.Value {
+	if len(args) == 0 {
+		return redis.ErrorValue("ZSCORE requires at least two argument")
+	}
+	key := args[0].Bulk
+	member := args[1].Bulk
+	return redis.DoubleValue(n.ZScore(key, member))
+}
+
+func zIncrBy(n *Nodis, args []redis.Value) redis.Value {
+	if len(args) < 3 {
+		return redis.ErrorValue("ZINCRBY requires at least three arguments")
+	}
+	key := args[0].Bulk
+	score, _ := strconv.ParseFloat(args[1].Bulk, 64)
+	member := args[2].Bulk
+	v := n.ZIncrBy(key, member, score)
+	return redis.DoubleValue(v)
+}
+
+func zRange(n *Nodis, args []redis.Value) redis.Value {
+	if len(args) < 3 {
+		return redis.ErrorValue("ZRANGE requires at least three arguments")
+	}
+	key := args[0].Bulk
+	start, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
+	stop, _ := strconv.ParseInt(args[2].Bulk, 10, 64)
+	results := n.ZRange(key, start, stop)
+	var r = make([]redis.Value, 0, len(results))
+	for _, v := range results {
+		r = append(r, redis.StringValue(v))
+	}
+	return redis.ArrayValue(r...)
+}
+
+func zRevRange(n *Nodis, args []redis.Value) redis.Value {
+	if len(args) < 3 {
+		return redis.ErrorValue("ZREVRANGE requires at least three arguments")
+	}
+	key := args[0].Bulk
+	start, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
+	stop, _ := strconv.ParseInt(args[2].Bulk, 10, 64)
+	results := n.ZRevRange(key, start, stop)
+	var r = make([]redis.Value, 0, len(results))
+	for _, v := range results {
+		r = append(r, redis.StringValue(v))
+	}
+	return redis.ArrayValue(r...)
+}
+
+func zRangeByScore(n *Nodis, args []redis.Value) redis.Value {
+	if len(args) < 3 {
+		return redis.ErrorValue("ZRANGEBYSCORE requires at least three arguments")
+	}
+	key := args[0].Bulk
+	min, _ := strconv.ParseFloat(args[1].Bulk, 64)
+	max, _ := strconv.ParseFloat(args[1].Bulk, 64)
+	results := n.ZRangeByScore(key, min, max)
+	var r = make([]redis.Value, 0, len(results))
+	for _, v := range results {
+		r = append(r, redis.StringValue(v))
+	}
+	return redis.ArrayValue(r...)
+}
+
+func zRevRangeByScore(n *Nodis, args []redis.Value) redis.Value {
+	if len(args) < 3 {
+		return redis.ErrorValue("ZREVRANGEBYSCORE requires at least three arguments")
+	}
+	key := args[0].Bulk
+	min, _ := strconv.ParseFloat(args[1].Bulk, 64)
+	max, _ := strconv.ParseFloat(args[1].Bulk, 64)
+	results := n.ZRevRangeByScore(key, min, max)
+	var r = make([]redis.Value, 0, len(results))
+	for _, v := range results {
+		r = append(r, redis.StringValue(v))
+	}
+	return redis.ArrayValue(r...)
+}
+
+func zRem(n *Nodis, args []redis.Value) redis.Value {
+	if len(args) < 2 {
+		return redis.ErrorValue("ZREM requires at least two arguments")
+	}
+	key := args[0].Bulk
+	members := make([]string, 0, len(args)-1)
+	for i := 1; i < len(args); i++ {
+		members = append(members, args[i].Bulk)
+	}
+	return redis.IntegerValue(n.ZRem(key, members...))
+}
+
+func zRemRangeByRank(n *Nodis, args []redis.Value) redis.Value {
+	if len(args) < 3 {
+		return redis.ErrorValue("ZREMRANGEBYRANK requires at least three arguments")
+	}
+	key := args[0].Bulk
+	start, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
+	stop, _ := strconv.ParseInt(args[2].Bulk, 10, 64)
+	return redis.IntegerValue(n.ZRemRangeByRank(key, start, stop))
+}
+
+func zRemRangeByScore(n *Nodis, args []redis.Value) redis.Value {
+	if len(args) < 3 {
+		return redis.ErrorValue("ZREMRANGEBYSCORE requires at least three arguments")
+	}
+	key := args[0].Bulk
+	min, _ := strconv.ParseFloat(args[1].Bulk, 64)
+	max, _ := strconv.ParseFloat(args[1].Bulk, 64)
+	return redis.IntegerValue(n.ZRemRangeByScore(key, min, max))
+}
+
+func zClear(n *Nodis, args []redis.Value) redis.Value {
+	if len(args) == 0 {
+		return redis.ErrorValue("ZCLEAR requires at least one argument")
+	}
+	key := args[0].Bulk
+	n.ZClear(key)
+	return redis.StringValue("OK")
+}
+
+func zExists(n *Nodis, args []redis.Value) redis.Value {
+	if len(args) < 2 {
+		return redis.ErrorValue("ZEXISTS requires at least two arguments")
+	}
+	key := args[0].Bulk
+	member := args[1].Bulk
+	is := n.ZExists(key, member)
+	var r int64 = 0
+	if is {
+		r = 1
+	}
+	return redis.IntegerValue(r)
 }

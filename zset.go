@@ -49,12 +49,28 @@ func (n *Nodis) ZRank(key string, member string) int64 {
 	return s.(*zset.SortedSet).ZRank(member)
 }
 
+func (n *Nodis) ZRankWithScore(key string, member string) (int64, *zset.Item) {
+	_, s := n.getDs(key, nil, 0)
+	if s == nil {
+		return 0, nil
+	}
+	return s.(*zset.SortedSet).ZRankWithScore(member)
+}
+
 func (n *Nodis) ZRevRank(key string, member string) int64 {
 	_, s := n.getDs(key, nil, 0)
 	if s == nil {
 		return 0
 	}
 	return s.(*zset.SortedSet).ZRevRank(member)
+}
+
+func (n *Nodis) ZRevRankWithScore(key string, member string) (int64, *zset.Item) {
+	_, s := n.getDs(key, nil, 0)
+	if s == nil {
+		return 0, nil
+	}
+	return s.(*zset.SortedSet).ZRevRankWithScore(member)
 }
 
 func (n *Nodis) ZScore(key string, member string) float64 {

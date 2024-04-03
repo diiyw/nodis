@@ -25,7 +25,7 @@ func TestSetBit_SetBit(t *testing.T) {
 		if v {
 			r = 1
 		}
-		if s.GetBit(k) != r {
+		if s.GetBit(k) != int64(r) {
 			t.Errorf("expected %v, got %v", v, s.GetBit(k))
 		}
 	}

@@ -118,11 +118,33 @@ func (sortedSet *SortedSet) ZRank(member string) int64 {
 	return sortedSet.getRank(member, false)
 }
 
+// ZRankWithScore returns the rank of the given member, sort by ascending order, rank starts from 0
+func (sortedSet *SortedSet) ZRankWithScore(member string) (int64, *Item) {
+	sortedSet.RLock()
+	defer sortedSet.RUnlock()
+	element, ok := sortedSet.dict.Get(member)
+	if !ok {
+		return 0, nil
+	}
+	return sortedSet.getRank(member, false), element
+}
+
 // ZRevRank returns the rank of the given member, sort by descending order, rank starts from 0
 func (sortedSet *SortedSet) ZRevRank(member string) int64 {
 	sortedSet.RLock()
 	defer sortedSet.RUnlock()
 	return sortedSet.getRank(member, true)
+}
+
+// ZRevRankWithScore returns the rank of the given member, sort by descending order, rank starts from 0
+func (sortedSet *SortedSet) ZRevRankWithScore(member string) (int64, *Item) {
+	sortedSet.RLock()
+	defer sortedSet.RUnlock()
+	element, ok := sortedSet.dict.Get(member)
+	if !ok {
+		return 0, nil
+	}
+	return sortedSet.getRank(member, true), element
 }
 
 // ZScore returns the score of the given member
