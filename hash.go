@@ -97,11 +97,11 @@ func (n *Nodis) HSetNX(key string, field string, value []byte) bool {
 	h = n.newHash()
 	n.dataStructs.Set(key, h)
 	k := newKey(h.Type(), 0)
-	k.lastUse.Store(uint32(time.Now().Unix()))
+	k.lastUse.Store(time.Now().Unix())
 	n.keys.Set(key, k)
 	k.changed.Store(true)
 	n.HSet(key, field, value)
-	n.notify(pb.NewOp(pb.OpType_HSetNX, key).Fields(field).Value(value))
+	n.notify(pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
 	return true
 }
 

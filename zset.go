@@ -17,20 +17,46 @@ func (n *Nodis) ZAdd(key string, member string, score float64) {
 	s.(*zset.SortedSet).ZAdd(member, score)
 }
 
-func (n *Nodis) ZAddXX(key string, member string, score float64) {
+func (n *Nodis) ZAddXX(key string, member string, score float64) int64 {
 	k, s := n.getDs(key, n.newZSet, 0)
 	if s.(*zset.SortedSet).ZAddXX(member, score) {
 		k.changed.Store(true)
 		n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
+		return 1
 	}
+	return 0
 }
 
-func (n *Nodis) ZAddNX(key string, member string, score float64) {
+func (n *Nodis) ZAddNX(key string, member string, score float64) int64 {
 	k, s := n.getDs(key, n.newZSet, 0)
 	if s.(*zset.SortedSet).ZAddNX(member, score) {
 		k.changed.Store(true)
 		n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
+		return 1
 	}
+	return 0
+}
+
+// ZAddLT add member if score less than the current score
+func (n *Nodis) ZAddLT(key string, member string, score float64) int64 {
+	k, s := n.getDs(key, n.newZSet, 0)
+	if s.(*zset.SortedSet).ZAddLT(member, score) {
+		k.changed.Store(true)
+		n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
+		return 1
+	}
+	return 0
+}
+
+// ZAddGT add member if score greater than the current score
+func (n *Nodis) ZAddGT(key string, member string, score float64) int64 {
+	k, s := n.getDs(key, n.newZSet, 0)
+	if s.(*zset.SortedSet).ZAddGT(member, score) {
+		k.changed.Store(true)
+		n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
+		return 1
+	}
+	return 0
 }
 
 func (n *Nodis) ZCard(key string) int64 {

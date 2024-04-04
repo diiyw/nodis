@@ -58,6 +58,30 @@ func (sortedSet *SortedSet) ZAddNX(member string, score float64) bool {
 	return false
 }
 
+// ZAddLT add member if score less than the current score
+func (sortedSet *SortedSet) ZAddLT(member string, score float64) bool {
+	sortedSet.Lock()
+	defer sortedSet.Unlock()
+	element, ok := sortedSet.dict.Get(member)
+	if ok && element.Score > score {
+		sortedSet.zAdd(member, score)
+		return true
+	}
+	return false
+}
+
+// ZAddGT add member if score greater than the current score
+func (sortedSet *SortedSet) ZAddGT(member string, score float64) bool {
+	sortedSet.Lock()
+	defer sortedSet.Unlock()
+	element, ok := sortedSet.dict.Get(member)
+	if ok && element.Score < score {
+		sortedSet.zAdd(member, score)
+		return true
+	}
+	return false
+}
+
 // zAdd puts member into set,  and returns whether it has inserted new node
 func (sortedSet *SortedSet) zAdd(member string, score float64) bool {
 	element, ok := sortedSet.dict.Get(member)

@@ -13,15 +13,15 @@ import (
 
 type Key struct {
 	Expiration int64
-	lastUse    atomic.Uint32
+	lastUse    atomic.Int64
 	Type       ds.DataType
 	changed    atomic.Bool
 }
 
-func newKey(typ ds.DataType, seconds int64) *Key {
+func newKey(typ ds.DataType, ms int64) *Key {
 	k := &Key{Type: typ}
-	if seconds != 0 {
-		k.Expiration = seconds + time.Now().Unix()
+	if ms != 0 {
+		k.Expiration = ms + time.Now().UnixMilli()
 	}
 	k.changed.Store(true)
 	return k
@@ -31,7 +31,7 @@ func (k *Key) expired() bool {
 	if k == nil {
 		return false
 	}
-	return k.Expiration != 0 && k.Expiration <= time.Now().Unix()
+	return k.Expiration != 0 && k.Expiration <= time.Now().UnixMilli()
 }
 
 func (n *Nodis) getKey(key string) (*Key, bool) {
@@ -106,20 +106,114 @@ func (n *Nodis) exists(key string) (k *Key, ok bool) {
 
 // Expire the keys
 func (n *Nodis) Expire(key string, seconds int64) int64 {
+	if seconds == 0 {
+		return n.Del(key)
+	}
 	n.Lock()
 	k, ok := n.getKey(key)
 	if !ok {
 		n.Unlock()
-		return -1
+		return 0
 	}
 	if k.Expiration == 0 {
-		k.Expiration = time.Now().Unix()
+		k.Expiration = time.Now().UnixMilli()
 	}
-	k.Expiration += seconds
+	k.Expiration += seconds * 1000
 	k.changed.Store(true)
 	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
 	n.Unlock()
 	return 1
+}
+
+// ExpirePX the keys in milliseconds
+func (n *Nodis) ExpirePX(key string, milliseconds int64) int64 {
+	return n.Expire(key, milliseconds/1000)
+}
+
+// ExpireNX the keys only when the key has no expiry
+func (n *Nodis) ExpireNX(key string, seconds int64) int64 {
+	n.Lock()
+	k, ok := n.getKey(key)
+	if !ok {
+		n.Unlock()
+		return 0
+	}
+	if k.Expiration != 0 {
+		n.Unlock()
+		return 0
+	}
+	k.Expiration = time.Now().UnixMilli() + seconds*1000
+	k.changed.Store(true)
+	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
+	n.Unlock()
+	return 1
+}
+
+// ExpireXX the keys only when the key has an existing expiry
+func (n *Nodis) ExpireXX(key string, seconds int64) int64 {
+	n.Lock()
+	k, ok := n.getKey(key)
+	if !ok {
+		n.Unlock()
+		return 0
+	}
+	if k.Expiration == 0 {
+		n.Unlock()
+		return 0
+	}
+	k.Expiration += seconds * 1000
+	k.changed.Store(true)
+	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
+	n.Unlock()
+	return 1
+}
+
+// ExpireLT the keys only when the new expiry is less than current one
+func (n *Nodis) ExpireLT(key string, seconds int64) int64 {
+	n.Lock()
+	k, ok := n.getKey(key)
+	if !ok {
+		n.Unlock()
+		return 0
+	}
+	if k.Expiration == 0 {
+		n.Unlock()
+		return 0
+	}
+	ms := seconds * 1000
+	if k.Expiration > time.Now().UnixMilli()-ms {
+		k.Expiration -= ms
+		k.changed.Store(true)
+		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
+		n.Unlock()
+		return 1
+	}
+	n.Unlock()
+	return 0
+}
+
+// ExpireGT the keys only when the new expiry is greater than current one
+func (n *Nodis) ExpireGT(key string, seconds int64) int64 {
+	n.Lock()
+	k, ok := n.getKey(key)
+	if !ok {
+		n.Unlock()
+		return 0
+	}
+	now := time.Now().UnixMilli()
+	if k.Expiration == 0 {
+		k.Expiration = now
+	}
+	ms := seconds * 1000
+	if k.Expiration < now+ms {
+		k.Expiration += ms
+		k.changed.Store(true)
+		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
+		n.Unlock()
+		return 1
+	}
+	n.Unlock()
+	return 0
 }
 
 // ExpireAt the keys
@@ -128,13 +222,98 @@ func (n *Nodis) ExpireAt(key string, timestamp time.Time) int64 {
 	k, ok := n.getKey(key)
 	if !ok {
 		n.Unlock()
-		return -1
+		return 0
 	}
-	k.Expiration = timestamp.Unix()
+	k.Expiration = timestamp.UnixMilli()
 	k.changed.Store(true)
 	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
 	n.Unlock()
 	return 1
+}
+
+// ExpireAtNX the keys only when the key has no expiry
+func (n *Nodis) ExpireAtNX(key string, timestamp time.Time) int64 {
+	n.Lock()
+	k, ok := n.getKey(key)
+	if !ok {
+		n.Unlock()
+		return 0
+	}
+	if k.Expiration != 0 {
+		n.Unlock()
+		return 0
+	}
+	k.Expiration = timestamp.UnixMilli()
+	k.changed.Store(true)
+	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
+	n.Unlock()
+	return 1
+}
+
+// ExpireAtXX the keys only when the key has an existing expiry
+func (n *Nodis) ExpireAtXX(key string, timestamp time.Time) int64 {
+	n.Lock()
+	k, ok := n.getKey(key)
+	if !ok {
+		n.Unlock()
+		return 0
+	}
+	if k.Expiration == 0 {
+		n.Unlock()
+		return 0
+	}
+	k.Expiration = timestamp.UnixMilli()
+	k.changed.Store(true)
+	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
+	n.Unlock()
+	return 1
+}
+
+// ExpireAtLT the keys only when the new expiry is less than current one
+func (n *Nodis) ExpireAtLT(key string, timestamp time.Time) int64 {
+	n.Lock()
+	k, ok := n.getKey(key)
+	if !ok {
+		n.Unlock()
+		return 0
+	}
+	if k.Expiration == 0 {
+		n.Unlock()
+		return 0
+	}
+	unix := timestamp.UnixMilli()
+	if k.Expiration > unix {
+		k.Expiration = unix
+		k.changed.Store(true)
+		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
+		n.Unlock()
+		return 1
+	}
+	n.Unlock()
+	return 0
+}
+
+// ExpireAtGT the keys only when the new expiry is greater than current one
+func (n *Nodis) ExpireAtGT(key string, timestamp time.Time) int64 {
+	n.Lock()
+	k, ok := n.getKey(key)
+	if !ok {
+		n.Unlock()
+		return 0
+	}
+	unix := timestamp.UnixMilli()
+	if k.Expiration == 0 {
+		k.Expiration = unix
+	}
+	if k.Expiration < unix {
+		k.Expiration = unix
+		k.changed.Store(true)
+		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
+		n.Unlock()
+		return 1
+	}
+	n.Unlock()
+	return 0
 }
 
 // Keys gets the keys
@@ -171,13 +350,15 @@ func (n *Nodis) TTL(key string) time.Duration {
 	k, ok := n.getKey(key)
 	if !ok {
 		n.RUnlock()
-		return -1
+		return 0
 	}
 	n.RUnlock()
 	if k.Expiration == 0 {
-		return -1
+		return 0
 	}
-	return time.Until(time.Unix(k.Expiration, 0))
+	s := k.Expiration / 1000
+	ns := (k.Expiration - s*1000) * 1000 * 1000
+	return time.Until(time.Unix(k.Expiration/1000, ns))
 }
 
 // Rename a key

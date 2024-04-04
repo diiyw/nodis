@@ -15,7 +15,6 @@ enum OpType  {
   HIncrByFloat = 8;
   HMSet = 9;
   HSet = 10;
-  HSetNX = 11;
   LInsert = 12;
   LPop = 13;
   LPopRPush = 14;
@@ -30,7 +29,7 @@ enum OpType  {
   RPushX = 23;
   SAdd = 24;
   SRem = 25;
-  Set = 26;
+  Set = 26;;
   ZAdd = 27;
   ZClear = 28;
   ZIncrBy = 29;

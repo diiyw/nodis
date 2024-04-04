@@ -108,3 +108,27 @@ func (n *Nodis) SRem(key string, members ...string) int64 {
 	n.notify(pb.NewOp(pb.OpType_SRem, key).Members(members))
 	return s.(*set.Set).SRem(members...)
 }
+
+// SScan scans the set value stored at key.
+func (n *Nodis) SScan(key string, cursor int64, match string, count int64) (int64, []string) {
+	_, s := n.getDs(key, nil, 0)
+	if s == nil {
+		return 0, nil
+	}
+	return s.(*set.Set).SScan(cursor, match, count)
+}
+
+// SPop removes and returns a random element from the set value stored at key.
+func (n *Nodis) SPop(key string, count int64) []string {
+	k, s := n.getDs(key, nil, 0)
+	if s == nil {
+		return nil
+	}
+	if count == 0 {
+		count = 1
+	}
+	members := s.(*set.Set).SPop(count)
+	k.changed.Store(true)
+	n.notify(pb.NewOp(pb.OpType_SRem, key).Members(members))
+	return members
+}

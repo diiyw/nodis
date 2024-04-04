@@ -44,7 +44,7 @@ func main() {
 	n := nodis.Open(opt)
 	defer n.Close()
 	// Set a key-value pair
-	n.Set("key", []byte("value"), 0)
+	n.Set("key", []byte("value"))
 	n.LPush("list", []byte("value1"))
 }
 

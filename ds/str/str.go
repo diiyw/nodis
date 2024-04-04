@@ -1,6 +1,7 @@
 package str
 
 import (
+	"encoding/binary"
 	"sync"
 
 	"github.com/diiyw/nodis/ds"
@@ -32,6 +33,32 @@ func (s *String) Get() []byte {
 	s.RLock()
 	defer s.RUnlock()
 	return s.V
+}
+
+// Incr increments the value by 1
+func (s *String) Incr() int64 {
+	s.Lock()
+	defer s.Unlock()
+	if len(s.V) != 8 {
+		s.V = make([]byte, 8)
+	}
+	v := binary.LittleEndian.Uint64(s.V)
+	v++
+	binary.LittleEndian.PutUint64(s.V, v)
+	return int64(v)
+}
+
+// Decr decrements the value by 1
+func (s *String) Decr() int64 {
+	s.Lock()
+	defer s.Unlock()
+	if len(s.V) != 8 {
+		s.V = make([]byte, 8)
+	}
+	v := binary.LittleEndian.Uint64(s.V)
+	v--
+	binary.LittleEndian.PutUint64(s.V, v)
+	return int64(v)
 }
 
 // SetBit set a bit in a key

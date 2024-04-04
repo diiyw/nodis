@@ -3,10 +3,9 @@ package redis
 import (
 	"log"
 	"net"
-	"strings"
 )
 
-func Serve(addr string, handler func(cmd string, args []Value) Value) error {
+func Serve(addr string, handler func(cmd Value, args []Value) Value) error {
 	// Create a new server
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -22,7 +21,7 @@ func Serve(addr string, handler func(cmd string, args []Value) Value) error {
 	}
 }
 
-func handleConn(conn net.Conn, handler func(cmd string, args []Value) Value) {
+func handleConn(conn net.Conn, handler func(cmd Value, args []Value) Value) {
 	defer conn.Close()
 	for {
 		resp := NewResp(conn)
@@ -40,11 +39,13 @@ func handleConn(conn net.Conn, handler func(cmd string, args []Value) Value) {
 			log.Println("Invalid request, expected array length > 0")
 			continue
 		}
-		command := strings.ToUpper(value.Array[0].Bulk)
+		cmd := value.Array[0]
+		cmd.Options = value.Options
+		cmd.Args = value.Args
 		args := value.Array[1:]
 
 		writer := NewWriter(conn)
-		result := handler(command, args)
-		writer.Write(result)
+		result := handler(cmd, args)
+		_ = writer.Write(result)
 	}
 }

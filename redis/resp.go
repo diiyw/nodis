@@ -2,8 +2,8 @@ package redis
 
 import (
 	"bufio"
-	"fmt"
 	"io"
+	"log"
 	"strconv"
 	"strings"
 )
@@ -18,19 +18,39 @@ const (
 	DOUBLE  = ','
 )
 
+var (
+	options = map[string]bool{
+		"NX":         true,
+		"XX":         true,
+		"KEEPTTL":    true,
+		"GET":        true,
+		"LT":         true,
+		"GT":         true,
+		"CH":         true,
+		"INCR":       true,
+		"WITHSCORES": true,
+	}
+
+	args = map[string]bool{
+		"EX":    true,
+		"PX":    true,
+		"EXAT":  true,
+		"PXAT":  true,
+		"MATCH": true,
+		"COUNT": true,
+	}
+)
+
 type Value struct {
-	typ        string
-	Str        string
-	Integer    int64
-	Bulk       string
-	Double     float64
-	Array      []Value
-	Map        map[string]Value
-	XX, NX     bool
-	LT, GT     bool
-	WITHSCORES bool
-	INCR       bool
-	CH         bool
+	typ     string
+	Str     string
+	Integer int64
+	Bulk    string
+	Double  float64
+	Array   []Value
+	Map     map[string]Value
+	Options map[string]bool
+	Args    map[string]Value
 }
 
 func StringValue(v string) Value {
@@ -113,29 +133,48 @@ func (r *Resp) Read() (Value, error) {
 	case BULK:
 		return r.readBulk()
 	default:
-		fmt.Printf("Unknown type: %v", string(_type))
+		log.Printf("Unknown type: %v \n", string(_type))
 		return Value{}, nil
 	}
 }
 
 func (r *Resp) readArray() (Value, error) {
-	v := Value{}
+	v := Value{
+		Options: make(map[string]bool),
+		Args:    make(map[string]Value),
+	}
 	v.typ = "array"
 
 	// read length of array
-	len, _, err := r.readInteger()
+	l, _, err := r.readInteger()
 	if err != nil {
 		return v, err
 	}
 
 	// foreach line, parse and read the value
 	v.Array = make([]Value, 0)
-	for i := 0; i < len; i++ {
+	var arg string
+	for i := 0; i < l; i++ {
 		val, err := r.Read()
 		if err != nil {
 			return v, err
 		}
-
+		if arg != "" {
+			v.Args[arg] = val
+			arg = ""
+			continue
+		}
+		b := strings.ToUpper(val.Bulk)
+		// options are special case
+		if options[b] && i != 0 {
+			v.Options[b] = true
+			continue
+		}
+		// args are special case
+		if args[b] {
+			arg = b
+			continue
+		}
 		// append parsed value to array
 		v.Array = append(v.Array, val)
 	}
@@ -148,32 +187,16 @@ func (r *Resp) readBulk() (Value, error) {
 
 	v.typ = "bulk"
 
-	len, _, err := r.readInteger()
+	l, _, err := r.readInteger()
 	if err != nil {
 		return v, err
 	}
 
-	bulk := make([]byte, len)
+	bulk := make([]byte, l)
 
 	r.reader.Read(bulk)
 
 	v.Bulk = string(bulk)
-	b := strings.ToUpper(v.Bulk)
-	if b == "XX" {
-		v.XX = true
-	} else if b == "NX" {
-		v.NX = true
-	} else if b == "LT" {
-		v.LT = true
-	} else if b == "GT" {
-		v.GT = true
-	} else if b == "WITHSCORES" {
-		v.WITHSCORES = true
-	} else if b == "INCR" {
-		v.INCR = true
-	} else if b == "CH" {
-		v.CH = true
-	}
 
 	// Read the trailing CRLF
 	r.readLine()
@@ -226,13 +249,13 @@ func (v Value) marshalBulk() []byte {
 }
 
 func (v Value) marshalArray() []byte {
-	len := len(v.Array)
+	l := len(v.Array)
 	var bytes []byte
 	bytes = append(bytes, ARRAY)
-	bytes = append(bytes, strconv.Itoa(len)...)
+	bytes = append(bytes, strconv.Itoa(l)...)
 	bytes = append(bytes, '\r', '\n')
 
-	for i := 0; i < len; i++ {
+	for i := 0; i < l; i++ {
 		bytes = append(bytes, v.Array[i].Marshal()...)
 	}
 

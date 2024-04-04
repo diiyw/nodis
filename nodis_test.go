@@ -30,7 +30,7 @@ func TestNodis_Sync(t *testing.T) {
 		FileSize:        FileSizeGB,
 	}
 	n := Open(&opt)
-	n.Set("test", []byte("test1"), 0)
+	n.Set("test", []byte("test1"))
 	keys := n.getChangedEntries()
 	if keys == nil {
 		t.Errorf("Sync() = %v, want %v", keys, nil)
@@ -44,7 +44,7 @@ func TestNodis_OpenAndSync(t *testing.T) {
 		Path: "testdata",
 	}
 	n := Open(opt)
-	n.Set("set", []byte("set"), 0)
+	n.Set("set", []byte("set"))
 	n.ZAdd("zset", "zset", 1)
 	n.HSet("hset", "hset", []byte("hset"))
 	n.LPush("lpush", []byte("lpush"))
@@ -82,7 +82,7 @@ func TestNodis_OpenAndSyncBigdata10000(t *testing.T) {
 	n := Open(&opt)
 	for i := 0; i < 10000; i++ {
 		is := strconv.Itoa(i)
-		n.Set(is, []byte(is), 0)
+		n.Set(is, []byte(is))
 	}
 	for i := 10000; i < 20000; i++ {
 		n.ZAdd("zset", strconv.Itoa(i), float64(i))
@@ -132,7 +132,7 @@ func TestNodis_Snapshot(t *testing.T) {
 		Path: "testdata",
 	}
 	n := Open(opt)
-	n.Set("test", []byte("test"), 0)
+	n.Set("test", []byte("test"))
 	n.Snapshot("testdata")
 	_ = n.Close()
 }
@@ -143,10 +143,10 @@ func TestNodis_SnapshotChanged(t *testing.T) {
 		Path: "testdata",
 	}
 	n := Open(opt)
-	n.Set("test", []byte("test"), 0)
+	n.Set("test", []byte("test"))
 	n.Snapshot(opt.Path)
 	time.Sleep(time.Second)
-	n.Set("test", []byte("test_new"), 0)
+	n.Set("test", []byte("test_new"))
 	n.Snapshot(opt.Path)
 	_ = n.Close()
 }
@@ -158,13 +158,13 @@ func TestNodis_Recycle(t *testing.T) {
 		RecycleDuration: time.Second,
 	}
 	n := Open(opt)
-	n.Set("test", []byte("test"), 1)
-	time.Sleep(1 * time.Second)
+	n.SetEX("test", []byte("test"), 1)
+	time.Sleep(2 * time.Second)
 	v := n.Get("test")
 	if v != nil {
 		t.Errorf("Get() = %v, want %v", v, nil)
 	}
-	n.Set("test", []byte("test"), 0)
+	n.SetEX("test", []byte("test"), 5)
 	// load from disk
 	time.Sleep(2 * time.Second)
 	v = n.Get("test")
@@ -180,7 +180,7 @@ func TestNodis_Clear(t *testing.T) {
 		Path: "testdata",
 	}
 	n := Open(opt)
-	n.Set("test", []byte("test"), 0)
+	n.Set("test", []byte("test"))
 	n.Clear()
 	v := n.Get("test")
 	if v != nil {
@@ -263,7 +263,7 @@ func TestNodis_SetEntity(t *testing.T) {
 		Path: "testdata",
 	}
 	n := Open(opt)
-	n.Set("test", []byte("test"), 0)
+	n.Set("test", []byte("test"))
 	data := n.GetEntry("test")
 	n.Clear()
 	v := n.Get("test")
@@ -287,7 +287,7 @@ func TestNodis_parseDs(t *testing.T) {
 		Path: "testdata",
 	}
 	n := Open(opt)
-	n.Set("test", []byte("test"), 0)
+	n.Set("test", []byte("test"))
 	data := n.GetEntry("test")
 	k, d, _, err := n.parseDs(data)
 	if err != nil {
@@ -308,13 +308,13 @@ func TestNodis_Watch(t *testing.T) {
 		Path: "testdata",
 	}
 	n := Open(opt)
-	n.Set("test", []byte("test"), 0)
+	n.Set("test", []byte("test"))
 	n.Watch([]string{"test"}, func(op *pb.Operation) {
 		if op == nil || string(op.Value) != "test_new" {
 			t.Errorf("Watch() = %v, want %v", op, "test_new")
 		}
 	})
-	n.Set("test", []byte("test_new"), 0)
+	n.Set("test", []byte("test_new"))
 	time.Sleep(time.Second)
 }
 
@@ -324,13 +324,13 @@ func TestNodis_UnWatch(t *testing.T) {
 		Path: "testdata",
 	}
 	n := Open(opt)
-	n.Set("test", []byte("test"), 0)
+	n.Set("test", []byte("test"))
 	id := n.Watch([]string{"test"}, func(op *pb.Operation) {
 		if op == nil || string(op.Value) != "test_new" {
 			t.Errorf("Watch() = %v, want %v", op, "test_new")
 		}
 	})
 	n.UnWatch(id)
-	n.Set("test", []byte("test_new"), 0)
+	n.Set("test", []byte("test_new"))
 	time.Sleep(time.Second)
 }

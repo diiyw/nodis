@@ -1,6 +1,7 @@
 package set
 
 import (
+	"path/filepath"
 	"sync"
 
 	"github.com/diiyw/nodis/ds"
@@ -126,6 +127,28 @@ func (s *Set) SRem(member ...string) int64 {
 	return removed
 }
 
+// SPop removes and returns a random member from the set.
+func (s *Set) SPop(count int64) []string {
+	s.Lock()
+	defer s.Unlock()
+	if count <= 0 {
+		return nil
+	}
+	if count > int64(s.data.Len()) {
+		count = int64(s.data.Len())
+	}
+	members := make([]string, 0, count)
+	s.data.Scan(func(member string) bool {
+		if count > 0 {
+			s.data.Delete(member)
+			members = append(members, member)
+			count--
+		}
+		return true
+	})
+	return members
+}
+
 // SUnion gets the union between sets.
 func (s *Set) SUnion(sets ...*Set) []string {
 	s.RLock()
@@ -150,6 +173,26 @@ func (s *Set) SUnionStore(destination *Set, sets ...*Set) {
 	for _, member := range union {
 		destination.sAdd(member)
 	}
+}
+
+// SScan scans the set members.
+func (s *Set) SScan(cursor int64, match string, count int64) (int64, []string) {
+	s.RLock()
+	defer s.RUnlock()
+	keys := make([]string, 0, 32)
+	if cursor >= int64(s.data.Len()) {
+		return 0, nil
+	}
+	s.data.Scan(func(member string) bool {
+		if count > 0 && int64(len(keys)) >= count {
+			return false
+		}
+		if matched, err := filepath.Match(match, member); matched && err == nil {
+			keys = append(keys, member)
+		}
+		return true
+	})
+	return cursor, keys
 }
 
 // Type returns the type of the data structure

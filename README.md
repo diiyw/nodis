@@ -45,7 +45,7 @@ func main() {
 	n := nodis.Open(opt)
 	defer n.Close()
 	// Set a key-value pair
-	n.Set("key", []byte("value"), 0)
+	n.Set("key", []byte("value"))
 	n.LPush("list", []byte("value1"))
 }
 ```
@@ -73,7 +73,7 @@ func main() {
 	go func() {
 		for {
 			time.Sleep(time.Second)
-			n.Set("test", []byte(time.Now().Format("2006-01-02 15:04:05")), 0)
+			n.Set("test", []byte(time.Now().Format("2006-01-02 15:04:05")))
 		}
 	}()
 	err := n.Publish("127.0.0.1:6380", []string{"*"})

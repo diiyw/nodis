@@ -6,6 +6,7 @@ import (
 	"hash/crc32"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -96,8 +97,8 @@ func (n *Nodis) Recycle() {
 	if n.closed {
 		return
 	}
-	now := uint32(time.Now().Unix())
-	recycleTime := now - uint32(n.options.RecycleDuration.Seconds())
+	now := time.Now().UnixMilli()
+	recycleTime := now - n.options.RecycleDuration.Milliseconds()
 	n.keys.Scan(func(key string, k *Key) bool {
 		if k.expired() {
 			n.dataStructs.Delete(key)
@@ -156,7 +157,7 @@ func (n *Nodis) Close() error {
 	return n.store.close()
 }
 
-func (n *Nodis) getDs(key string, newFn func() ds.DataStruct, ttl int64) (*Key, ds.DataStruct) {
+func (n *Nodis) getDs(key string, newFn func() ds.DataStruct, seconds int64) (*Key, ds.DataStruct) {
 	n.Lock()
 	defer n.Unlock()
 	k, ok := n.exists(key)
@@ -168,14 +169,14 @@ func (n *Nodis) getDs(key string, newFn func() ds.DataStruct, ttl int64) (*Key, 
 		if newFn != nil {
 			d = newFn()
 			n.dataStructs.Set(key, d)
-			k = newKey(d.Type(), ttl)
-			k.lastUse.Store(uint32(time.Now().Unix()))
+			k = newKey(d.Type(), seconds)
+			k.lastUse.Store(time.Now().UnixMilli())
 			n.keys.Set(key, k)
 			return k, d
 		}
 		return nil, nil
 	}
-	k.lastUse.Store(uint32(time.Now().Unix()))
+	k.lastUse.Store(time.Now().UnixMilli())
 	return k, d
 }
 
@@ -314,8 +315,6 @@ func (n *Nodis) patch(op *pb.Op) error {
 		n.HIncrByFloat(op.Key, op.Operation.Field, op.Operation.IncrFloat)
 	case pb.OpType_HSet:
 		n.HSet(op.Key, op.Operation.Field, op.Operation.Value)
-	case pb.OpType_HSetNX:
-		n.HSetNX(op.Key, op.Operation.Field, op.Operation.Value)
 	case pb.OpType_LInsert:
 		n.LInsert(op.Key, op.Operation.Pivot, op.Operation.Value, op.Operation.Before)
 	case pb.OpType_LPop:
@@ -345,7 +344,7 @@ func (n *Nodis) patch(op *pb.Op) error {
 	case pb.OpType_SRem:
 		n.SRem(op.Key, op.Operation.Members...)
 	case pb.OpType_Set:
-		n.Set(op.Key, op.Operation.Value, op.Operation.Expiration)
+		n.Set(op.Key, op.Operation.Value)
 	case pb.OpType_ZAdd:
 		n.ZAdd(op.Key, op.Operation.Member, op.Operation.Score)
 	case pb.OpType_ZClear:
@@ -387,13 +386,14 @@ func (n *Nodis) Subscribe(addr string) error {
 
 func (n *Nodis) Serve(addr string) error {
 	log.Println("Nodis listen on", addr)
-	return redis.Serve(addr, func(cmd string, args []redis.Value) redis.Value {
-		c, ok := redisHandlers[cmd]
+	return redis.Serve(addr, func(cmd redis.Value, args []redis.Value) redis.Value {
+		c, ok := redisHandlers[strings.ToUpper(cmd.Bulk)]
 		if !ok {
 			data, _ := json.Marshal(args)
-			fmt.Printf("%s\n", data)
+			cj, _ := json.Marshal(cmd)
+			fmt.Printf("%s, %s\n", cj, data)
 			return redis.ErrorValue("Unsupported command")
 		}
-		return c(n, args)
+		return c(n, cmd, args)
 	})
 }

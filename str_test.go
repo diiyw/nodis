@@ -10,17 +10,17 @@ func TestStr_Set(t *testing.T) {
 		Path:            "testdata",
 		RecycleDuration: 60 * time.Second,
 	})
-	n.Set("a", []byte("b"), 0)
+	n.Set("a", []byte("b"))
 	v := n.Get("a")
 	if string(v) != "b" {
 		t.Errorf("Set failed expected b got `%s`", string(v))
 	}
-	n.Set("a", []byte("b"), 0)
+	n.Set("a", []byte("b"))
 	v = n.Get("a")
 	if string(v) != "b" {
 		t.Errorf("Set failed expected b got `%s`", string(v))
 	}
-	n.Set("a", []byte("b"), 1)
+	n.Set("a", []byte("b"))
 	v = n.Get("a")
 	if string(v) != "b" {
 		t.Errorf("Set failed expected b got `%s`", string(v))
