@@ -27,8 +27,9 @@ It is a simple and easy to embed in your application.
 - Low memory used, only hot data stored in memory
 - Snapshot and WAL for data storage.
 - Support custom data storage as backend.(e.g. S3, Browser, etc.)
-- Runing on browser with WebAssembly. (^v1.2.0)
+- Running on browser with WebAssembly. (^v1.2.0)
 - Support watch changes from remote. (^v1.2.0)
+- Support redis protocol. (^v1.3.0)
 
 ## Get Started
 ```bash
@@ -49,9 +50,7 @@ func main() {
 	n.LPush("list", []byte("value1"))
 }
 ```
-Watch changes from remote
-
-Server 
+- Watch changes from remote `Server`
 ```go
 package main
 
@@ -82,7 +81,7 @@ func main() {
 	}
 }
 ```
-Browser client built with WebAssembly
+- Browser client built with WebAssembly
 
 ```bash
 GOOS=js GOARCH=wasm go build -o test.wasm
