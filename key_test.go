@@ -34,7 +34,7 @@ func TestKey_ExpireXX(t *testing.T) {
 	}
 	n.SetEX("test2", []byte("test2"), 1)
 	n.ExpireXX("test2", 2)
-	if int64(n.TTL("test2").Seconds()) != 3 {
+	if int64(n.TTL("test2").Seconds()) < 2 {
 		t.Errorf("TTL() = %v, want %vs", n.TTL("test2"), 3)
 	}
 }

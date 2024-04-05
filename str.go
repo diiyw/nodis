@@ -27,7 +27,9 @@ func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
 	if k.Expiration == 0 {
 		k.Expiration = time.Now().UnixMilli()
 	}
+	n.Lock()
 	k.Expiration += seconds * 1000
+	n.Unlock()
 	n.notify(pb.NewOp(pb.OpType_Set, key).Value(value).Expiration(k.Expiration))
 	s.(*str.String).Set(value)
 }
@@ -39,7 +41,9 @@ func (n *Nodis) SetPX(key string, value []byte, milliseconds int64) {
 	if k.Expiration == 0 {
 		k.Expiration = time.Now().UnixMilli()
 	}
+	n.Lock()
 	k.Expiration += milliseconds
+	n.Unlock()
 	n.notify(pb.NewOp(pb.OpType_Set, key).Value(value).Expiration(k.Expiration))
 	s.(*str.String).Set(value)
 }
