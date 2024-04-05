@@ -16,8 +16,9 @@ type Node struct {
 
 type DoublyLinkedList struct {
 	sync.RWMutex
-	head *Node
-	tail *Node
+	head   *Node
+	tail   *Node
+	length int64
 }
 
 // Type returns the type of the data structure
@@ -48,6 +49,7 @@ func (l *DoublyLinkedList) lPush(data ...[]byte) {
 			l.head.prev = newNode
 			l.head = newNode
 		}
+		l.length++
 	}
 }
 
@@ -69,6 +71,7 @@ func (l *DoublyLinkedList) rPush(data ...[]byte) {
 			newNode.prev = l.tail
 			l.tail = newNode
 		}
+		l.length++
 	}
 }
 
@@ -91,6 +94,7 @@ func (l *DoublyLinkedList) LPop(count int64) [][]byte {
 		} else {
 			l.tail = nil
 		}
+		l.length--
 	}
 	return result
 }
@@ -114,6 +118,7 @@ func (l *DoublyLinkedList) RPop(count int64) [][]byte {
 		} else {
 			l.head = nil
 		}
+		l.length--
 	}
 	return result
 }
@@ -155,7 +160,7 @@ func (l *DoublyLinkedList) size() int64 {
 func (l *DoublyLinkedList) LLen() int64 {
 	l.RLock()
 	defer l.RUnlock()
-	return l.size()
+	return l.length
 }
 
 // BLPop removes and returns the first element of the list
@@ -165,11 +170,11 @@ func (l *DoublyLinkedList) BLPop(timeout time.Duration) []byte {
 		l.RUnlock()
 		time.Sleep(timeout)
 	}
-	reslut := l.LPop(1)
-	if len(reslut) == 0 {
+	result := l.LPop(1)
+	if len(result) == 0 {
 		return nil
 	}
-	return reslut[0]
+	return result[0]
 }
 
 // BRPop removes and returns the last element of the list
@@ -233,7 +238,7 @@ func (l *DoublyLinkedList) LInsert(pivot, data []byte, before bool) int64 {
 		}
 		currentNode = currentNode.next
 	}
-	return 0
+	return -1
 }
 
 // LPushX adds an element to the head of the list if the list exists
@@ -280,6 +285,7 @@ func (l *DoublyLinkedList) LRem(count int64, value []byte) int64 {
 				l.tail = currentNode.prev
 			}
 			removed++
+			l.length--
 		}
 		currentNode = currentNode.next
 	}
@@ -324,6 +330,7 @@ func (l *DoublyLinkedList) LTrim(start, end int64) {
 		}
 		currentNode = currentNode.next
 		index++
+		l.length--
 	}
 }
 

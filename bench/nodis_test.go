@@ -57,13 +57,12 @@ func BenchmarkLPop(b *testing.B) {
 	})
 	for i := 0; i < 100000; i++ {
 		id := strconv.Itoa(i)
-		n.LPush(id, []byte("value"+id))
+		n.LPush("test", []byte("value"+id))
 	}
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		id := strconv.Itoa(i)
-		n.LPop(id, 1)
+		n.LPop("test", 1)
 	}
 }
 

@@ -2,7 +2,6 @@ package nodis
 
 import (
 	"errors"
-	"fmt"
 	"hash/crc32"
 	"log"
 	"os"
@@ -11,8 +10,6 @@ import (
 	"time"
 
 	"encoding/binary"
-	"encoding/json"
-
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/hash"
 	"github.com/diiyw/nodis/ds/list"
@@ -389,9 +386,6 @@ func (n *Nodis) Serve(addr string) error {
 	return redis.Serve(addr, func(cmd redis.Value, args []redis.Value) redis.Value {
 		c, ok := redisHandlers[strings.ToUpper(cmd.Bulk)]
 		if !ok {
-			data, _ := json.Marshal(args)
-			cj, _ := json.Marshal(cmd)
-			fmt.Printf("%s, %s\n", cj, data)
 			return redis.ErrorValue("Unsupported command")
 		}
 		return c(n, cmd, args)
