@@ -2,13 +2,11 @@ package str
 
 import (
 	"encoding/binary"
-	"sync"
 
 	"github.com/diiyw/nodis/ds"
 )
 
 type String struct {
-	sync.RWMutex
 	V []byte
 }
 
@@ -23,22 +21,16 @@ func (s *String) Type() ds.DataType {
 
 // Set the value
 func (s *String) Set(v []byte) {
-	s.Lock()
 	s.V = v
-	s.Unlock()
 }
 
 // Get the value
 func (s *String) Get() []byte {
-	s.RLock()
-	defer s.RUnlock()
 	return s.V
 }
 
 // Incr increments the value by 1
 func (s *String) Incr() int64 {
-	s.Lock()
-	defer s.Unlock()
 	if len(s.V) != 8 {
 		s.V = make([]byte, 8)
 	}
@@ -50,8 +42,6 @@ func (s *String) Incr() int64 {
 
 // Decr decrements the value by 1
 func (s *String) Decr() int64 {
-	s.Lock()
-	defer s.Unlock()
 	if len(s.V) != 8 {
 		s.V = make([]byte, 8)
 	}
@@ -63,8 +53,6 @@ func (s *String) Decr() int64 {
 
 // SetBit set a bit in a key
 func (s *String) SetBit(offset int64, value bool) int {
-	s.Lock()
-	defer s.Unlock()
 	if offset < 0 {
 		return 0
 	}
@@ -84,8 +72,6 @@ func (s *String) SetBit(offset int64, value bool) int {
 
 // GetBit get a bit in a key
 func (s *String) GetBit(offset int64) int64 {
-	s.RLock()
-	defer s.RUnlock()
 	return s.getBit(offset)
 }
 
@@ -104,8 +90,6 @@ func (s *String) getBit(offset int64) int64 {
 
 // BitCount counts the number of bits set to 1
 func (s *String) BitCount(start, end int64) int64 {
-	s.RLock()
-	defer s.RUnlock()
 	var count int64 = 0
 	if start < 0 {
 		start = 0
@@ -127,8 +111,6 @@ func (s *String) BitCount(start, end int64) int64 {
 
 // GetValue the string to bytes
 func (s *String) GetValue() []byte {
-	s.RLock()
-	defer s.RUnlock()
 	return s.V
 }
 

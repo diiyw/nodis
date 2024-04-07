@@ -2,7 +2,6 @@ package list
 
 import (
 	"bytes"
-	"sync"
 	"time"
 
 	"github.com/diiyw/nodis/ds"
@@ -15,7 +14,6 @@ type Node struct {
 }
 
 type DoublyLinkedList struct {
-	sync.RWMutex
 	head   *Node
 	tail   *Node
 	length int64
@@ -33,8 +31,6 @@ func NewDoublyLinkedList() *DoublyLinkedList {
 
 // LPush adds an element to the head of the list
 func (l *DoublyLinkedList) LPush(data ...[]byte) {
-	l.Lock()
-	defer l.Unlock()
 	l.lPush(data...)
 }
 
@@ -55,8 +51,6 @@ func (l *DoublyLinkedList) lPush(data ...[]byte) {
 
 // RPush adds an element to the end of the list
 func (l *DoublyLinkedList) RPush(data ...[]byte) {
-	l.Lock()
-	defer l.Unlock()
 	l.rPush(data...)
 }
 
@@ -77,8 +71,6 @@ func (l *DoublyLinkedList) rPush(data ...[]byte) {
 
 // LPop returns the first element of the list
 func (l *DoublyLinkedList) LPop(count int64) [][]byte {
-	l.Lock()
-	defer l.Unlock()
 	if l.head == nil {
 		return nil // 链表为空
 	}
@@ -101,8 +93,6 @@ func (l *DoublyLinkedList) LPop(count int64) [][]byte {
 
 // RPop returns the last element of the list
 func (l *DoublyLinkedList) RPop(count int64) [][]byte {
-	l.Lock()
-	defer l.Unlock()
 	if l.tail == nil {
 		return nil
 	}
@@ -125,8 +115,6 @@ func (l *DoublyLinkedList) RPop(count int64) [][]byte {
 
 // LRange returns a range of elements from the list
 func (l *DoublyLinkedList) LRange(start, end int64) [][]byte {
-	l.RLock()
-	defer l.RUnlock()
 	var result [][]byte
 	currentNode := l.head
 	var index int64 = 0
@@ -158,16 +146,12 @@ func (l *DoublyLinkedList) size() int64 {
 
 // LLen returns the length of the list
 func (l *DoublyLinkedList) LLen() int64 {
-	l.RLock()
-	defer l.RUnlock()
 	return l.length
 }
 
 // BLPop removes and returns the first element of the list
 func (l *DoublyLinkedList) BLPop(timeout time.Duration) []byte {
-	l.RLock()
 	if l.head == nil {
-		l.RUnlock()
 		time.Sleep(timeout)
 	}
 	result := l.LPop(1)
@@ -179,9 +163,7 @@ func (l *DoublyLinkedList) BLPop(timeout time.Duration) []byte {
 
 // BRPop removes and returns the last element of the list
 func (l *DoublyLinkedList) BRPop(timeout time.Duration) []byte {
-	l.RLock()
 	if l.tail == nil {
-		l.RUnlock()
 		time.Sleep(timeout)
 	}
 	result := l.RPop(1)
@@ -193,8 +175,6 @@ func (l *DoublyLinkedList) BRPop(timeout time.Duration) []byte {
 
 // LIndex returns the element at index in the list
 func (l *DoublyLinkedList) LIndex(index int64) []byte {
-	l.RLock()
-	defer l.RUnlock()
 	currentNode := l.head
 	var currentIndex int64 = 0
 	for currentNode != nil {
@@ -209,8 +189,6 @@ func (l *DoublyLinkedList) LIndex(index int64) []byte {
 
 // LInsert inserts the element before or after the pivot element
 func (l *DoublyLinkedList) LInsert(pivot, data []byte, before bool) int64 {
-	l.Lock()
-	defer l.Unlock()
 	currentNode := l.head
 	for currentNode != nil {
 		if bytes.Contains(currentNode.data, pivot) {
@@ -243,8 +221,6 @@ func (l *DoublyLinkedList) LInsert(pivot, data []byte, before bool) int64 {
 
 // LPushX adds an element to the head of the list if the list exists
 func (l *DoublyLinkedList) LPushX(data []byte) int64 {
-	l.Lock()
-	defer l.Unlock()
 	if l.head == nil {
 		return 0
 	}
@@ -254,8 +230,6 @@ func (l *DoublyLinkedList) LPushX(data []byte) int64 {
 
 // RPushX adds an element to the end of the list if the list exists
 func (l *DoublyLinkedList) RPushX(data []byte) int64 {
-	l.Lock()
-	defer l.Unlock()
 	if l.tail == nil {
 		return 0
 	}
@@ -265,8 +239,6 @@ func (l *DoublyLinkedList) RPushX(data []byte) int64 {
 
 // LRem removes the first count occurrences of elements equal to value from the list
 func (l *DoublyLinkedList) LRem(count int64, value []byte) int64 {
-	l.Lock()
-	defer l.Unlock()
 	currentNode := l.head
 	var removed int64 = 0
 	for currentNode != nil {
@@ -294,8 +266,6 @@ func (l *DoublyLinkedList) LRem(count int64, value []byte) int64 {
 
 // LSet sets the list element at index to value
 func (l *DoublyLinkedList) LSet(index int64, value []byte) bool {
-	l.Lock()
-	defer l.Unlock()
 	currentNode := l.head
 	var currentIndex int64 = 0
 	for currentNode != nil {
@@ -311,8 +281,6 @@ func (l *DoublyLinkedList) LSet(index int64, value []byte) bool {
 
 // LTrim trims an existing list so that it will contain only the specified range of elements specified
 func (l *DoublyLinkedList) LTrim(start, end int64) {
-	l.Lock()
-	defer l.Unlock()
 	currentNode := l.head
 	var index int64 = 0
 	for currentNode != nil {

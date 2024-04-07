@@ -39,16 +39,8 @@ func (n *Nodis) SDiff(keys ...string) []string {
 		if setDs == nil {
 			continue
 		}
-		setDs.RLock()
 		otherSets[i] = setDs.(*set.Set)
 	}
-	defer func() {
-		for _, otherSet := range otherSets {
-			if otherSet != nil {
-				otherSet.RUnlock()
-			}
-		}
-	}()
 	return s.(*set.Set).SDiff(otherSets...)
 }
 
@@ -67,16 +59,8 @@ func (n *Nodis) SInter(keys ...string) []string {
 		if setDs == nil {
 			continue
 		}
-		setDs.RLock()
 		otherSets[i] = setDs.(*set.Set)
 	}
-	defer func() {
-		for _, otherSet := range otherSets {
-			if otherSet != nil {
-				otherSet.RUnlock()
-			}
-		}
-	}()
 	return s.(*set.Set).SInter(otherSets...)
 }
 

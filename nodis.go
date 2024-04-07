@@ -5,11 +5,12 @@ import (
 	"hash/crc32"
 	"log"
 	"os"
+	"runtime"
 	"strings"
-	"sync"
 	"time"
 
 	"encoding/binary"
+
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/hash"
 	"github.com/diiyw/nodis/ds/list"
@@ -30,7 +31,6 @@ var (
 )
 
 type Nodis struct {
-	sync.RWMutex
 	dataStructs btree.Map[string, ds.DataStruct]
 	keys        btree.Map[string, *Key]
 	options     *Options
@@ -89,8 +89,6 @@ func (n *Nodis) Snapshot(path string) {
 
 // Recycle removes expired and unused keys
 func (n *Nodis) Recycle() {
-	n.Lock()
-	defer n.Unlock()
 	if n.closed {
 		return
 	}
@@ -140,8 +138,6 @@ func (n *Nodis) getChangedEntries() []*pb.Entry {
 
 // Close the store
 func (n *Nodis) Close() error {
-	n.Lock()
-	defer n.Unlock()
 	// save values to disk
 	entries := n.getChangedEntries()
 	for _, entry := range entries {
@@ -155,8 +151,6 @@ func (n *Nodis) Close() error {
 }
 
 func (n *Nodis) getDs(key string, newFn func() ds.DataStruct, seconds int64) (*Key, ds.DataStruct) {
-	n.Lock()
-	defer n.Unlock()
 	k, ok := n.exists(key)
 	if !ok && newFn == nil {
 		return nil, nil
@@ -179,8 +173,6 @@ func (n *Nodis) getDs(key string, newFn func() ds.DataStruct, seconds int64) (*K
 
 // Clear removes all keys from the store
 func (n *Nodis) Clear() {
-	n.Lock()
-	defer n.Unlock()
 	n.dataStructs.Clear()
 	n.keys.Clear()
 	err := n.store.clear()
@@ -269,17 +261,13 @@ func (n *Nodis) notify(ops ...*pb.Op) {
 }
 
 func (n *Nodis) Watch(pattern []string, fn func(op *pb.Operation)) int {
-	n.Lock()
 	w := watch.NewWatcher(pattern, fn)
 	n.watchers = append(n.watchers, w)
-	n.Unlock()
 	return len(n.watchers) - 1
 }
 
 func (n *Nodis) UnWatch(id int) {
-	n.Lock()
 	n.watchers = append(n.watchers[:id], n.watchers[id+1:]...)
-	n.Unlock()
 }
 
 func (n *Nodis) Patch(ops ...*pb.Op) error {
@@ -383,6 +371,7 @@ func (n *Nodis) Subscribe(addr string) error {
 
 func (n *Nodis) Serve(addr string) error {
 	log.Println("Nodis listen on", addr)
+	runtime.GOMAXPROCS(1)
 	return redis.Serve(addr, func(cmd redis.Value, args []redis.Value) redis.Value {
 		c, ok := redisHandlers[strings.ToUpper(cmd.Bulk)]
 		if !ok {

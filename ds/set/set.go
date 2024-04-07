@@ -2,14 +2,12 @@ package set
 
 import (
 	"path/filepath"
-	"sync"
 
 	"github.com/diiyw/nodis/ds"
 	"github.com/tidwall/btree"
 )
 
 type Set struct {
-	sync.RWMutex
 	data btree.Set[string]
 }
 
@@ -20,8 +18,6 @@ func NewSet() *Set {
 
 // SAdd adds a member to the set
 func (s *Set) SAdd(member ...string) int64 {
-	s.Lock()
-	defer s.Unlock()
 	return s.sAdd(member...)
 }
 
@@ -34,15 +30,11 @@ func (s *Set) sAdd(member ...string) int64 {
 
 // SCard gets the set members count.
 func (s *Set) SCard() int64 {
-	s.RLock()
-	defer s.RUnlock()
 	return int64(s.data.Len())
 }
 
 // SDiff gets the difference between sets.
 func (s *Set) SDiff(sets ...*Set) []string {
-	s.RLock()
-	defer s.RUnlock()
 	diff := make([]string, 0, 32)
 	s.data.Scan(func(member string) bool {
 		found := false
@@ -63,8 +55,6 @@ func (s *Set) SDiff(sets ...*Set) []string {
 // SDiffStore gets the difference between sets and stores it in a new set.
 func (s *Set) SDiffStore(destination *Set, sets ...*Set) {
 	diff := s.SDiff(sets...)
-	s.Lock()
-	defer s.Unlock()
 	for _, member := range diff {
 		destination.sAdd(member)
 	}
@@ -72,8 +62,6 @@ func (s *Set) SDiffStore(destination *Set, sets ...*Set) {
 
 // SInter gets the intersection between sets.
 func (s *Set) SInter(sets ...*Set) []string {
-	s.RLock()
-	defer s.RUnlock()
 	inter := make([]string, 0, 32)
 	s.data.Scan(func(member string) bool {
 		found := true
@@ -94,8 +82,6 @@ func (s *Set) SInter(sets ...*Set) []string {
 // SInterStore gets the intersection between sets and stores it in a new set.
 func (s *Set) SInterStore(destination *Set, sets ...*Set) {
 	inter := s.SInter(sets...)
-	s.Lock()
-	defer s.Unlock()
 	for _, member := range inter {
 		destination.sAdd(member)
 	}
@@ -103,22 +89,16 @@ func (s *Set) SInterStore(destination *Set, sets ...*Set) {
 
 // SMembers gets the set members.
 func (s *Set) SMembers() []string {
-	s.RLock()
-	defer s.RUnlock()
 	return s.data.Keys()
 }
 
 // SIsMember checks if a member is in the set.
 func (s *Set) SIsMember(member string) bool {
-	s.RLock()
-	defer s.RUnlock()
 	return s.data.Contains(member)
 }
 
 // SRem removes a member from the set.
 func (s *Set) SRem(member ...string) int64 {
-	s.Lock()
-	defer s.Unlock()
 	var removed int64 = 0
 	for _, m := range member {
 		s.data.Delete(m)
@@ -129,8 +109,6 @@ func (s *Set) SRem(member ...string) int64 {
 
 // SPop removes and returns a random member from the set.
 func (s *Set) SPop(count int64) []string {
-	s.Lock()
-	defer s.Unlock()
 	if count <= 0 {
 		return nil
 	}
@@ -151,8 +129,6 @@ func (s *Set) SPop(count int64) []string {
 
 // SUnion gets the union between sets.
 func (s *Set) SUnion(sets ...*Set) []string {
-	s.RLock()
-	defer s.RUnlock()
 	union := s.data.Keys()
 	for _, set := range sets {
 		set.data.Scan(func(member string) bool {
@@ -168,8 +144,6 @@ func (s *Set) SUnion(sets ...*Set) []string {
 // SUnionStore gets the union between sets and stores it in a new set.
 func (s *Set) SUnionStore(destination *Set, sets ...*Set) {
 	union := s.SUnion(sets...)
-	s.Lock()
-	defer s.Unlock()
 	for _, member := range union {
 		destination.sAdd(member)
 	}
@@ -177,8 +151,6 @@ func (s *Set) SUnionStore(destination *Set, sets ...*Set) {
 
 // SScan scans the set members.
 func (s *Set) SScan(cursor int64, match string, count int64) (int64, []string) {
-	s.RLock()
-	defer s.RUnlock()
 	keys := make([]string, 0, 32)
 	if cursor >= int64(s.data.Len()) {
 		return 0, nil

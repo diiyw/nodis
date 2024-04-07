@@ -53,21 +53,16 @@ func (n *Nodis) Del(keys ...string) int64 {
 		if d == nil {
 			continue
 		}
-		d.Lock()
-		n.Lock()
 		n.dataStructs.Delete(key)
 		n.keys.Delete(key)
-		n.Unlock()
 		n.store.remove(key)
 		n.notify(pb.NewOp(pb.OpType_Del, key))
-		d.Unlock()
 		c++
 	}
 	return c
 }
 
 func (n *Nodis) Exists(keys ...string) int64 {
-	n.RLock()
 	var num int64
 	for _, key := range keys {
 		_, ok := n.exists(key)
@@ -75,7 +70,6 @@ func (n *Nodis) Exists(keys ...string) int64 {
 			num++
 		}
 	}
-	n.RUnlock()
 	return num
 }
 
@@ -109,10 +103,8 @@ func (n *Nodis) Expire(key string, seconds int64) int64 {
 	if seconds == 0 {
 		return n.Del(key)
 	}
-	n.Lock()
 	k, ok := n.getKey(key)
 	if !ok {
-		n.Unlock()
 		return 0
 	}
 	if k.Expiration == 0 {
@@ -121,7 +113,6 @@ func (n *Nodis) Expire(key string, seconds int64) int64 {
 	k.Expiration += seconds * 1000
 	k.changed.Store(true)
 	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
-	n.Unlock()
 	return 1
 }
 
@@ -132,52 +123,41 @@ func (n *Nodis) ExpirePX(key string, milliseconds int64) int64 {
 
 // ExpireNX the keys only when the key has no expiry
 func (n *Nodis) ExpireNX(key string, seconds int64) int64 {
-	n.Lock()
 	k, ok := n.getKey(key)
 	if !ok {
-		n.Unlock()
 		return 0
 	}
 	if k.Expiration != 0 {
-		n.Unlock()
 		return 0
 	}
 	k.Expiration = time.Now().UnixMilli() + seconds*1000
 	k.changed.Store(true)
 	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
-	n.Unlock()
 	return 1
 }
 
 // ExpireXX the keys only when the key has an existing expiry
 func (n *Nodis) ExpireXX(key string, seconds int64) int64 {
-	n.Lock()
 	k, ok := n.getKey(key)
 	if !ok {
-		n.Unlock()
 		return 0
 	}
 	if k.Expiration == 0 {
-		n.Unlock()
 		return 0
 	}
 	k.Expiration += seconds * 1000
 	k.changed.Store(true)
 	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
-	n.Unlock()
 	return 1
 }
 
 // ExpireLT the keys only when the new expiry is less than current one
 func (n *Nodis) ExpireLT(key string, seconds int64) int64 {
-	n.Lock()
 	k, ok := n.getKey(key)
 	if !ok {
-		n.Unlock()
 		return 0
 	}
 	if k.Expiration == 0 {
-		n.Unlock()
 		return 0
 	}
 	ms := seconds * 1000
@@ -185,19 +165,15 @@ func (n *Nodis) ExpireLT(key string, seconds int64) int64 {
 		k.Expiration -= ms
 		k.changed.Store(true)
 		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
-		n.Unlock()
 		return 1
 	}
-	n.Unlock()
 	return 0
 }
 
 // ExpireGT the keys only when the new expiry is greater than current one
 func (n *Nodis) ExpireGT(key string, seconds int64) int64 {
-	n.Lock()
 	k, ok := n.getKey(key)
 	if !ok {
-		n.Unlock()
 		return 0
 	}
 	now := time.Now().UnixMilli()
@@ -209,76 +185,60 @@ func (n *Nodis) ExpireGT(key string, seconds int64) int64 {
 		k.Expiration += ms
 		k.changed.Store(true)
 		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
-		n.Unlock()
 		return 1
 	}
-	n.Unlock()
 	return 0
 }
 
 // ExpireAt the keys
 func (n *Nodis) ExpireAt(key string, timestamp time.Time) int64 {
-	n.Lock()
 	k, ok := n.getKey(key)
 	if !ok {
-		n.Unlock()
 		return 0
 	}
 	k.Expiration = timestamp.UnixMilli()
 	k.changed.Store(true)
 	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
-	n.Unlock()
 	return 1
 }
 
 // ExpireAtNX the keys only when the key has no expiry
 func (n *Nodis) ExpireAtNX(key string, timestamp time.Time) int64 {
-	n.Lock()
 	k, ok := n.getKey(key)
 	if !ok {
-		n.Unlock()
 		return 0
 	}
 	if k.Expiration != 0 {
-		n.Unlock()
 		return 0
 	}
 	k.Expiration = timestamp.UnixMilli()
 	k.changed.Store(true)
 	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
-	n.Unlock()
 	return 1
 }
 
 // ExpireAtXX the keys only when the key has an existing expiry
 func (n *Nodis) ExpireAtXX(key string, timestamp time.Time) int64 {
-	n.Lock()
 	k, ok := n.getKey(key)
 	if !ok {
-		n.Unlock()
 		return 0
 	}
 	if k.Expiration == 0 {
-		n.Unlock()
 		return 0
 	}
 	k.Expiration = timestamp.UnixMilli()
 	k.changed.Store(true)
 	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
-	n.Unlock()
 	return 1
 }
 
 // ExpireAtLT the keys only when the new expiry is less than current one
 func (n *Nodis) ExpireAtLT(key string, timestamp time.Time) int64 {
-	n.Lock()
 	k, ok := n.getKey(key)
 	if !ok {
-		n.Unlock()
 		return 0
 	}
 	if k.Expiration == 0 {
-		n.Unlock()
 		return 0
 	}
 	unix := timestamp.UnixMilli()
@@ -286,19 +246,15 @@ func (n *Nodis) ExpireAtLT(key string, timestamp time.Time) int64 {
 		k.Expiration = unix
 		k.changed.Store(true)
 		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
-		n.Unlock()
 		return 1
 	}
-	n.Unlock()
 	return 0
 }
 
 // ExpireAtGT the keys only when the new expiry is greater than current one
 func (n *Nodis) ExpireAtGT(key string, timestamp time.Time) int64 {
-	n.Lock()
 	k, ok := n.getKey(key)
 	if !ok {
-		n.Unlock()
 		return 0
 	}
 	unix := timestamp.UnixMilli()
@@ -309,16 +265,13 @@ func (n *Nodis) ExpireAtGT(key string, timestamp time.Time) int64 {
 		k.Expiration = unix
 		k.changed.Store(true)
 		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(k.Expiration))
-		n.Unlock()
 		return 1
 	}
-	n.Unlock()
 	return 0
 }
 
 // Keys gets the keys
 func (n *Nodis) Keys(pattern string) []string {
-	n.RLock()
 	keyMap := make(map[string]struct{})
 	n.keys.Scan(func(key string, k *Key) bool {
 		matched, _ := filepath.Match(pattern, key)
@@ -336,7 +289,6 @@ func (n *Nodis) Keys(pattern string) []string {
 		return true
 	})
 	n.store.RUnlock()
-	n.RUnlock()
 	var keys []string
 	for key := range keyMap {
 		keys = append(keys, key)
@@ -346,13 +298,10 @@ func (n *Nodis) Keys(pattern string) []string {
 
 // TTL gets the TTL
 func (n *Nodis) TTL(key string) time.Duration {
-	n.RLock()
 	k, ok := n.getKey(key)
 	if !ok {
-		n.RUnlock()
 		return 0
 	}
-	n.RUnlock()
 	if k.Expiration == 0 {
 		return 0
 	}
@@ -363,15 +312,12 @@ func (n *Nodis) TTL(key string) time.Duration {
 
 // Rename a key
 func (n *Nodis) Rename(key, key2 string) error {
-	n.Lock()
 	_, ok := n.getKey(key2)
 	if ok {
-		n.Unlock()
 		return errors.New("newKey exists")
 	}
 	v, ok := n.dataStructs.Get(key)
 	if !ok {
-		n.Unlock()
 		return errors.New("key does not exist")
 	}
 	n.dataStructs.Delete(key)
@@ -382,16 +328,13 @@ func (n *Nodis) Rename(key, key2 string) error {
 	n.notify(
 		pb.NewOp(pb.OpType_Rename, key).DstKey(key2),
 	)
-	n.Unlock()
 	return nil
 }
 
 // Type gets the type of key
 func (n *Nodis) Type(key string) string {
-	n.RLock()
 	k, ok := n.getKey(key)
 	if !ok {
-		n.RUnlock()
 		n.store.RLock()
 		v, err := n.store.get(key)
 		if err != nil || len(v) == 0 {
@@ -406,13 +349,11 @@ func (n *Nodis) Type(key string) string {
 		n.store.RUnlock()
 		return ds.DataTypeMap[d.Type()]
 	}
-	n.RUnlock()
 	return ds.DataTypeMap[k.Type]
 }
 
 // Scan the keys
 func (n *Nodis) Scan(cursor int64, match string, count int64) (int64, []string) {
-	n.RLock()
 	keys := make([]string, 0, n.keys.Len())
 	n.keys.Scan(func(key string, k *Key) bool {
 		matched, _ := filepath.Match(match, key)
@@ -421,7 +362,6 @@ func (n *Nodis) Scan(cursor int64, match string, count int64) (int64, []string) 
 		}
 		return true
 	})
-	n.RUnlock()
 	if len(keys) == 0 {
 		return 0, nil
 	}

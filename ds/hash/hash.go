@@ -3,7 +3,6 @@ package hash
 import (
 	"path/filepath"
 	"strconv"
-	"sync"
 	"unsafe"
 
 	"github.com/diiyw/nodis/ds"
@@ -12,7 +11,6 @@ import (
 )
 
 type HashMap struct {
-	sync.RWMutex
 	data btree.Map[string, []byte]
 }
 

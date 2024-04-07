@@ -1,10 +1,6 @@
 package ds
 
 type DataStruct interface {
-	Lock()
-	Unlock()
-	RLock()
-	RUnlock()
 	Type() DataType
 }
 
