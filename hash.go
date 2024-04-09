@@ -14,115 +14,127 @@ func (n *Nodis) newHash() ds.DataStruct {
 }
 
 func (n *Nodis) HSet(key string, field string, value []byte) {
-	k, h := n.getDs(key, n.newHash, 0)
-	k.changed.Store(true)
-	h.(*hash.HashMap).HSet(field, value)
+	tx := n.writeKey(key, n.newHash)
+	tx.ds.(*hash.HashMap).HSet(field, value)
+	tx.commit()
 	n.notify(pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
 }
 
 func (n *Nodis) HGet(key string, field string) []byte {
-	_, h := n.getDs(key, nil, 0)
-	if h == nil {
+	tx := n.readKey(key)
+	if !tx.isOk() {
 		return nil
 	}
-	return h.(*hash.HashMap).HGet(field)
+	defer tx.commit()
+	return tx.ds.(*hash.HashMap).HGet(field)
 }
 
 func (n *Nodis) HDel(key string, fields ...string) int64 {
-	k, h := n.getDs(key, nil, 0)
-	if h == nil {
+	tx := n.writeKey(key, nil)
+	if !tx.isOk() {
 		return 0
 	}
-	k.changed.Store(true)
-	h.(*hash.HashMap).HDel(fields...)
-	if h.(*hash.HashMap).HLen() == 0 {
-		n.dataStructs.Delete(key)
-		n.keys.Delete(key)
+	tx.ds.(*hash.HashMap).HDel(fields...)
+	if tx.ds.(*hash.HashMap).HLen() == 0 {
+		n.delKey(key)
 	}
+	tx.commit()
 	n.notify(pb.NewOp(pb.OpType_HDel, key).Fields(fields...))
 	return int64(len(fields))
 }
 
 func (n *Nodis) HLen(key string) int64 {
-	_, h := n.getDs(key, nil, 0)
-	if h == nil {
+	tx := n.readKey(key)
+	if !tx.isOk() {
 		return 0
 	}
-	return h.(*hash.HashMap).HLen()
+	v := tx.ds.(*hash.HashMap).HLen()
+	tx.commit()
+	return v
 }
 
 func (n *Nodis) HKeys(key string) []string {
-	_, h := n.getDs(key, nil, 0)
-	if h == nil {
+	tx := n.readKey(key)
+	if !tx.isOk() {
 		return nil
 	}
-	return h.(*hash.HashMap).HKeys()
+	v := tx.ds.(*hash.HashMap).HKeys()
+	tx.commit()
+	return v
 }
 
 func (n *Nodis) HExists(key string, field string) bool {
-	_, h := n.getDs(key, nil, 0)
-	if h == nil {
+	tx := n.readKey(key)
+	if !tx.isOk() {
 		return false
 	}
-	return h.(*hash.HashMap).HExists(field)
+	v := tx.ds.(*hash.HashMap).HExists(field)
+	tx.commit()
+	return v
 }
 
 func (n *Nodis) HGetAll(key string) map[string][]byte {
-	_, h := n.getDs(key, nil, 0)
-	if h == nil {
+	tx := n.readKey(key)
+	if !tx.isOk() {
 		return nil
 	}
-	return h.(*hash.HashMap).HGetAll()
+	v := tx.ds.(*hash.HashMap).HGetAll()
+	tx.commit()
+	return v
 }
 
 func (n *Nodis) HIncrBy(key string, field string, value int64) int64 {
-	k, h := n.getDs(key, n.newHash, 0)
-	k.changed.Store(true)
+	tx := n.writeKey(key, n.newHash)
+	v := tx.ds.(*hash.HashMap).HIncrBy(field, value)
+	tx.commit()
 	n.notify(pb.NewOp(pb.OpType_HIncrBy, key).Fields(field).IncrInt(value))
-	return h.(*hash.HashMap).HIncrBy(field, value)
+	return v
 }
 
 func (n *Nodis) HIncrByFloat(key string, field string, value float64) float64 {
-	k, h := n.getDs(key, n.newHash, 0)
-	k.changed.Store(true)
+	tx := n.writeKey(key, n.newHash)
+	v := tx.ds.(*hash.HashMap).HIncrByFloat(field, value)
+	tx.commit()
 	n.notify(pb.NewOp(pb.OpType_HIncrByFloat, key).Fields(field).IncrFloat(value))
-	return h.(*hash.HashMap).HIncrByFloat(field, value)
+	return v
 }
 
 func (n *Nodis) HSetNX(key string, field string, value []byte) bool {
-	_, h := n.getDs(key, nil, 0)
-	if h != nil && h.(*hash.HashMap).HExists(field) {
+	tx := n.writeKey(key, nil)
+	if tx.isOk() && tx.ds.(*hash.HashMap).HExists(field) {
+		tx.commit()
 		return false
 	}
-	h = n.newHash()
+	h := n.newHash()
 	n.dataStructs.Set(key, h)
-	k := newKey(h.Type(), 0)
-	k.lastUse.Store(time.Now().Unix())
+	k := newKey(h.Type())
+	k.lastUse = time.Now().Unix()
 	n.keys.Set(key, k)
-	k.changed.Store(true)
 	n.HSet(key, field, value)
-	n.notify(pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
+	tx.commit()
 	return true
 }
 
 func (n *Nodis) HMSet(key string, fields map[string][]byte) {
-	k, h := n.getDs(key, n.newHash, 0)
-	k.changed.Store(true)
+	tx := n.writeKey(key, n.newHash)
 	var ops = make([]*pb.Op, 0, len(fields))
 	for field, value := range fields {
-		h.(*hash.HashMap).HSet(field, value)
+		tx.ds.(*hash.HashMap).HSet(field, value)
 		ops = append(ops, pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
 	}
 	n.notify(ops...)
-	h.(*hash.HashMap).HMSet(fields)
+	tx.ds.(*hash.HashMap).HMSet(fields)
+	tx.commit()
 }
 
 func (n *Nodis) HMGet(key string, fields ...string) [][]byte {
-	_, h := n.getDs(key, nil, 0)
-	if h == nil {
+	tx := n.readKey(key)
+	if !tx.isOk() {
 		return nil
 	}
-	return h.(*hash.HashMap).HMGet(fields...)
+	v := tx.ds.(*hash.HashMap).HMGet(fields...)
+	tx.commit()
+	return v
 }
 
 func (n *Nodis) HClear(key string) {
@@ -130,17 +142,21 @@ func (n *Nodis) HClear(key string) {
 }
 
 func (n *Nodis) HScan(key string, cursor int64, match string, count int64) (int64, map[string][]byte) {
-	_, h := n.getDs(key, nil, 0)
-	if h == nil {
+	tx := n.readKey(key)
+	if !tx.isOk() {
 		return 0, nil
 	}
-	return h.(*hash.HashMap).HScan(cursor, match, count)
+	c, v := tx.ds.(*hash.HashMap).HScan(cursor, match, count)
+	tx.commit()
+	return c, v
 }
 
 func (n *Nodis) HVals(key string) [][]byte {
-	_, h := n.getDs(key, nil, 0)
-	if h == nil {
+	tx := n.readKey(key)
+	if !tx.isOk() {
 		return nil
 	}
-	return h.(*hash.HashMap).HVals()
+	v := tx.ds.(*hash.HashMap).HVals()
+	tx.commit()
+	return v
 }

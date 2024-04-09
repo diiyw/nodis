@@ -322,3 +322,10 @@ func (s *store) clear() error {
 	s.index.Clear()
 	return nil
 }
+
+func (s *store) exixts(key string) bool {
+	s.RLock()
+	defer s.RUnlock()
+	_, ok := s.index.Get(key)
+	return ok
+}

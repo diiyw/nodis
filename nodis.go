@@ -5,8 +5,8 @@ import (
 	"hash/crc32"
 	"log"
 	"os"
-	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"encoding/binary"
@@ -31,6 +31,7 @@ var (
 )
 
 type Nodis struct {
+	sync.RWMutex
 	dataStructs btree.Map[string, ds.DataStruct]
 	keys        btree.Map[string, *Key]
 	options     *Options
@@ -81,6 +82,100 @@ func Open(opt *Options) *Nodis {
 	return n
 }
 
+func (n *Nodis) writeKey(key string, newFn func() ds.DataStruct) *Tx {
+	k, ok := n.keys.Get(key)
+	if ok {
+		k.Lock()
+		if k.expired() {
+			if newFn == nil {
+				return emptyTx
+			}
+			k.Expiration = 0
+		}
+		n.Lock()
+		d, ok := n.dataStructs.Get(key)
+		if !ok {
+			if newFn == nil {
+				return emptyTx
+			}
+			d = newFn()
+			n.dataStructs.Set(key, d)
+		}
+		n.Unlock()
+		k.changed = true
+		return newTx(k, d, true)
+	}
+	tx := n.fromStore(key)
+	if !tx.isOk() && newFn != nil {
+		d := newFn()
+		if d == nil {
+			return emptyTx
+		}
+		n.Lock()
+		k = newKey(d.Type())
+		n.keys.Set(key, k)
+		k.Lock()
+		n.dataStructs.Set(key, d)
+		n.Unlock()
+		tx = newTx(k, d, true)
+	}
+	tx.writable = true
+	tx.markChanged()
+	return tx
+}
+
+func (n *Nodis) readKey(key string) *Tx {
+	k, ok := n.keys.Get(key)
+	if ok {
+		k.RLock()
+		if k.expired() {
+			n.delKey(key)
+			k.RUnlock()
+			return emptyTx
+		}
+		d, ok := n.dataStructs.Get(key)
+		if !ok {
+			k.RUnlock()
+			return emptyTx
+		}
+		return newTx(k, d, false)
+	}
+	if n.store.exixts(key) {
+		return n.fromStore(key)
+	}
+	return emptyTx
+}
+
+func (n *Nodis) delKey(key string) {
+	n.keys.Delete(key)
+	n.dataStructs.Delete(key)
+	n.store.remove(key)
+	n.notify(pb.NewOp(pb.OpType_Del, key))
+}
+
+func (n *Nodis) fromStore(key string) *Tx {
+	// try get from store
+	v, err := n.store.get(key)
+	if err == nil && len(v) > 0 {
+		key, d, expiration, err := n.parseDs(v)
+		if err != nil {
+			log.Println("Parse DataStruct:", err)
+			return emptyTx
+		}
+		if d != nil {
+			n.Lock()
+			n.dataStructs.Set(key, d)
+			k := newKey(d.Type())
+			k.Expiration = expiration
+			k.changed = false
+			n.keys.Set(key, k)
+			n.Unlock()
+			return newTx(k, d, false)
+		}
+	}
+	return emptyTx
+}
+
 // Snapshot saves the data to disk
 func (n *Nodis) Snapshot(path string) {
 	n.Recycle()
@@ -101,13 +196,12 @@ func (n *Nodis) Recycle() {
 			n.store.remove(key)
 			return true
 		}
-		lastUse := k.lastUse.Load()
-		if lastUse != 0 && lastUse <= recycleTime {
+		if k.lastUse != 0 && k.lastUse <= recycleTime {
 			d, ok := n.dataStructs.Get(key)
 			n.dataStructs.Delete(key)
 			n.keys.Delete(key)
 			if ok {
-				k.changed.Store(false)
+				k.changed = false
 				// save to disk
 				err := n.store.put(newEntry(key, d, k.Expiration))
 				if err != nil {
@@ -123,7 +217,7 @@ func (n *Nodis) Recycle() {
 func (n *Nodis) getChangedEntries() []*pb.Entry {
 	entries := make([]*pb.Entry, 0)
 	n.keys.Scan(func(key string, k *Key) bool {
-		if !k.changed.Load() || k.expired() {
+		if !k.changed || k.expired() {
 			return true
 		}
 		d, ok := n.dataStructs.Get(key)
@@ -148,27 +242,6 @@ func (n *Nodis) Close() error {
 	}
 	n.closed = true
 	return n.store.close()
-}
-
-func (n *Nodis) getDs(key string, newFn func() ds.DataStruct, seconds int64) (*Key, ds.DataStruct) {
-	k, ok := n.exists(key)
-	if !ok && newFn == nil {
-		return nil, nil
-	}
-	d, ok := n.dataStructs.Get(key)
-	if !ok {
-		if newFn != nil {
-			d = newFn()
-			n.dataStructs.Set(key, d)
-			k = newKey(d.Type(), seconds)
-			k.lastUse.Store(time.Now().UnixMilli())
-			n.keys.Set(key, k)
-			return k, d
-		}
-		return nil, nil
-	}
-	k.lastUse.Store(time.Now().UnixMilli())
-	return k, d
 }
 
 // Clear removes all keys from the store
@@ -204,11 +277,11 @@ func (n *Nodis) parseEntry(data []byte) (*pb.Entry, error) {
 
 // GetEntry gets an entity
 func (n *Nodis) GetEntry(key string) []byte {
-	k, d := n.getDs(key, nil, 0)
-	if d == nil {
+	tx := n.readKey(key)
+	if !tx.isOk() {
 		return nil
 	}
-	var entity = newEntry(key, d, k.Expiration)
+	var entity = newEntry(key, tx.ds, tx.key.Expiration)
 	data, _ := entity.Marshal()
 	return data
 }
@@ -371,7 +444,6 @@ func (n *Nodis) Subscribe(addr string) error {
 
 func (n *Nodis) Serve(addr string) error {
 	log.Println("Nodis listen on", addr)
-	runtime.GOMAXPROCS(1)
 	return redis.Serve(addr, func(cmd redis.Value, args []redis.Value) redis.Value {
 		c, ok := redisHandlers[strings.ToUpper(cmd.Bulk)]
 		if !ok {
