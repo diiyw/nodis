@@ -22,16 +22,17 @@ func (n *Nodis) HSet(key string, field string, value []byte) {
 
 func (n *Nodis) HGet(key string, field string) []byte {
 	tx := n.readKey(key)
+	defer tx.commit()
 	if !tx.isOk() {
 		return nil
 	}
-	defer tx.commit()
 	return tx.ds.(*hash.HashMap).HGet(field)
 }
 
 func (n *Nodis) HDel(key string, fields ...string) int64 {
 	tx := n.writeKey(key, nil)
 	if !tx.isOk() {
+		tx.commit()
 		return 0
 	}
 	tx.ds.(*hash.HashMap).HDel(fields...)
@@ -46,6 +47,7 @@ func (n *Nodis) HDel(key string, fields ...string) int64 {
 func (n *Nodis) HLen(key string) int64 {
 	tx := n.readKey(key)
 	if !tx.isOk() {
+		tx.commit()
 		return 0
 	}
 	v := tx.ds.(*hash.HashMap).HLen()
@@ -56,6 +58,7 @@ func (n *Nodis) HLen(key string) int64 {
 func (n *Nodis) HKeys(key string) []string {
 	tx := n.readKey(key)
 	if !tx.isOk() {
+		tx.commit()
 		return nil
 	}
 	v := tx.ds.(*hash.HashMap).HKeys()
@@ -66,6 +69,7 @@ func (n *Nodis) HKeys(key string) []string {
 func (n *Nodis) HExists(key string, field string) bool {
 	tx := n.readKey(key)
 	if !tx.isOk() {
+		tx.commit()
 		return false
 	}
 	v := tx.ds.(*hash.HashMap).HExists(field)
@@ -76,6 +80,7 @@ func (n *Nodis) HExists(key string, field string) bool {
 func (n *Nodis) HGetAll(key string) map[string][]byte {
 	tx := n.readKey(key)
 	if !tx.isOk() {
+		tx.commit()
 		return nil
 	}
 	v := tx.ds.(*hash.HashMap).HGetAll()
@@ -107,10 +112,10 @@ func (n *Nodis) HSetNX(key string, field string, value []byte) bool {
 	}
 	h := n.newHash()
 	n.dataStructs.Set(key, h)
-	k := newKey(h.Type())
+	k := newKey()
 	k.lastUse = time.Now().Unix()
 	n.keys.Set(key, k)
-	n.HSet(key, field, value)
+	h.(*hash.HashMap).HSet(field, value)
 	tx.commit()
 	return true
 }
@@ -130,6 +135,7 @@ func (n *Nodis) HMSet(key string, fields map[string][]byte) {
 func (n *Nodis) HMGet(key string, fields ...string) [][]byte {
 	tx := n.readKey(key)
 	if !tx.isOk() {
+		tx.commit()
 		return nil
 	}
 	v := tx.ds.(*hash.HashMap).HMGet(fields...)
@@ -144,6 +150,7 @@ func (n *Nodis) HClear(key string) {
 func (n *Nodis) HScan(key string, cursor int64, match string, count int64) (int64, map[string][]byte) {
 	tx := n.readKey(key)
 	if !tx.isOk() {
+		tx.commit()
 		return 0, nil
 	}
 	c, v := tx.ds.(*hash.HashMap).HScan(cursor, match, count)
@@ -154,6 +161,7 @@ func (n *Nodis) HScan(key string, cursor int64, match string, count int64) (int6
 func (n *Nodis) HVals(key string) [][]byte {
 	tx := n.readKey(key)
 	if !tx.isOk() {
+		tx.commit()
 		return nil
 	}
 	v := tx.ds.(*hash.HashMap).HVals()

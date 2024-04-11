@@ -23,6 +23,7 @@ func (n *Nodis) SAdd(key string, members ...string) int64 {
 func (n *Nodis) SCard(key string) int64 {
 	tx := n.writeKey(key, nil)
 	if !tx.isOk() {
+		tx.commit()
 		return 0
 	}
 	v := tx.ds.(*set.Set).SCard()
@@ -37,6 +38,7 @@ func (n *Nodis) SDiff(keys ...string) []string {
 	}
 	tx := n.readKey(keys[0])
 	if !tx.isOk() {
+		tx.commit()
 		return nil
 	}
 	lockedKeys := []*Tx{}
@@ -64,6 +66,7 @@ func (n *Nodis) SInter(keys ...string) []string {
 	}
 	tx := n.readKey(keys[0])
 	if !tx.isOk() {
+		tx.commit()
 		return nil
 	}
 	lockedSets := []*Tx{}
@@ -88,6 +91,7 @@ func (n *Nodis) SInter(keys ...string) []string {
 func (n *Nodis) SIsMember(key, member string) bool {
 	tx := n.readKey(key)
 	if !tx.isOk() {
+		tx.commit()
 		return false
 	}
 	v := tx.ds.(*set.Set).SIsMember(member)
@@ -99,6 +103,7 @@ func (n *Nodis) SIsMember(key, member string) bool {
 func (n *Nodis) SMembers(key string) []string {
 	tx := n.readKey(key)
 	if !tx.isOk() {
+		tx.commit()
 		return nil
 	}
 	v := tx.ds.(*set.Set).SMembers()
@@ -110,6 +115,7 @@ func (n *Nodis) SMembers(key string) []string {
 func (n *Nodis) SRem(key string, members ...string) int64 {
 	tx := n.writeKey(key, nil)
 	if !tx.isOk() {
+		tx.commit()
 		return 0
 	}
 	v := tx.ds.(*set.Set).SRem(members...)
@@ -122,6 +128,7 @@ func (n *Nodis) SRem(key string, members ...string) int64 {
 func (n *Nodis) SScan(key string, cursor int64, match string, count int64) (int64, []string) {
 	tx := n.readKey(key)
 	if !tx.isOk() {
+		tx.commit()
 		return 0, nil
 	}
 	c, v := tx.ds.(*set.Set).SScan(cursor, match, count)
@@ -133,6 +140,7 @@ func (n *Nodis) SScan(key string, cursor int64, match string, count int64) (int6
 func (n *Nodis) SPop(key string, count int64) []string {
 	tx := n.writeKey(key, nil)
 	if !tx.isOk() {
+		tx.commit()
 		return nil
 	}
 	if count == 0 {

@@ -6,6 +6,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const (
@@ -306,6 +307,7 @@ func (v Value) marshallMap() []byte {
 // Writer
 
 type Writer struct {
+	sync.RWMutex
 	writer io.Writer
 }
 
@@ -315,8 +317,9 @@ func NewWriter(w io.Writer) *Writer {
 
 func (w *Writer) Write(v Value) error {
 	var bytes = v.Marshal()
-
+	w.Lock()
 	_, err := w.writer.Write(bytes)
+	w.Unlock()
 	if err != nil {
 		return err
 	}

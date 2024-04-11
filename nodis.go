@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"encoding/binary"
@@ -31,13 +32,13 @@ var (
 )
 
 type Nodis struct {
-	sync.RWMutex
 	dataStructs btree.Map[string, ds.DataStruct]
 	keys        btree.Map[string, *Key]
 	options     *Options
 	store       *store
-	closed      bool
+	closed      atomic.Bool
 	watchers    []*watch.Watcher
+	locks       []*sync.RWMutex
 }
 
 func Open(opt *Options) *Nodis {
@@ -47,8 +48,15 @@ func Open(opt *Options) *Nodis {
 	if opt.Filesystem == nil {
 		opt.Filesystem = &fs.Memory{}
 	}
+	if opt.LockPoolSize == 0 {
+		opt.LockPoolSize = 10240
+	}
 	n := &Nodis{
 		options: opt,
+		locks:   make([]*sync.RWMutex, opt.LockPoolSize),
+	}
+	for i := 0; i < opt.LockPoolSize; i++ {
+		n.locks[i] = &sync.RWMutex{}
 	}
 	isDir, err := opt.Filesystem.IsDir(opt.Path)
 	if err != nil {
@@ -82,68 +90,78 @@ func Open(opt *Options) *Nodis {
 	return n
 }
 
+func fnv32(key string) uint32 {
+	hash := uint32(2166136261)
+	for i := 0; i < len(key); i++ {
+		hash *= 16777619
+		hash ^= uint32(key[i])
+	}
+	return hash
+}
+
+func (n *Nodis) spread(hashCode uint32) *sync.RWMutex {
+	tableSize := uint32(n.options.LockPoolSize)
+	return n.locks[(tableSize-1)&hashCode]
+}
+
+func (n *Nodis) getLocker(key string) *sync.RWMutex {
+	return n.spread(fnv32(key))
+}
+
 func (n *Nodis) writeKey(key string, newFn func() ds.DataStruct) *Tx {
+	locker := n.getLocker(key)
+	locker.Lock()
 	k, ok := n.keys.Get(key)
 	if ok {
-		k.Lock()
 		if k.expired() {
 			if newFn == nil {
-				return emptyTx
+				return newEmptyTx(locker, true)
 			}
-			k.Expiration = 0
+			k.expiration = 0
 		}
-		n.Lock()
 		d, ok := n.dataStructs.Get(key)
 		if !ok {
 			if newFn == nil {
-				return emptyTx
+				return newEmptyTx(locker, true)
 			}
 			d = newFn()
 			n.dataStructs.Set(key, d)
 		}
-		n.Unlock()
 		k.changed = true
-		return newTx(k, d, true)
+		return newTx(k, d, true, locker)
 	}
-	tx := n.fromStore(key)
-	if !tx.isOk() && newFn != nil {
-		d := newFn()
-		if d == nil {
-			return emptyTx
+	tx := n.fromStore(key, true, locker)
+	if !tx.isOk() {
+		if newFn != nil {
+			d := newFn()
+			if d == nil {
+				return newEmptyTx(locker, true)
+			}
+			k = newKey()
+			n.keys.Set(key, k)
+			n.dataStructs.Set(key, d)
+			tx = newTx(k, d, true, locker)
+			tx.markChanged()
 		}
-		n.Lock()
-		k = newKey(d.Type())
-		n.keys.Set(key, k)
-		k.Lock()
-		n.dataStructs.Set(key, d)
-		n.Unlock()
-		tx = newTx(k, d, true)
 	}
-	tx.writable = true
-	tx.markChanged()
 	return tx
 }
 
 func (n *Nodis) readKey(key string) *Tx {
+	locker := n.getLocker(key)
+	locker.RLock()
 	k, ok := n.keys.Get(key)
 	if ok {
-		k.RLock()
 		if k.expired() {
-			n.delKey(key)
-			k.RUnlock()
-			return emptyTx
+			return newEmptyTx(locker, false)
 		}
 		d, ok := n.dataStructs.Get(key)
 		if !ok {
-			k.RUnlock()
-			return emptyTx
+			return newEmptyTx(locker, false)
 		}
-		return newTx(k, d, false)
+		return newTx(k, d, false, locker)
 	}
-	if n.store.exixts(key) {
-		return n.fromStore(key)
-	}
-	return emptyTx
+	return n.fromStore(key, false, locker)
 }
 
 func (n *Nodis) delKey(key string) {
@@ -153,27 +171,24 @@ func (n *Nodis) delKey(key string) {
 	n.notify(pb.NewOp(pb.OpType_Del, key))
 }
 
-func (n *Nodis) fromStore(key string) *Tx {
+func (n *Nodis) fromStore(key string, writable bool, locker *sync.RWMutex) *Tx {
 	// try get from store
 	v, err := n.store.get(key)
 	if err == nil && len(v) > 0 {
 		key, d, expiration, err := n.parseDs(v)
 		if err != nil {
 			log.Println("Parse DataStruct:", err)
-			return emptyTx
+			return newEmptyTx(locker, writable)
 		}
 		if d != nil {
-			n.Lock()
 			n.dataStructs.Set(key, d)
-			k := newKey(d.Type())
-			k.Expiration = expiration
-			k.changed = false
+			k := newKey()
+			k.expiration = expiration
 			n.keys.Set(key, k)
-			n.Unlock()
-			return newTx(k, d, false)
+			return newTx(k, d, writable, locker)
 		}
 	}
-	return emptyTx
+	return newEmptyTx(locker, writable)
 }
 
 // Snapshot saves the data to disk
@@ -184,12 +199,15 @@ func (n *Nodis) Snapshot(path string) {
 
 // Recycle removes expired and unused keys
 func (n *Nodis) Recycle() {
-	if n.closed {
+	if n.closed.Load() {
 		return
 	}
 	now := time.Now().UnixMilli()
 	recycleTime := now - n.options.RecycleDuration.Milliseconds()
 	n.keys.Scan(func(key string, k *Key) bool {
+		locker := n.getLocker(key)
+		locker.Lock()
+		defer locker.Unlock()
 		if k.expired() {
 			n.dataStructs.Delete(key)
 			n.keys.Delete(key)
@@ -203,7 +221,7 @@ func (n *Nodis) Recycle() {
 			if ok {
 				k.changed = false
 				// save to disk
-				err := n.store.put(newEntry(key, d, k.Expiration))
+				err := n.store.put(newEntry(key, d, k.expiration))
 				if err != nil {
 					log.Println("Recycle: ", err)
 				}
@@ -224,7 +242,7 @@ func (n *Nodis) getChangedEntries() []*pb.Entry {
 		if !ok {
 			return true
 		}
-		entries = append(entries, newEntry(key, d, k.Expiration))
+		entries = append(entries, newEntry(key, d, k.expiration))
 		return true
 	})
 	return entries
@@ -240,7 +258,7 @@ func (n *Nodis) Close() error {
 			return err
 		}
 	}
-	n.closed = true
+	n.closed.Store(true)
 	return n.store.close()
 }
 
@@ -279,9 +297,11 @@ func (n *Nodis) parseEntry(data []byte) (*pb.Entry, error) {
 func (n *Nodis) GetEntry(key string) []byte {
 	tx := n.readKey(key)
 	if !tx.isOk() {
+		tx.commit()
 		return nil
 	}
-	var entity = newEntry(key, tx.ds, tx.key.Expiration)
+	var entity = newEntry(key, tx.ds, tx.key.expiration)
+	tx.commit()
 	data, _ := entity.Marshal()
 	return data
 }

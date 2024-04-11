@@ -35,10 +35,14 @@ type Options struct {
 
 	// Synchronizer is the synchronizer to use. The default is nil and no synchronization is performed.
 	Synchronizer sync.Synchronizer
+
+	// LockPoolSize is the key locks pool size
+	LockPoolSize int
 }
 
 var DefaultOptions = &Options{
 	Path:            "data",
 	FileSize:        FileSizeGB,
 	RecycleDuration: 60 * time.Second,
+	LockPoolSize:    10240,
 }

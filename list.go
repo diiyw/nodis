@@ -36,6 +36,7 @@ func (n *Nodis) RPush(key string, values ...[]byte) int64 {
 func (n *Nodis) LPop(key string, count int64) [][]byte {
 	tx := n.writeKey(key, nil)
 	if !tx.isOk() {
+		tx.commit()
 		return nil
 	}
 	v := tx.ds.(*list.DoublyLinkedList).LPop(count)
@@ -50,6 +51,7 @@ func (n *Nodis) LPop(key string, count int64) [][]byte {
 func (n *Nodis) RPop(key string, count int64) [][]byte {
 	tx := n.writeKey(key, nil)
 	if !tx.isOk() {
+		tx.commit()
 		return nil
 	}
 	v := tx.ds.(*list.DoublyLinkedList).RPop(count)
@@ -64,6 +66,7 @@ func (n *Nodis) RPop(key string, count int64) [][]byte {
 func (n *Nodis) LLen(key string) int64 {
 	tx := n.readKey(key)
 	if !tx.isOk() {
+		tx.commit()
 		return 0
 	}
 	v := tx.ds.(*list.DoublyLinkedList).LLen()
@@ -74,6 +77,7 @@ func (n *Nodis) LLen(key string) int64 {
 func (n *Nodis) LIndex(key string, index int64) []byte {
 	tx := n.readKey(key)
 	if !tx.isOk() {
+		tx.commit()
 		return nil
 	}
 	v := tx.ds.(*list.DoublyLinkedList).LIndex(index)
@@ -108,6 +112,7 @@ func (n *Nodis) RPushX(key string, data []byte) int64 {
 func (n *Nodis) LRem(key string, count int64, data []byte) int64 {
 	tx := n.writeKey(key, nil)
 	if !tx.isOk() {
+		tx.commit()
 		return 0
 	}
 	v := tx.ds.(*list.DoublyLinkedList).LRem(count, data)
@@ -127,6 +132,7 @@ func (n *Nodis) LSet(key string, index int64, data []byte) bool {
 func (n *Nodis) LTrim(key string, start, stop int64) {
 	tx := n.writeKey(key, nil)
 	if !tx.isOk() {
+		tx.commit()
 		return
 	}
 	tx.ds.(*list.DoublyLinkedList).LTrim(start, stop)
@@ -136,6 +142,7 @@ func (n *Nodis) LTrim(key string, start, stop int64) {
 func (n *Nodis) LRange(key string, start, stop int64) [][]byte {
 	tx := n.readKey(key)
 	if !tx.isOk() {
+		tx.commit()
 		return nil
 	}
 	v := tx.ds.(*list.DoublyLinkedList).LRange(start, stop)
@@ -146,6 +153,7 @@ func (n *Nodis) LRange(key string, start, stop int64) [][]byte {
 func (n *Nodis) LPopRPush(source, destination string) []byte {
 	tx := n.writeKey(source, nil)
 	if !tx.isOk() {
+		tx.commit()
 		return nil
 	}
 	v := tx.ds.(*list.DoublyLinkedList).LPop(1)
@@ -166,6 +174,7 @@ func (n *Nodis) LPopRPush(source, destination string) []byte {
 func (n *Nodis) RPopLPush(source, destination string) []byte {
 	tx := n.writeKey(source, nil)
 	if !tx.isOk() {
+		tx.commit()
 		return nil
 	}
 	v := tx.ds.(*list.DoublyLinkedList).RPop(1)
@@ -184,23 +193,27 @@ func (n *Nodis) RPopLPush(source, destination string) []byte {
 }
 
 func (n *Nodis) BLPop(key string, timeout time.Duration) []byte {
-	tx := n.writeKey(key, n.newList)
-	v := tx.ds.(*list.DoublyLinkedList).BLPop(timeout)
-	if tx.ds.(*list.DoublyLinkedList).LLen() == 0 {
-		n.delKey(key)
+	results := n.LPop(key, 1)
+	if results == nil {
+		time.Sleep(timeout)
 	}
-	tx.commit()
+	results = n.LPop(key, 1)
+	if results == nil {
+		return nil
+	}
 	n.notify(pb.NewOp(pb.OpType_LPop, key))
-	return v
+	return results[0]
 }
 
 func (n *Nodis) BRPop(key string, timeout time.Duration) []byte {
-	tx := n.writeKey(key, n.newList)
-	v := tx.ds.(*list.DoublyLinkedList).BRPop(timeout)
-	if tx.ds.(*list.DoublyLinkedList).LLen() == 0 {
-		n.delKey(key)
+	results := n.RPop(key, 1)
+	if results == nil {
+		time.Sleep(timeout)
 	}
-	tx.commit()
+	results = n.RPop(key, 1)
+	if results == nil {
+		return nil
+	}
 	n.notify(pb.NewOp(pb.OpType_RPop, key))
-	return v
+	return results[0]
 }

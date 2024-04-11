@@ -2,7 +2,6 @@ package list
 
 import (
 	"bytes"
-	"time"
 
 	"github.com/diiyw/nodis/ds"
 )
@@ -147,30 +146,6 @@ func (l *DoublyLinkedList) size() int64 {
 // LLen returns the length of the list
 func (l *DoublyLinkedList) LLen() int64 {
 	return l.length
-}
-
-// BLPop removes and returns the first element of the list
-func (l *DoublyLinkedList) BLPop(timeout time.Duration) []byte {
-	if l.head == nil {
-		time.Sleep(timeout)
-	}
-	result := l.LPop(1)
-	if len(result) == 0 {
-		return nil
-	}
-	return result[0]
-}
-
-// BRPop removes and returns the last element of the list
-func (l *DoublyLinkedList) BRPop(timeout time.Duration) []byte {
-	if l.tail == nil {
-		time.Sleep(timeout)
-	}
-	result := l.RPop(1)
-	if len(result) == 0 {
-		return nil
-	}
-	return result[0]
 }
 
 // LIndex returns the element at index in the list

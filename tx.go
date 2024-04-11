@@ -1,25 +1,36 @@
 package nodis
 
 import (
+	"sync"
+
 	"github.com/diiyw/nodis/ds"
 )
 
 type Tx struct {
+	locker   *sync.RWMutex
 	key      *Key
 	ds       ds.DataStruct
 	ok       bool
 	writable bool
 }
 
-var emptyTx = &Tx{ok: false}
-
-func newTx(key *Key, d ds.DataStruct, writable bool) *Tx {
+func newEmptyTx(locker *sync.RWMutex, writable bool) *Tx {
 	return &Tx{
+		locker:   locker,
+		ok:       false,
+		writable: writable,
+	}
+}
+
+func newTx(key *Key, d ds.DataStruct, writable bool, locker *sync.RWMutex) *Tx {
+	tx := &Tx{
+		locker:   locker,
 		key:      key,
 		ds:       d,
 		writable: writable,
 		ok:       true,
 	}
+	return tx
 }
 
 func (t *Tx) isOk() bool {
@@ -33,11 +44,9 @@ func (t *Tx) markChanged() {
 }
 
 func (t *Tx) commit() {
-	if t.ok {
-		if t.writable {
-			t.key.Unlock()
-		} else {
-			t.key.RUnlock()
-		}
+	if t.writable {
+		t.locker.Unlock()
+	} else {
+		t.locker.RUnlock()
 	}
 }
