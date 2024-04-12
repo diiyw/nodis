@@ -91,12 +91,12 @@ func Open(opt *Options) *Nodis {
 }
 
 func fnv32(key string) uint32 {
-	hash := uint32(2166136261)
+	h := uint32(2166136261)
 	for i := 0; i < len(key); i++ {
-		hash *= 16777619
-		hash ^= uint32(key[i])
+		h *= 16777619
+		h ^= uint32(key[i])
 	}
-	return hash
+	return h
 }
 
 func (n *Nodis) spread(hashCode uint32) *sync.RWMutex {
@@ -465,7 +465,7 @@ func (n *Nodis) Subscribe(addr string) error {
 func (n *Nodis) Serve(addr string) error {
 	log.Println("Nodis listen on", addr)
 	return redis.Serve(addr, func(cmd redis.Value, args []redis.Value) redis.Value {
-		c, ok := redisHandlers[strings.ToUpper(cmd.Bulk)]
+		c, ok := redisCommands[strings.ToUpper(cmd.Bulk)]
 		if !ok {
 			return redis.ErrorValue("Unsupported command")
 		}

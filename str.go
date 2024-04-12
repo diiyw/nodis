@@ -74,7 +74,7 @@ func (n *Nodis) SetXX(key string, value []byte) bool {
 
 // Get a key
 func (n *Nodis) Get(key string) []byte {
-	meta := n.writeKey(key, nil)
+	meta := n.readKey(key)
 	if !meta.isOk() {
 		meta.commit()
 		return nil
