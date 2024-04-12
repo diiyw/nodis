@@ -22,8 +22,13 @@ func Serve(addr string, handler func(cmd Value, args []Value) Value) error {
 }
 
 func handleConn(conn net.Conn, handler func(cmd Value, args []Value) Value) {
-	defer conn.Close()
 	writer := NewWriter(conn)
+	defer func() {
+		if r := recover(); r != nil {
+			_ = writer.Write(ErrorValue(r.(error).Error()))
+		}
+		conn.Close()
+	}()
 	resp := NewResp(conn)
 	for {
 		value, err := resp.Read()
@@ -40,14 +45,12 @@ func handleConn(conn net.Conn, handler func(cmd Value, args []Value) Value) {
 			log.Println("Invalid request, expected array length > 0")
 			continue
 		}
-		go func() {
-			cmd := value.Array[0]
-			cmd.Options = value.Options
-			cmd.Args = value.Args
-			args := value.Array[1:]
+		cmd := value.Array[0]
+		cmd.Options = value.Options
+		cmd.Args = value.Args
+		args := value.Array[1:]
 
-			result := handler(cmd, args)
-			_ = writer.Write(result)
-		}()
+		result := handler(cmd, args)
+		_ = writer.Write(result)
 	}
 }

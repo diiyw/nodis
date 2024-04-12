@@ -108,58 +108,58 @@ func (n *Nodis) getLocker(key string) *sync.RWMutex {
 	return n.spread(fnv32(key))
 }
 
-func (n *Nodis) writeKey(key string, newFn func() ds.DataStruct) *Tx {
+func (n *Nodis) writeKey(key string, newFn func() ds.DataStruct) *metadata {
 	locker := n.getLocker(key)
 	locker.Lock()
 	k, ok := n.keys.Get(key)
 	if ok {
 		if k.expired() {
 			if newFn == nil {
-				return newEmptyTx(locker, true)
+				return newEmptyMetadata(locker, true)
 			}
 			k.expiration = 0
 		}
 		d, ok := n.dataStructs.Get(key)
 		if !ok {
 			if newFn == nil {
-				return newEmptyTx(locker, true)
+				return newEmptyMetadata(locker, true)
 			}
 			d = newFn()
 			n.dataStructs.Set(key, d)
 		}
 		k.changed = true
-		return newTx(k, d, true, locker)
+		return newMetadata(k, d, true, locker)
 	}
-	tx := n.fromStore(key, true, locker)
-	if !tx.isOk() {
+	meta := n.fromStore(key, true, locker)
+	if !meta.isOk() {
 		if newFn != nil {
 			d := newFn()
 			if d == nil {
-				return newEmptyTx(locker, true)
+				return newEmptyMetadata(locker, true)
 			}
 			k = newKey()
 			n.keys.Set(key, k)
 			n.dataStructs.Set(key, d)
-			tx = newTx(k, d, true, locker)
-			tx.markChanged()
+			meta = newMetadata(k, d, true, locker)
+			meta.markChanged()
 		}
 	}
-	return tx
+	return meta
 }
 
-func (n *Nodis) readKey(key string) *Tx {
+func (n *Nodis) readKey(key string) *metadata {
 	locker := n.getLocker(key)
 	locker.RLock()
 	k, ok := n.keys.Get(key)
 	if ok {
 		if k.expired() {
-			return newEmptyTx(locker, false)
+			return newEmptyMetadata(locker, false)
 		}
 		d, ok := n.dataStructs.Get(key)
 		if !ok {
-			return newEmptyTx(locker, false)
+			return newEmptyMetadata(locker, false)
 		}
-		return newTx(k, d, false, locker)
+		return newMetadata(k, d, false, locker)
 	}
 	return n.fromStore(key, false, locker)
 }
@@ -171,24 +171,24 @@ func (n *Nodis) delKey(key string) {
 	n.notify(pb.NewOp(pb.OpType_Del, key))
 }
 
-func (n *Nodis) fromStore(key string, writable bool, locker *sync.RWMutex) *Tx {
+func (n *Nodis) fromStore(key string, writable bool, locker *sync.RWMutex) *metadata {
 	// try get from store
 	v, err := n.store.get(key)
 	if err == nil && len(v) > 0 {
 		key, d, expiration, err := n.parseDs(v)
 		if err != nil {
 			log.Println("Parse DataStruct:", err)
-			return newEmptyTx(locker, writable)
+			return newEmptyMetadata(locker, writable)
 		}
 		if d != nil {
 			n.dataStructs.Set(key, d)
 			k := newKey()
 			k.expiration = expiration
 			n.keys.Set(key, k)
-			return newTx(k, d, writable, locker)
+			return newMetadata(k, d, writable, locker)
 		}
 	}
-	return newEmptyTx(locker, writable)
+	return newEmptyMetadata(locker, writable)
 }
 
 // Snapshot saves the data to disk
@@ -295,13 +295,13 @@ func (n *Nodis) parseEntry(data []byte) (*pb.Entry, error) {
 
 // GetEntry gets an entity
 func (n *Nodis) GetEntry(key string) []byte {
-	tx := n.readKey(key)
-	if !tx.isOk() {
-		tx.commit()
+	meta := n.readKey(key)
+	if !meta.isOk() {
+		meta.commit()
 		return nil
 	}
-	var entity = newEntry(key, tx.ds, tx.key.expiration)
-	tx.commit()
+	var entity = newEntry(key, meta.ds, meta.key.expiration)
+	meta.commit()
 	data, _ := entity.Marshal()
 	return data
 }
