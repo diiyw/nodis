@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"encoding/binary"
@@ -32,11 +31,12 @@ var (
 )
 
 type Nodis struct {
+	sync.RWMutex
 	dataStructs btree.Map[string, ds.DataStruct]
 	keys        btree.Map[string, *Key]
 	options     *Options
 	store       *store
-	closed      atomic.Bool
+	closed      bool
 	watchers    []*watch.Watcher
 	locks       []*sync.RWMutex
 }
@@ -109,11 +109,13 @@ func (n *Nodis) getLocker(key string) *sync.RWMutex {
 }
 
 func (n *Nodis) writeKey(key string, newFn func() ds.DataStruct) *metadata {
+	n.Lock()
+	defer n.Unlock()
 	locker := n.getLocker(key)
 	locker.Lock()
 	k, ok := n.keys.Get(key)
 	if ok {
-		if k.expired() {
+		if k.expired(time.Now().UnixMilli()) {
 			if newFn == nil {
 				return newEmptyMetadata(locker, true)
 			}
@@ -140,6 +142,7 @@ func (n *Nodis) writeKey(key string, newFn func() ds.DataStruct) *metadata {
 			k = newKey()
 			n.keys.Set(key, k)
 			n.dataStructs.Set(key, d)
+			n.store.put(newEntry(key, d, k.expiration))
 			meta = newMetadata(k, d, true, locker)
 			meta.markChanged()
 		}
@@ -152,7 +155,7 @@ func (n *Nodis) readKey(key string) *metadata {
 	locker.RLock()
 	k, ok := n.keys.Get(key)
 	if ok {
-		if k.expired() {
+		if k.expired(time.Now().UnixMilli()) {
 			return newEmptyMetadata(locker, false)
 		}
 		d, ok := n.dataStructs.Get(key)
@@ -199,7 +202,9 @@ func (n *Nodis) Snapshot(path string) {
 
 // Recycle removes expired and unused keys
 func (n *Nodis) Recycle() {
-	if n.closed.Load() {
+	n.Lock()
+	defer n.Unlock()
+	if n.closed {
 		return
 	}
 	now := time.Now().UnixMilli()
@@ -208,7 +213,7 @@ func (n *Nodis) Recycle() {
 		locker := n.getLocker(key)
 		locker.Lock()
 		defer locker.Unlock()
-		if k.expired() {
+		if k.expired(time.Now().UnixMilli()) {
 			n.dataStructs.Delete(key)
 			n.keys.Delete(key)
 			n.store.remove(key)
@@ -235,7 +240,7 @@ func (n *Nodis) Recycle() {
 func (n *Nodis) getChangedEntries() []*pb.Entry {
 	entries := make([]*pb.Entry, 0)
 	n.keys.Scan(func(key string, k *Key) bool {
-		if !k.changed || k.expired() {
+		if !k.changed || k.expired(time.Now().UnixMilli()) {
 			return true
 		}
 		d, ok := n.dataStructs.Get(key)
@@ -250,6 +255,8 @@ func (n *Nodis) getChangedEntries() []*pb.Entry {
 
 // Close the store
 func (n *Nodis) Close() error {
+	n.Lock()
+	defer n.Unlock()
 	// save values to disk
 	entries := n.getChangedEntries()
 	for _, entry := range entries {
@@ -258,7 +265,7 @@ func (n *Nodis) Close() error {
 			return err
 		}
 	}
-	n.closed.Store(true)
+	n.closed = true
 	return n.store.close()
 }
 

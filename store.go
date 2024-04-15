@@ -80,6 +80,13 @@ type index struct {
 	fileId     uint16
 }
 
+func (i *index) expired(now int64) bool {
+	if i == nil {
+		return false
+	}
+	return i.expiration != 0 && i.expiration <= now
+}
+
 // marshal index to bytes
 func (i *index) marshal() []byte {
 	var b [22]byte

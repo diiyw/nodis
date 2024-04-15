@@ -1,6 +1,7 @@
 package nodis
 
 import (
+	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ var redisHandlers = map[string]func(*Nodis, redis.Value, []redis.Value) redis.Va
 	"CONFIG":           config,
 	"PING":             ping,
 	"QUIT":             quit,
+	"FLUSHDB":          flushdb,
 	"INFO":             info,
 	"DEL":              del,
 	"EXISTS":           exists,
@@ -122,10 +124,22 @@ func config(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 }
 
 func info(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
+	memStats := runtime.MemStats{}
+	runtime.ReadMemStats(&memStats)
+	usedMemory := strconv.FormatUint(memStats.Sys, 10)
+	pid := strconv.Itoa(os.Getpid())
 	return redis.BulkValue(`# Server
 redis_version:6.0.0
 nodis_version:1.3.0
-os:` + runtime.GOOS)
+os:` + runtime.GOOS + `
+process_id:` + pid + `# Memory
+used_memory:` + usedMemory)
+}
+
+func flushdb(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
+	n.Clear()
+	return redis.StringValue("OK")
+
 }
 
 func quit(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {

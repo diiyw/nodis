@@ -21,7 +21,7 @@ func (n *Nodis) SAdd(key string, members ...string) int64 {
 
 // SCard gets the set members count.
 func (n *Nodis) SCard(key string) int64 {
-	meta := n.writeKey(key, nil)
+	meta := n.readKey(key)
 	if !meta.isOk() {
 		meta.commit()
 		return 0

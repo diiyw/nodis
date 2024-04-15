@@ -21,11 +21,11 @@ func newKey() *Key {
 	return k
 }
 
-func (k *Key) expired() bool {
+func (k *Key) expired(now int64) bool {
 	if k == nil {
 		return false
 	}
-	return k.expiration != 0 && k.expiration <= time.Now().UnixMilli()
+	return k.expiration != 0 && k.expiration <= now
 }
 
 // Del a key
@@ -261,9 +261,10 @@ func (n *Nodis) ExpireAtGT(key string, timestamp time.Time) int64 {
 // Keys gets the keys
 func (n *Nodis) Keys(pattern string) []string {
 	keyMap := make(map[string]struct{})
+	now := time.Now().UnixMilli()
 	n.keys.Scan(func(key string, k *Key) bool {
 		matched, _ := filepath.Match(pattern, key)
-		if matched && !k.expired() {
+		if matched && !k.expired(now) {
 			keyMap[key] = struct{}{}
 		}
 		return true
@@ -286,7 +287,7 @@ func (n *Nodis) Keys(pattern string) []string {
 
 // TTL gets the TTL
 func (n *Nodis) TTL(key string) time.Duration {
-	meta := n.writeKey(key, nil)
+	meta := n.readKey(key)
 	if !meta.isOk() {
 		meta.commit()
 		return 0
@@ -348,9 +349,10 @@ func (n *Nodis) Type(key string) string {
 // Scan the keys
 func (n *Nodis) Scan(cursor int64, match string, count int64) (int64, []string) {
 	keys := make([]string, 0, n.keys.Len())
-	n.keys.Scan(func(key string, k *Key) bool {
+	now := time.Now().UnixMilli()
+	n.store.index.Scan(func(key string, idx *index) bool {
 		matched, _ := filepath.Match(match, key)
-		if matched && !k.expired() {
+		if matched && !idx.expired(now) {
 			keys = append(keys, key)
 		}
 		return true
