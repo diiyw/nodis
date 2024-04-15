@@ -10,7 +10,7 @@ import (
 	"github.com/diiyw/nodis/redis"
 )
 
-var redisHandlers = map[string]func(*Nodis, redis.Value, []redis.Value) redis.Value{
+var redisCommands = map[string]func(*Nodis, redis.Value, []redis.Value) redis.Value{
 	"CLIENT":           client,
 	"CONFIG":           config,
 	"PING":             ping,
