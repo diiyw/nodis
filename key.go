@@ -348,6 +348,7 @@ func (n *Nodis) Type(key string) string {
 
 // Scan the keys
 func (n *Nodis) Scan(cursor int64, match string, count int64) (int64, []string) {
+	n.Recycle()
 	keys := make([]string, 0, n.keys.Len())
 	now := time.Now().UnixMilli()
 	n.store.index.Scan(func(key string, idx *index) bool {

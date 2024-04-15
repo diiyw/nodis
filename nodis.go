@@ -142,7 +142,6 @@ func (n *Nodis) writeKey(key string, newFn func() ds.DataStruct) *metadata {
 			k = newKey()
 			n.keys.Set(key, k)
 			n.dataStructs.Set(key, d)
-			n.store.put(newEntry(key, d, k.expiration))
 			meta = newMetadata(k, d, true, locker)
 			meta.markChanged()
 		}
@@ -213,7 +212,7 @@ func (n *Nodis) Recycle() {
 		locker := n.getLocker(key)
 		locker.Lock()
 		defer locker.Unlock()
-		if k.expired(time.Now().UnixMilli()) {
+		if k.expired(now) {
 			n.dataStructs.Delete(key)
 			n.keys.Delete(key)
 			n.store.remove(key)
@@ -239,8 +238,12 @@ func (n *Nodis) Recycle() {
 // getChangedEntries returns all keys that have been getChangedEntries
 func (n *Nodis) getChangedEntries() []*pb.Entry {
 	entries := make([]*pb.Entry, 0)
+	now := time.Now().UnixMilli()
 	n.keys.Scan(func(key string, k *Key) bool {
-		if !k.changed || k.expired(time.Now().UnixMilli()) {
+		locker := n.getLocker(key)
+		locker.RLock()
+		defer locker.RUnlock()
+		if !k.changed || k.expired(now) {
 			return true
 		}
 		d, ok := n.dataStructs.Get(key)

@@ -37,7 +37,7 @@ It is a simple and easy to embed in your application.
 ```
 Or use test version
 ```bash
- go get github.com/diiyw/nodis@v1.5.0-beta.5
+ go get github.com/diiyw/nodis@v1.5.0-beta.6
 ```
 ```go
 package main
