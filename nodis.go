@@ -239,7 +239,7 @@ func (n *Nodis) Subscribe(addr string) error {
 func (n *Nodis) Serve(addr string) error {
 	log.Println("Nodis listen on", addr)
 	return redis.Serve(addr, func(cmd redis.Value, args []redis.Value) redis.Value {
-		c, ok := redisCommands[strings.ToUpper(cmd.Bulk)]
+		c, ok := redisCommands.Get(strings.ToUpper(cmd.Bulk))
 		if !ok {
 			return redis.ErrorValue("Unsupported command")
 		}

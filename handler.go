@@ -1,6 +1,7 @@
 package nodis
 
 import (
+	"github.com/tidwall/btree"
 	"os"
 	"runtime"
 	"strconv"
@@ -10,82 +11,84 @@ import (
 	"github.com/diiyw/nodis/redis"
 )
 
-var redisCommands = map[string]func(*Nodis, redis.Value, []redis.Value) redis.Value{
-	"CLIENT":           client,
-	"CONFIG":           config,
-	"PING":             ping,
-	"QUIT":             quit,
-	"FLUSHDB":          flushdb,
-	"INFO":             info,
-	"DEL":              del,
-	"EXISTS":           exists,
-	"EXPIRE":           expire,
-	"EXPIREAT":         expireAt,
-	"KEYS":             keys,
-	"TTL":              ttl,
-	"RENAME":           rename,
-	"TYPE":             typ,
-	"SCAN":             scan,
-	"SET":              setString,
-	"GET":              getString,
-	"INCR":             incr,
-	"DESR":             decr,
-	"SETBIT":           setBit,
-	"GETBIT":           getBit,
-	"BITCOUNT":         bitCount,
-	"SADD":             sAdd,
-	"SSCAN":            sScan,
-	"SCARD":            scard,
-	"SPOP":             sPop,
-	"SDIFF":            sDiff,
-	"SINTER":           sInter,
-	"SISMEMBER":        sIsMember,
-	"SMEMBERS":         sMembers,
-	"SREM":             sRem,
-	"HSET":             hSet,
-	"HGET":             hGet,
-	"HDEL":             hDel,
-	"HLEN":             hLen,
-	"HKEYS":            hKeys,
-	"HEXISTS":          hExists,
-	"HGETALL":          hGetAll,
-	"HINCRBY":          hIncrBy,
-	"HINCRBYFLOAT":     hIncrByFloat,
-	"HSETNX":           hSetNX,
-	"HMGET":            hMGet,
-	"HMSET":            hMSet,
-	"HCLEAR":           hClear,
-	"HSCAN":            hScan,
-	"HVALS":            hVals,
-	"LPUSH":            lPush,
-	"RPUSH":            rPush,
-	"LPOP":             lPop,
-	"RPOP":             rPop,
-	"LLEN":             llen,
-	"LINDEX":           lIndex,
-	"LINSERT":          lInsert,
-	"LPUSHX":           lPushx,
-	"RPUSHX":           rPushx,
-	"LREM":             lRem,
-	"LSET":             lSet,
-	"LRANGE":           lRange,
-	"LPOPRPUSH":        lPopRPush,
-	"RPOPLPUSH":        rPopLPush,
-	"ZADD":             zAdd,
-	"ZCARD":            zCard,
-	"ZRANK":            zRank,
-	"ZREVRANK":         zRevRank,
-	"ZSCORE":           zScore,
-	"ZINCRBY":          zIncrBy,
-	"ZRANGE":           zRange,
-	"ZREVRANGE":        zRevRange,
-	"ZRANGEBYSCORE":    zRangeByScore,
-	"ZREVRANGEBYSCORE": zRevRangeByScore,
-	"ZREM":             zRem,
-	"ZREMRANGEBYRANK":  zRemRangeByRank,
-	"ZREMRANGEBYSCORE": zRemRangeByScore,
-	"ZCLEAR":           zClear,
-	"ZEXISTS":          zExists,
+var redisCommands btree.Map[string, func(*Nodis, redis.Value, []redis.Value) redis.Value]
+
+func init() {
+	redisCommands.Set("CLIENT", client)
+	redisCommands.Set("CONFIG", config)
+	redisCommands.Set("PING", ping)
+	redisCommands.Set("QUIT", quit)
+	redisCommands.Set("FLUSHDB", flushdb)
+	redisCommands.Set("INFO", info)
+	redisCommands.Set("DEL", del)
+	redisCommands.Set("EXISTS", exists)
+	redisCommands.Set("EXPIRE", expire)
+	redisCommands.Set("EXPIREAT", expireAt)
+	redisCommands.Set("KEYS", keys)
+	redisCommands.Set("TTL", ttl)
+	redisCommands.Set("RENAME", rename)
+	redisCommands.Set("TYPE", typ)
+	redisCommands.Set("SCAN", scan)
+	redisCommands.Set("SET", setString)
+	redisCommands.Set("GET", getString)
+	redisCommands.Set("INCR", incr)
+	redisCommands.Set("DESR", decr)
+	redisCommands.Set("SETBIT", setBit)
+	redisCommands.Set("GETBIT", getBit)
+	redisCommands.Set("BITCOUNT", bitCount)
+	redisCommands.Set("SADD", sAdd)
+	redisCommands.Set("SSCAN", sScan)
+	redisCommands.Set("SCARD", scard)
+	redisCommands.Set("SPOP", sPop)
+	redisCommands.Set("SDIFF", sDiff)
+	redisCommands.Set("SINTER", sInter)
+	redisCommands.Set("SISMEMBER", sIsMember)
+	redisCommands.Set("SMEMBERS", sMembers)
+	redisCommands.Set("SREM", sRem)
+	redisCommands.Set("HSET", hSet)
+	redisCommands.Set("HGET", hGet)
+	redisCommands.Set("HDEL", hDel)
+	redisCommands.Set("HLEN", hLen)
+	redisCommands.Set("HKEYS", hKeys)
+	redisCommands.Set("HEXISTS", hExists)
+	redisCommands.Set("HGETALL", hGetAll)
+	redisCommands.Set("HINCRBY", hIncrBy)
+	redisCommands.Set("HINCRBYFLOAT", hIncrByFloat)
+	redisCommands.Set("HSETNX", hSetNX)
+	redisCommands.Set("HMGET", hMGet)
+	redisCommands.Set("HMSET", hMSet)
+	redisCommands.Set("HCLEAR", hClear)
+	redisCommands.Set("HSCAN", hScan)
+	redisCommands.Set("HVALS", hVals)
+	redisCommands.Set("LPUSH", lPush)
+	redisCommands.Set("RPUSH", rPush)
+	redisCommands.Set("LPOP", lPop)
+	redisCommands.Set("RPOP", rPop)
+	redisCommands.Set("LLEN", llen)
+	redisCommands.Set("LINDEX", lIndex)
+	redisCommands.Set("LINSERT", lInsert)
+	redisCommands.Set("LPUSHX", lPushx)
+	redisCommands.Set("RPUSHX", rPushx)
+	redisCommands.Set("LREM", lRem)
+	redisCommands.Set("LSET", lSet)
+	redisCommands.Set("LRANGE", lRange)
+	redisCommands.Set("LPOPRPUSH", lPopRPush)
+	redisCommands.Set("RPOPLPUSH", rPopLPush)
+	redisCommands.Set("ZADD", zAdd)
+	redisCommands.Set("ZCARD", zCard)
+	redisCommands.Set("ZRANK", zRank)
+	redisCommands.Set("ZREVRANK", zRevRank)
+	redisCommands.Set("ZSCORE", zScore)
+	redisCommands.Set("ZINCRBY", zIncrBy)
+	redisCommands.Set("ZRANGE", zRange)
+	redisCommands.Set("ZREVRANGE", zRevRange)
+	redisCommands.Set("ZRANGEBYSCORE", zRangeByScore)
+	redisCommands.Set("ZREVRANGEBYSCORE", zRevRangeByScore)
+	redisCommands.Set("ZREM", zRem)
+	redisCommands.Set("ZREMRANGEBYRANK", zRemRangeByRank)
+	redisCommands.Set("ZREMRANGEBYSCORE", zRemRangeByScore)
+	redisCommands.Set("ZCLEAR", zClear)
+	redisCommands.Set("ZEXISTS", zExists)
 }
 
 func client(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
