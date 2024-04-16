@@ -138,16 +138,16 @@ Linux VM: 2C/8GB
 goos: linux
 goarch: amd64
 pkg: github.com/diiyw/nodis/bench             
-BenchmarkSet-2        	 1000000	      1359 ns/op	     223 B/op	       4 allocs/op
-BenchmarkGet-2        	 4724623	     214.9 ns/op	       7 B/op	       0 allocs/op
-BenchmarkLPush-2      	 1000000	      1422 ns/op	     271 B/op	       5 allocs/op
-BenchmarkLPop-2       	17787996	     71.42 ns/op	       8 B/op	       1 allocs/op
-BenchmarkSAdd-2       	 1000000	      1669 ns/op	     335 B/op	       6 allocs/op
-BenchmarkSMembers-2   	 5861822	     178.0 ns/op	       8 B/op	       1 allocs/op
-BenchmarkZAdd-2       	 1000000	      1625 ns/op	     214 B/op	       7 allocs/op
-BenchmarkZRank-2      	 5033864	     207.4 ns/op	       7 B/op	       0 allocs/op
-BenchmarkHSet-2       	  939238	      1782 ns/op	     399 B/op	       7 allocs/op
-BenchmarkHGet-2       	 6019508	     197.3 ns/op	       7 B/op	       0 allocs/op
+BenchmarkSet-2        	  750900	      1828 ns/op	     591 B/op	       8 allocs/op
+BenchmarkGet-2        	 4765485	       247.9 ns/op	      55 B/op	       1 allocs/op
+BenchmarkLPush-2      	  851473	      1866 ns/op	     663 B/op	      10 allocs/op
+BenchmarkLPop-2       	18313623	        56.78 ns/op	      49 B/op	       1 allocs/op
+BenchmarkSAdd-2       	  857107	      2231 ns/op	     710 B/op	      11 allocs/op
+BenchmarkSMembers-2   	 4297828	       306.2 ns/op	      56 B/op	       2 allocs/op
+BenchmarkZAdd-2       	  788445	      2082 ns/op	     598 B/op	      11 allocs/op
+BenchmarkZRank-2      	 3196694	       329.8 ns/op	      55 B/op	       1 allocs/op
+BenchmarkHSet-2       	  823741	      2200 ns/op	     790 B/op	      12 allocs/op
+BenchmarkHGet-2       	 4493481	       290.2 ns/op	      55 B/op	       1 allocs/op
 ```
 
 ## Note
