@@ -6,15 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/pb"
 )
 
 func TestNodis_Open(t *testing.T) {
 	opt := Options{
-		Path:            "testdata",
-		RecycleDuration: 60 * time.Second,
-		FileSize:        FileSizeGB,
+		Path:         "testdata",
+		TidyDuration: 60 * time.Second,
+		FileSize:     FileSizeGB,
 	}
 	got := Open(&opt)
 	if got == nil {
@@ -22,62 +21,12 @@ func TestNodis_Open(t *testing.T) {
 	}
 }
 
-func TestNodis_Sync(t *testing.T) {
+func TestNodis_OpenAndCloseBigdata10000(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	opt := Options{
-		Path:            "testdata",
-		RecycleDuration: 60 * time.Second,
-		FileSize:        FileSizeGB,
-	}
-	n := Open(&opt)
-	n.Set("test", []byte("test1"))
-	keys := n.getChangedEntries()
-	if keys == nil {
-		t.Errorf("Sync() = %v, want %v", keys, nil)
-	}
-	_ = n.Close()
-}
-
-func TestNodis_OpenAndSync(t *testing.T) {
-	_ = os.RemoveAll("testdata")
-	opt := &Options{
-		Path: "testdata",
-	}
-	n := Open(opt)
-	n.Set("set", []byte("set"))
-	n.ZAdd("zset", "zset", 1)
-	n.HSet("hset", "hset", []byte("hset"))
-	n.LPush("lpush", []byte("lpush"))
-	keys := n.getChangedEntries()
-	if keys == nil {
-		t.Errorf("Sync() = %v, want %v", keys, nil)
-	}
-	_ = n.Close()
-	n = Open(opt)
-	v := n.Get("set")
-	if v == nil {
-		t.Errorf("Get() = %s, want %v", v, "set")
-	}
-	s := n.ZScore("zset", "zset")
-	if s != 1 {
-		t.Errorf("ZScore() = %v, want %v", v, 1)
-	}
-	v = n.HGet("hset", "hset")
-	if v == nil {
-		t.Errorf("HGet() = %s, want %v", v, "hset")
-	}
-	v = n.LPop("lpush", 1)[0]
-	if v == nil {
-		t.Errorf("LPop() = %s, want %v", v, "lpush")
-	}
-}
-
-func TestNodis_OpenAndSyncBigdata10000(t *testing.T) {
-	_ = os.RemoveAll("testdata")
-	opt := Options{
-		Path:            "testdata",
-		RecycleDuration: 60 * time.Second,
-		FileSize:        FileSizeGB,
+		Path:         "testdata",
+		TidyDuration: 60 * time.Second,
+		FileSize:     FileSizeGB,
 	}
 	n := Open(&opt)
 	for i := 0; i < 10000; i++ {
@@ -151,11 +100,11 @@ func TestNodis_SnapshotChanged(t *testing.T) {
 	_ = n.Close()
 }
 
-func TestNodis_Recycle(t *testing.T) {
+func TestNodis_Tidy(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	opt := &Options{
-		Path:            "testdata",
-		RecycleDuration: time.Second,
+		Path:         "testdata",
+		TidyDuration: time.Second,
 	}
 	n := Open(opt)
 	n.SetEX("test", []byte("test"), 1)
@@ -165,7 +114,7 @@ func TestNodis_Recycle(t *testing.T) {
 		t.Errorf("Get() = %v, want %v", v, nil)
 	}
 	n.SetEX("test", []byte("test"), 5)
-	// load from disk
+	// load from storage
 	time.Sleep(2 * time.Second)
 	v = n.Get("test")
 	if v == nil {
@@ -281,27 +230,6 @@ func TestNodis_SetEntity(t *testing.T) {
 	}
 }
 
-func TestNodis_parseDs(t *testing.T) {
-	_ = os.RemoveAll("testdata")
-	opt := &Options{
-		Path: "testdata",
-	}
-	n := Open(opt)
-	n.Set("test", []byte("test"))
-	data := n.GetEntry("test")
-	k, d, _, err := n.parseDs(data)
-	if err != nil {
-		t.Errorf("parseDs() = %v, want %v", err, nil)
-	}
-	if k != "test" {
-		t.Errorf("parseDs() = %v, want %v", k, "test")
-	}
-	if d.Type() != ds.String {
-		t.Errorf("parseDs() = %v, want %v", d.Type(), ds.String)
-	}
-	_ = n.Close()
-}
-
 func TestNodis_Watch(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	opt := &Options{
@@ -333,4 +261,38 @@ func TestNodis_UnWatch(t *testing.T) {
 	n.UnWatch(id)
 	n.Set("test", []byte("test_new"))
 	time.Sleep(time.Second)
+}
+
+func TestNodis_OpenAndClose(t *testing.T) {
+	_ = os.RemoveAll("testdata")
+	opt := &Options{
+		Path: "testdata",
+	}
+	n := Open(opt)
+	n.Set("str", []byte("set"))
+	n.ZAdd("zset", "zset", 1)
+	n.HSet("hset", "hset", []byte("hset"))
+	n.LPush("lpush", []byte("lpush"))
+	n.SAdd("set", "set")
+	_ = n.Close()
+	n = Open(opt)
+	v := n.Get("str")
+	if v == nil {
+		t.Errorf("Get() = %s, want %v", v, "set")
+	}
+	s := n.ZScore("zset", "zset")
+	if s != 1 {
+		t.Errorf("ZScore() = %v, want %v", v, 1)
+	}
+	v = n.HGet("hset", "hset")
+	if v == nil {
+		t.Errorf("HGet() = %s, want %v", v, "hset")
+	}
+	if !n.SIsMember("set", "set") {
+		t.Errorf("SIsMember() = %v, want %v", false, true)
+	}
+	v = n.LPop("lpush", 1)[0]
+	if v == nil {
+		t.Errorf("LPop() = %s, want %v", v, "lpush")
+	}
 }

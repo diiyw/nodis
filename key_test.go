@@ -11,8 +11,8 @@ import (
 func TestKey_Expire(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:            "testdata",
-		RecycleDuration: 60 * time.Second,
+		Path:         "testdata",
+		TidyDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"))
 	n.Expire("test", 2)
@@ -42,8 +42,8 @@ func TestKey_ExpireXX(t *testing.T) {
 func TestKey_ExpireNX(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:            "testdata",
-		RecycleDuration: 60 * time.Second,
+		Path:         "testdata",
+		TidyDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"))
 	n.ExpireNX("test", 2)
@@ -60,8 +60,8 @@ func TestKey_ExpireNX(t *testing.T) {
 func TestKey_ExpireLT(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:            "testdata",
-		RecycleDuration: 60 * time.Second,
+		Path:         "testdata",
+		TidyDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"))
 	v := n.ExpireLT("test", 2)
@@ -78,8 +78,8 @@ func TestKey_ExpireLT(t *testing.T) {
 func TestKey_ExpireGT(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:            "testdata",
-		RecycleDuration: 60 * time.Second,
+		Path:         "testdata",
+		TidyDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"))
 	v := n.ExpireGT("test", 2)
@@ -96,8 +96,8 @@ func TestKey_ExpireGT(t *testing.T) {
 func TestKey_ExpireAt(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:            "testdata",
-		RecycleDuration: 60 * time.Second,
+		Path:         "testdata",
+		TidyDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"))
 	n.ExpireAt("test", time.Now().Add(2*time.Second))
@@ -111,8 +111,8 @@ func TestKey_ExpireAt(t *testing.T) {
 func TestKey_TTL(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:            "testdata",
-		RecycleDuration: 60 * time.Second,
+		Path:         "testdata",
+		TidyDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"))
 	n.Expire("test", 300)
@@ -130,8 +130,8 @@ func TestKey_TTL(t *testing.T) {
 func TestKey_Rename(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:            "testdata",
-		RecycleDuration: 60 * time.Second,
+		Path:         "testdata",
+		TidyDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"))
 	n.Rename("test", "test2")
@@ -148,8 +148,8 @@ func TestKey_Rename(t *testing.T) {
 func TestKey_Keys(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:            "testdata",
-		RecycleDuration: 60 * time.Second,
+		Path:         "testdata",
+		TidyDuration: 60 * time.Second,
 	})
 	n.Set("test1", []byte("test1"))
 	n.Set("test2", []byte("test2"))
@@ -163,9 +163,9 @@ func TestKey_Keys(t *testing.T) {
 func TestKey_Type(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:            "testdata",
-		RecycleDuration: 60 * time.Second,
-		Filesystem:      &fs.Disk{},
+		Path:         "testdata",
+		TidyDuration: 60 * time.Second,
+		Filesystem:   &fs.Disk{},
 	})
 	n.Set("test1", []byte("test1"))
 	n.LPush("test2", []byte("test2"))
@@ -192,9 +192,9 @@ func TestKey_Type(t *testing.T) {
 		t.Fatalf("Close() = %v, want %v", err, nil)
 	}
 	n = Open(&Options{
-		Path:            "testdata",
-		RecycleDuration: 60 * time.Second,
-		Filesystem:      &fs.Disk{},
+		Path:         "testdata",
+		TidyDuration: 60 * time.Second,
+		Filesystem:   &fs.Disk{},
 	})
 	if n.Type("test1") != "string" {
 		t.Errorf("Type() = %v, want %v", n.Type("test1"), "string")
@@ -216,8 +216,8 @@ func TestKey_Type(t *testing.T) {
 func TestKey_Scan(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:            "testdata",
-		RecycleDuration: 60 * time.Second,
+		Path:         "testdata",
+		TidyDuration: 60 * time.Second,
 	})
 	n.Set("test1", []byte("test1"))
 	n.Set("test2", []byte("test2"))
@@ -271,8 +271,8 @@ func TestKey_Scan(t *testing.T) {
 func TestKey_Exists(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:            "testdata",
-		RecycleDuration: 60 * time.Second,
+		Path:         "testdata",
+		TidyDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"))
 	if n.Exists("test") != 1 {

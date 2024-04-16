@@ -1,6 +1,7 @@
 package nodis
 
 import (
+	"encoding/binary"
 	"errors"
 	"path/filepath"
 	"time"
@@ -12,6 +13,9 @@ import (
 type Key struct {
 	expiration int64
 	lastUse    int64
+	offset     int64
+	size       uint32
+	fileId     uint16
 	changed    bool
 }
 
@@ -28,16 +32,34 @@ func (k *Key) expired(now int64) bool {
 	return k.expiration != 0 && k.expiration <= now
 }
 
+// marshal index to bytes
+func (k *Key) marshal() []byte {
+	var b [22]byte
+	binary.LittleEndian.PutUint64(b[0:8], uint64(k.offset))
+	binary.LittleEndian.PutUint64(b[8:16], uint64(k.expiration))
+	binary.LittleEndian.PutUint32(b[16:20], k.size)
+	binary.LittleEndian.PutUint16(b[20:22], k.fileId)
+	return b[:]
+}
+
+// unmarshal bytes to index
+func (k *Key) unmarshal(b []byte) {
+	k.offset = int64(binary.LittleEndian.Uint64(b[0:8]))
+	k.expiration = int64(binary.LittleEndian.Uint64(b[8:16]))
+	k.size = binary.LittleEndian.Uint32(b[16:20])
+	k.fileId = binary.LittleEndian.Uint16(b[20:22])
+}
+
 // Del a key
 func (n *Nodis) Del(keys ...string) int64 {
 	var c int64 = 0
 	for _, key := range keys {
-		meta := n.writeKey(key, nil)
+		meta := n.store.writeKey(key, nil)
 		if !meta.isOk() {
 			meta.commit()
 			continue
 		}
-		n.delKey(key)
+		n.store.delKey(key)
 		c++
 		meta.commit()
 	}
@@ -47,7 +69,7 @@ func (n *Nodis) Del(keys ...string) int64 {
 func (n *Nodis) Exists(keys ...string) int64 {
 	var num int64
 	for _, key := range keys {
-		meta := n.readKey(key)
+		meta := n.store.readKey(key)
 		if meta.isOk() {
 			num++
 		}
@@ -61,7 +83,7 @@ func (n *Nodis) Expire(key string, seconds int64) int64 {
 	if seconds == 0 {
 		return n.Del(key)
 	}
-	meta := n.writeKey(key, nil)
+	meta := n.store.writeKey(key, nil)
 	if !meta.isOk() {
 		meta.commit()
 		return 0
@@ -80,7 +102,7 @@ func (n *Nodis) ExpirePX(key string, milliseconds int64) int64 {
 	if milliseconds == 0 {
 		return n.Del(key)
 	}
-	meta := n.writeKey(key, nil)
+	meta := n.store.writeKey(key, nil)
 	if !meta.isOk() {
 		meta.commit()
 		return 0
@@ -96,7 +118,7 @@ func (n *Nodis) ExpirePX(key string, milliseconds int64) int64 {
 
 // ExpireNX the keys only when the key has no expiry
 func (n *Nodis) ExpireNX(key string, seconds int64) int64 {
-	meta := n.writeKey(key, nil)
+	meta := n.store.writeKey(key, nil)
 	if !meta.isOk() {
 		meta.commit()
 		return 0
@@ -112,7 +134,7 @@ func (n *Nodis) ExpireNX(key string, seconds int64) int64 {
 
 // ExpireXX the keys only when the key has an existing expiry
 func (n *Nodis) ExpireXX(key string, seconds int64) int64 {
-	meta := n.writeKey(key, nil)
+	meta := n.store.writeKey(key, nil)
 	if !meta.isOk() {
 		meta.commit()
 		return 0
@@ -129,7 +151,7 @@ func (n *Nodis) ExpireXX(key string, seconds int64) int64 {
 
 // ExpireLT the keys only when the new expiry is less than current one
 func (n *Nodis) ExpireLT(key string, seconds int64) int64 {
-	meta := n.writeKey(key, nil)
+	meta := n.store.writeKey(key, nil)
 	if !meta.isOk() {
 		meta.commit()
 		return 0
@@ -151,7 +173,7 @@ func (n *Nodis) ExpireLT(key string, seconds int64) int64 {
 
 // ExpireGT the keys only when the new expiry is greater than current one
 func (n *Nodis) ExpireGT(key string, seconds int64) int64 {
-	meta := n.writeKey(key, nil)
+	meta := n.store.writeKey(key, nil)
 	if !meta.isOk() {
 		meta.commit()
 		return 0
@@ -173,7 +195,7 @@ func (n *Nodis) ExpireGT(key string, seconds int64) int64 {
 
 // ExpireAt the keys
 func (n *Nodis) ExpireAt(key string, timestamp time.Time) int64 {
-	meta := n.writeKey(key, nil)
+	meta := n.store.writeKey(key, nil)
 	if !meta.isOk() {
 		meta.commit()
 		return 0
@@ -186,7 +208,7 @@ func (n *Nodis) ExpireAt(key string, timestamp time.Time) int64 {
 
 // ExpireAtNX the keys only when the key has no expiry
 func (n *Nodis) ExpireAtNX(key string, timestamp time.Time) int64 {
-	meta := n.writeKey(key, nil)
+	meta := n.store.writeKey(key, nil)
 	if !meta.isOk() {
 		meta.commit()
 		return 0
@@ -203,7 +225,7 @@ func (n *Nodis) ExpireAtNX(key string, timestamp time.Time) int64 {
 
 // ExpireAtXX the keys only when the key has an existing expiry
 func (n *Nodis) ExpireAtXX(key string, timestamp time.Time) int64 {
-	meta := n.writeKey(key, nil)
+	meta := n.store.writeKey(key, nil)
 	if !meta.isOk() {
 		meta.commit()
 		return 0
@@ -220,7 +242,7 @@ func (n *Nodis) ExpireAtXX(key string, timestamp time.Time) int64 {
 
 // ExpireAtLT the keys only when the new expiry is less than current one
 func (n *Nodis) ExpireAtLT(key string, timestamp time.Time) int64 {
-	meta := n.writeKey(key, nil)
+	meta := n.store.writeKey(key, nil)
 	if !meta.isOk() {
 		meta.commit()
 		return 0
@@ -241,7 +263,7 @@ func (n *Nodis) ExpireAtLT(key string, timestamp time.Time) int64 {
 
 // ExpireAtGT the keys only when the new expiry is greater than current one
 func (n *Nodis) ExpireAtGT(key string, timestamp time.Time) int64 {
-	meta := n.writeKey(key, nil)
+	meta := n.store.writeKey(key, nil)
 	if !meta.isOk() {
 		meta.commit()
 		return 0
@@ -260,34 +282,23 @@ func (n *Nodis) ExpireAtGT(key string, timestamp time.Time) int64 {
 
 // Keys gets the keys
 func (n *Nodis) Keys(pattern string) []string {
-	keyMap := make(map[string]struct{})
+	var keys []string
 	now := time.Now().UnixMilli()
-	n.keys.Scan(func(key string, k *Key) bool {
+	n.store.RLock()
+	n.store.keys.Scan(func(key string, k *Key) bool {
 		matched, _ := filepath.Match(pattern, key)
 		if matched && !k.expired(now) {
-			keyMap[key] = struct{}{}
-		}
-		return true
-	})
-	n.store.RLock()
-	n.store.index.Scan(func(key string, _ *index) bool {
-		matched, _ := filepath.Match(pattern, key)
-		if matched {
-			keyMap[key] = struct{}{}
+			keys = append(keys, key)
 		}
 		return true
 	})
 	n.store.RUnlock()
-	var keys []string
-	for key := range keyMap {
-		keys = append(keys, key)
-	}
 	return keys
 }
 
 // TTL gets the TTL
 func (n *Nodis) TTL(key string) time.Duration {
-	meta := n.readKey(key)
+	meta := n.store.readKey(key)
 	if !meta.isOk() {
 		meta.commit()
 		return 0
@@ -304,19 +315,19 @@ func (n *Nodis) TTL(key string) time.Duration {
 
 // Rename a key
 func (n *Nodis) Rename(key, key2 string) error {
-	meta := n.writeKey(key, nil)
+	meta := n.store.writeKey(key, nil)
 	if !meta.isOk() {
 		meta.commit()
 		return errors.New("newKey exists")
 	}
-	v, ok := n.dataStructs.Get(key)
+	v, ok := n.store.values.Get(key)
 	if !ok {
 		return errors.New("key does not exist")
 	}
-	tx2 := n.writeKey(key2, nil)
-	n.delKey(key)
-	n.dataStructs.Set(key2, v)
-	n.keys.Set(key2, newKey())
+	tx2 := n.store.writeKey(key2, nil)
+	n.store.delKey(key)
+	n.store.values.Set(key2, v)
+	n.store.keys.Set(key2, newKey())
 	meta.commit()
 	tx2.commit()
 	n.notify(pb.NewOp(pb.OpType_Rename, key).DstKey(key2))
@@ -325,22 +336,10 @@ func (n *Nodis) Rename(key, key2 string) error {
 
 // Type gets the type of key
 func (n *Nodis) Type(key string) string {
-	meta := n.readKey(key)
+	meta := n.store.readKey(key)
 	if !meta.isOk() {
 		meta.commit()
-		n.store.RLock()
-		v, err := n.store.get(key)
-		if err != nil || len(v) == 0 {
-			n.store.RUnlock()
-			return "none"
-		}
-		_, d, _, err := n.parseDs(v)
-		if err != nil {
-			n.store.RUnlock()
-			return "none"
-		}
-		n.store.RUnlock()
-		return ds.DataTypeMap[d.Type()]
+		return "none"
 	}
 	meta.commit()
 	return ds.DataTypeMap[meta.ds.Type()]
@@ -348,12 +347,11 @@ func (n *Nodis) Type(key string) string {
 
 // Scan the keys
 func (n *Nodis) Scan(cursor int64, match string, count int64) (int64, []string) {
-	n.Recycle()
-	keys := make([]string, 0, n.keys.Len())
+	keys := make([]string, 0)
 	now := time.Now().UnixMilli()
-	n.store.index.Scan(func(key string, idx *index) bool {
+	n.store.keys.Scan(func(key string, k *Key) bool {
 		matched, _ := filepath.Match(match, key)
-		if matched && !idx.expired(now) {
+		if matched && !k.expired(now) {
 			keys = append(keys, key)
 		}
 		return true

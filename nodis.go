@@ -2,28 +2,17 @@ package nodis
 
 import (
 	"errors"
-	"hash/crc32"
 	"log"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
-	"encoding/binary"
-
-	"github.com/diiyw/nodis/ds"
-	"github.com/diiyw/nodis/ds/hash"
-	"github.com/diiyw/nodis/ds/list"
-	"github.com/diiyw/nodis/ds/set"
-	"github.com/diiyw/nodis/ds/str"
-	"github.com/diiyw/nodis/ds/zset"
 	"github.com/diiyw/nodis/fs"
 	"github.com/diiyw/nodis/pb"
 	"github.com/diiyw/nodis/redis"
 	nSync "github.com/diiyw/nodis/sync"
 	"github.com/diiyw/nodis/watch"
-	"github.com/tidwall/btree"
-	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -32,13 +21,9 @@ var (
 
 type Nodis struct {
 	sync.RWMutex
-	dataStructs btree.Map[string, ds.DataStruct]
-	keys        btree.Map[string, *Key]
-	options     *Options
-	store       *store
-	closed      bool
-	watchers    []*watch.Watcher
-	locks       []*sync.RWMutex
+	options  *Options
+	store    *store
+	watchers []*watch.Watcher
 }
 
 func Open(opt *Options) *Nodis {
@@ -53,10 +38,6 @@ func Open(opt *Options) *Nodis {
 	}
 	n := &Nodis{
 		options: opt,
-		locks:   make([]*sync.RWMutex, opt.LockPoolSize),
-	}
-	for i := 0; i < opt.LockPoolSize; i++ {
-		n.locks[i] = &sync.RWMutex{}
 	}
 	isDir, err := opt.Filesystem.IsDir(opt.Path)
 	if err != nil {
@@ -69,12 +50,12 @@ func Open(opt *Options) *Nodis {
 	} else if !isDir {
 		panic("Path is not a directory")
 	}
-	n.store = newStore(opt.Path, opt.FileSize, opt.Filesystem)
+	n.store = newStore(opt.Path, opt.FileSize, opt.LockPoolSize, opt.Filesystem)
 	go func() {
-		if opt.RecycleDuration != 0 {
+		if opt.TidyDuration != 0 {
 			for {
-				time.Sleep(opt.RecycleDuration)
-				n.Recycle()
+				time.Sleep(opt.TidyDuration)
+				n.store.tidy(opt.TidyDuration.Milliseconds())
 			}
 		}
 	}()
@@ -90,192 +71,18 @@ func Open(opt *Options) *Nodis {
 	return n
 }
 
-func fnv32(key string) uint32 {
-	h := uint32(2166136261)
-	for i := 0; i < len(key); i++ {
-		h *= 16777619
-		h ^= uint32(key[i])
-	}
-	return h
-}
-
-func (n *Nodis) spread(hashCode uint32) *sync.RWMutex {
-	tableSize := uint32(n.options.LockPoolSize)
-	return n.locks[(tableSize-1)&hashCode]
-}
-
-func (n *Nodis) getLocker(key string) *sync.RWMutex {
-	return n.spread(fnv32(key))
-}
-
-func (n *Nodis) writeKey(key string, newFn func() ds.DataStruct) *metadata {
-	n.Lock()
-	defer n.Unlock()
-	locker := n.getLocker(key)
-	locker.Lock()
-	k, ok := n.keys.Get(key)
-	if ok {
-		if k.expired(time.Now().UnixMilli()) {
-			if newFn == nil {
-				return newEmptyMetadata(locker, true)
-			}
-			k.expiration = 0
-		}
-		d, ok := n.dataStructs.Get(key)
-		if !ok {
-			if newFn == nil {
-				return newEmptyMetadata(locker, true)
-			}
-			d = newFn()
-			n.dataStructs.Set(key, d)
-		}
-		k.changed = true
-		return newMetadata(k, d, true, locker)
-	}
-	meta := n.fromStore(key, true, locker)
-	if !meta.isOk() {
-		if newFn != nil {
-			d := newFn()
-			if d == nil {
-				return newEmptyMetadata(locker, true)
-			}
-			k = newKey()
-			n.keys.Set(key, k)
-			n.dataStructs.Set(key, d)
-			meta = newMetadata(k, d, true, locker)
-			meta.markChanged()
-		}
-	}
-	return meta
-}
-
-func (n *Nodis) readKey(key string) *metadata {
-	locker := n.getLocker(key)
-	locker.RLock()
-	k, ok := n.keys.Get(key)
-	if ok {
-		if k.expired(time.Now().UnixMilli()) {
-			return newEmptyMetadata(locker, false)
-		}
-		d, ok := n.dataStructs.Get(key)
-		if !ok {
-			return newEmptyMetadata(locker, false)
-		}
-		return newMetadata(k, d, false, locker)
-	}
-	return n.fromStore(key, false, locker)
-}
-
-func (n *Nodis) delKey(key string) {
-	n.keys.Delete(key)
-	n.dataStructs.Delete(key)
-	n.store.remove(key)
-	n.notify(pb.NewOp(pb.OpType_Del, key))
-}
-
-func (n *Nodis) fromStore(key string, writable bool, locker *sync.RWMutex) *metadata {
-	// try get from store
-	v, err := n.store.get(key)
-	if err == nil && len(v) > 0 {
-		key, d, expiration, err := n.parseDs(v)
-		if err != nil {
-			log.Println("Parse DataStruct:", err)
-			return newEmptyMetadata(locker, writable)
-		}
-		if d != nil {
-			n.dataStructs.Set(key, d)
-			k := newKey()
-			k.expiration = expiration
-			n.keys.Set(key, k)
-			return newMetadata(k, d, writable, locker)
-		}
-	}
-	return newEmptyMetadata(locker, writable)
-}
-
 // Snapshot saves the data to disk
 func (n *Nodis) Snapshot(path string) {
-	n.Recycle()
-	n.store.snapshot(path, n.getChangedEntries())
-}
-
-// Recycle removes expired and unused keys
-func (n *Nodis) Recycle() {
-	n.Lock()
-	defer n.Unlock()
-	if n.closed {
-		return
-	}
-	now := time.Now().UnixMilli()
-	recycleTime := now - n.options.RecycleDuration.Milliseconds()
-	n.keys.Scan(func(key string, k *Key) bool {
-		locker := n.getLocker(key)
-		locker.Lock()
-		defer locker.Unlock()
-		if k.expired(now) {
-			n.dataStructs.Delete(key)
-			n.keys.Delete(key)
-			n.store.remove(key)
-			return true
-		}
-		if k.lastUse != 0 && k.lastUse <= recycleTime {
-			d, ok := n.dataStructs.Get(key)
-			n.dataStructs.Delete(key)
-			n.keys.Delete(key)
-			if ok {
-				k.changed = false
-				// save to disk
-				err := n.store.put(newEntry(key, d, k.expiration))
-				if err != nil {
-					log.Println("Recycle: ", err)
-				}
-			}
-		}
-		return true
-	})
-}
-
-// getChangedEntries returns all keys that have been getChangedEntries
-func (n *Nodis) getChangedEntries() []*pb.Entry {
-	entries := make([]*pb.Entry, 0)
-	now := time.Now().UnixMilli()
-	n.keys.Scan(func(key string, k *Key) bool {
-		locker := n.getLocker(key)
-		locker.RLock()
-		defer locker.RUnlock()
-		if !k.changed || k.expired(now) {
-			return true
-		}
-		d, ok := n.dataStructs.Get(key)
-		if !ok {
-			return true
-		}
-		entries = append(entries, newEntry(key, d, k.expiration))
-		return true
-	})
-	return entries
+	n.store.snapshot(path)
 }
 
 // Close the store
 func (n *Nodis) Close() error {
-	n.Lock()
-	defer n.Unlock()
-	// save values to disk
-	entries := n.getChangedEntries()
-	for _, entry := range entries {
-		err := n.store.put(entry)
-		if err != nil {
-			return err
-		}
-	}
-	n.closed = true
 	return n.store.close()
 }
 
 // Clear removes all keys from the store
 func (n *Nodis) Clear() {
-	n.dataStructs.Clear()
-	n.keys.Clear()
 	err := n.store.clear()
 	if err != nil {
 		log.Println("Clear: ", err)
@@ -284,28 +91,16 @@ func (n *Nodis) Clear() {
 
 // SetEntry sets an entity
 func (n *Nodis) SetEntry(data []byte) error {
-	entity, err := n.parseEntry(data)
+	entity, err := n.store.parseEntry(data)
 	if err != nil {
 		return err
 	}
-	return n.store.put(entity)
-}
-
-func (n *Nodis) parseEntry(data []byte) (*pb.Entry, error) {
-	c32 := binary.LittleEndian.Uint32(data)
-	if c32 != crc32.ChecksumIEEE(data[4:]) {
-		return nil, ErrCorruptedData
-	}
-	var entity pb.Entry
-	if err := proto.Unmarshal(data[4:], &entity); err != nil {
-		return nil, err
-	}
-	return &entity, nil
+	return n.store.putEntry(entity)
 }
 
 // GetEntry gets an entity
 func (n *Nodis) GetEntry(key string) []byte {
-	meta := n.readKey(key)
+	meta := n.store.readKey(key)
 	if !meta.isOk() {
 		meta.commit()
 		return nil
@@ -317,37 +112,6 @@ func (n *Nodis) GetEntry(key string) []byte {
 }
 
 // parseDs the data
-func (n *Nodis) parseDs(data []byte) (string, ds.DataStruct, int64, error) {
-	var entity, err = n.parseEntry(data)
-	if err != nil {
-		return "", nil, 0, err
-	}
-	var dataStruct ds.DataStruct
-	switch ds.DataType(entity.Type) {
-	case ds.String:
-		s := str.NewString()
-		s.SetValue(entity.GetStringValue().Value)
-		dataStruct = s
-	case ds.ZSet:
-		z := zset.NewSortedSet()
-		z.SetValue(entity.GetZSetValue().Values)
-		dataStruct = z
-	case ds.List:
-		l := list.NewDoublyLinkedList()
-		l.SetValue(entity.GetListValue().Values)
-		dataStruct = l
-	case ds.Hash:
-		h := hash.NewHashMap()
-		h.SetValue(entity.GetHashValue().Values)
-		dataStruct = h
-	case ds.Set:
-		s := set.NewSet()
-		s.SetValue(entity.GetSetValue().Values)
-		dataStruct = s
-	}
-	return entity.Key, dataStruct, entity.Expiration, nil
-}
-
 func (n *Nodis) notify(ops ...*pb.Op) {
 	if len(n.watchers) == 0 {
 		return

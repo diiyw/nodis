@@ -132,7 +132,8 @@ func info(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 redis_version:6.0.0
 nodis_version:1.3.0
 os:` + runtime.GOOS + `
-process_id:` + pid + `# Memory
+process_id:` + pid + `
+# Memory
 used_memory:` + usedMemory)
 }
 

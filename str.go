@@ -15,7 +15,7 @@ func (n *Nodis) newStr() ds.DataStruct {
 
 // Set a key with a value and a TTL
 func (n *Nodis) Set(key string, value []byte) {
-	meta := n.writeKey(key, n.newStr)
+	meta := n.store.writeKey(key, n.newStr)
 	n.notify(pb.NewOp(pb.OpType_Set, key).Value(value))
 	meta.ds.(*str.String).Set(value)
 	meta.commit()
@@ -23,7 +23,7 @@ func (n *Nodis) Set(key string, value []byte) {
 
 // SetEX set a key with specified expire time, in seconds (a positive integer).
 func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
-	meta := n.writeKey(key, n.newStr)
+	meta := n.store.writeKey(key, n.newStr)
 	if meta.key.expiration == 0 {
 		meta.key.expiration = time.Now().UnixMilli()
 	}
@@ -35,7 +35,7 @@ func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
 
 // SetPX set a key with specified expire time, in milliseconds (a positive integer).
 func (n *Nodis) SetPX(key string, value []byte, milliseconds int64) {
-	meta := n.writeKey(key, n.newStr)
+	meta := n.store.writeKey(key, n.newStr)
 	if meta.key.expiration == 0 {
 		meta.key.expiration = time.Now().UnixMilli()
 	}
@@ -47,12 +47,12 @@ func (n *Nodis) SetPX(key string, value []byte, milliseconds int64) {
 
 // SetNX set a key with a value if it does not exist
 func (n *Nodis) SetNX(key string, value []byte) bool {
-	meta := n.writeKey(key, nil)
+	meta := n.store.writeKey(key, nil)
 	if meta.isOk() {
 		meta.commit()
 		return false
 	}
-	meta = n.writeKey(key, nil)
+	meta = n.store.writeKey(key, nil)
 	n.notify(pb.NewOp(pb.OpType_Set, key).Value(value))
 	meta.ds.(*str.String).Set(value)
 	meta.commit()
@@ -61,7 +61,7 @@ func (n *Nodis) SetNX(key string, value []byte) bool {
 
 // SetXX set a key with a value if it exists
 func (n *Nodis) SetXX(key string, value []byte) bool {
-	meta := n.writeKey(key, nil)
+	meta := n.store.writeKey(key, nil)
 	if !meta.isOk() {
 		meta.commit()
 		return false
@@ -74,7 +74,7 @@ func (n *Nodis) SetXX(key string, value []byte) bool {
 
 // Get a key
 func (n *Nodis) Get(key string) []byte {
-	meta := n.readKey(key)
+	meta := n.store.readKey(key)
 	if !meta.isOk() {
 		meta.commit()
 		return nil
@@ -86,7 +86,7 @@ func (n *Nodis) Get(key string) []byte {
 
 // Incr increment the integer value of a key by one
 func (n *Nodis) Incr(key string) int64 {
-	meta := n.writeKey(key, n.newStr)
+	meta := n.store.writeKey(key, n.newStr)
 	v := meta.ds.(*str.String).Incr()
 	m := make([]byte, 8)
 	binary.LittleEndian.PutUint64(m, uint64(v))
@@ -97,7 +97,7 @@ func (n *Nodis) Incr(key string) int64 {
 
 // Decr decrement the integer value of a key by one
 func (n *Nodis) Decr(key string) int64 {
-	meta := n.writeKey(key, n.newStr)
+	meta := n.store.writeKey(key, n.newStr)
 	v := meta.ds.(*str.String).Decr()
 	m := make([]byte, 8)
 	binary.LittleEndian.PutUint64(m, uint64(v))
@@ -108,7 +108,7 @@ func (n *Nodis) Decr(key string) int64 {
 
 // SetBit set a bit in a key
 func (n *Nodis) SetBit(key string, offset int64, value bool) int {
-	meta := n.writeKey(key, n.newStr)
+	meta := n.store.writeKey(key, n.newStr)
 	k := meta.ds.(*str.String)
 	v := k.SetBit(offset, value)
 	meta.commit()
@@ -117,7 +117,7 @@ func (n *Nodis) SetBit(key string, offset int64, value bool) int {
 
 // GetBit get a bit in a key
 func (n *Nodis) GetBit(key string, offset int64) int64 {
-	meta := n.writeKey(key, nil)
+	meta := n.store.writeKey(key, nil)
 	if !meta.isOk() {
 		meta.commit()
 		return 0
@@ -129,7 +129,7 @@ func (n *Nodis) GetBit(key string, offset int64) int64 {
 
 // BitCount returns the number of bits set to 1
 func (n *Nodis) BitCount(key string, start, end int64) int64 {
-	meta := n.writeKey(key, nil)
+	meta := n.store.writeKey(key, nil)
 	if !meta.isOk() {
 		meta.commit()
 		return 0

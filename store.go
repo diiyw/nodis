@@ -1,6 +1,7 @@
 package nodis
 
 import (
+	"hash/crc32"
 	"log"
 	"os"
 	"path/filepath"
@@ -12,6 +13,12 @@ import (
 
 	"encoding/binary"
 
+	"github.com/diiyw/nodis/ds"
+	"github.com/diiyw/nodis/ds/hash"
+	"github.com/diiyw/nodis/ds/list"
+	"github.com/diiyw/nodis/ds/set"
+	"github.com/diiyw/nodis/ds/str"
+	"github.com/diiyw/nodis/ds/zset"
 	"github.com/diiyw/nodis/fs"
 	"github.com/diiyw/nodis/pb"
 	"github.com/tidwall/btree"
@@ -19,33 +26,41 @@ import (
 
 type store struct {
 	sync.RWMutex
-	fileSize   int64
-	fileId     uint16
-	path       string
-	current    string
-	indexFile  string
-	aof        fs.File
-	index      btree.Map[string, *index]
-	filesystem fs.Fs
+	fileSize     int64
+	fileId       uint16
+	path         string
+	current      string
+	indexFile    string
+	aof          fs.File
+	keys         btree.Map[string, *Key]
+	values       btree.Map[string, ds.DataStruct]
+	filesystem   fs.Fs
+	locks        []*sync.RWMutex
+	lockPoolSize int
+	closed       bool
 }
 
-func newStore(path string, fileSize int64, filesystem fs.Fs) *store {
+func newStore(path string, fileSize int64, lockPoolSize int, filesystem fs.Fs) *store {
 	s := &store{
-		path:      path,
-		fileSize:  fileSize,
-		indexFile: filepath.Join(path, "nodis.index"),
+		path:         path,
+		fileSize:     fileSize,
+		indexFile:    filepath.Join(path, "nodis.index"),
+		lockPoolSize: lockPoolSize,
+		locks:        make([]*sync.RWMutex, lockPoolSize),
 	}
-
+	for i := 0; i < lockPoolSize; i++ {
+		s.locks[i] = &sync.RWMutex{}
+	}
 	_ = filesystem.MkdirAll(path)
-	idxFile, err := filesystem.OpenFile(s.indexFile, os.O_RDWR|os.O_CREATE|os.O_APPEND)
+	indexFile, err := filesystem.OpenFile(s.indexFile, os.O_RDWR|os.O_CREATE|os.O_APPEND)
 	if err != nil {
 		panic(err)
 	}
-	data, err := idxFile.ReadAll()
+	data, err := indexFile.ReadAll()
 	if err != nil {
 		panic(err)
 	}
-	err = idxFile.Close()
+	err = indexFile.Close()
 	if err != nil {
 		panic(err)
 	}
@@ -57,9 +72,9 @@ func newStore(path string, fileSize int64, filesystem fs.Fs) *store {
 				panic(err)
 			}
 			for _, v := range idx.Items {
-				var i = &index{}
+				var i = &Key{}
 				i.unmarshal(v.Data)
-				s.index.Set(v.Key, i)
+				s.keys.Set(v.Key, i)
 			}
 		}
 		s.fileId = binary.LittleEndian.Uint16(data[:2])
@@ -73,36 +88,197 @@ func newStore(path string, fileSize int64, filesystem fs.Fs) *store {
 	return s
 }
 
-type index struct {
-	offset     int64
-	expiration int64
-	size       uint32
-	fileId     uint16
-}
-
-func (i *index) expired(now int64) bool {
-	if i == nil {
-		return false
+func fnv32(key string) uint32 {
+	h := uint32(2166136261)
+	for i := 0; i < len(key); i++ {
+		h *= 16777619
+		h ^= uint32(key[i])
 	}
-	return i.expiration != 0 && i.expiration <= now
+	return h
 }
 
-// marshal index to bytes
-func (i *index) marshal() []byte {
-	var b [22]byte
-	binary.LittleEndian.PutUint64(b[0:8], uint64(i.offset))
-	binary.LittleEndian.PutUint64(b[8:16], uint64(i.expiration))
-	binary.LittleEndian.PutUint32(b[16:20], i.size)
-	binary.LittleEndian.PutUint16(b[20:22], i.fileId)
-	return b[:]
+func (s *store) spread(hashCode uint32) *sync.RWMutex {
+	tableSize := uint32(s.lockPoolSize)
+	return s.locks[(tableSize-1)&hashCode]
 }
 
-// unmarshal bytes to index
-func (i *index) unmarshal(b []byte) {
-	i.offset = int64(binary.LittleEndian.Uint64(b[0:8]))
-	i.expiration = int64(binary.LittleEndian.Uint64(b[8:16]))
-	i.size = binary.LittleEndian.Uint32(b[16:20])
-	i.fileId = binary.LittleEndian.Uint16(b[20:22])
+func (s *store) getLocker(key string) *sync.RWMutex {
+	return s.spread(fnv32(key))
+}
+
+func (s *store) writeKey(key string, newFn func() ds.DataStruct) *metadata {
+	locker := s.getLocker(key)
+	locker.Lock()
+	k, ok := s.keys.Get(key)
+	if ok {
+		if k.expired(time.Now().UnixMilli()) {
+			if newFn == nil {
+				return newEmptyMetadata(locker, true)
+			}
+		}
+		d, ok := s.values.Get(key)
+		if ok {
+			return newMetadata(k, d, true, locker)
+		}
+		return s.fromStorage(k, true, locker)
+	}
+	if newFn != nil {
+		s.Lock()
+		defer s.Unlock()
+		d := newFn()
+		if d == nil {
+			return newEmptyMetadata(locker, true)
+		}
+		k = newKey()
+		s.keys.Set(key, k)
+		s.values.Set(key, d)
+		meta := newMetadata(k, d, true, locker)
+		meta.markChanged()
+		return meta
+	}
+	return newEmptyMetadata(locker, true)
+}
+
+func (s *store) readKey(key string) *metadata {
+	locker := s.getLocker(key)
+	locker.RLock()
+	k, ok := s.keys.Get(key)
+	if ok {
+		if k.expired(time.Now().UnixMilli()) {
+			return newEmptyMetadata(locker, false)
+		}
+		d, ok := s.values.Get(key)
+		if !ok {
+			// read from storage
+			return s.fromStorage(k, false, locker)
+		}
+		return newMetadata(k, d, false, locker)
+	}
+	return newEmptyMetadata(locker, false)
+}
+
+func (s *store) delKey(key string) {
+	s.keys.Delete(key)
+	s.values.Delete(key)
+}
+
+func (s *store) fromStorage(key *Key, writable bool, locker *sync.RWMutex) *metadata {
+	// try get from storage
+	v, err := s.getKey(key)
+	if err == nil && len(v) > 0 {
+		key, d, expiration, err := s.parseDs(v)
+		if err != nil {
+			log.Println("Parse DataStruct:", err)
+			return newEmptyMetadata(locker, writable)
+		}
+		if d != nil {
+			s.values.Set(key, d)
+			k := newKey()
+			k.expiration = expiration
+			s.keys.Set(key, k)
+			return newMetadata(k, d, writable, locker)
+		}
+	}
+	return newEmptyMetadata(locker, writable)
+}
+
+func (s *store) parseEntry(data []byte) (*pb.Entry, error) {
+	c32 := binary.LittleEndian.Uint32(data)
+	if c32 != crc32.ChecksumIEEE(data[4:]) {
+		return nil, ErrCorruptedData
+	}
+	var entity pb.Entry
+	if err := proto.Unmarshal(data[4:], &entity); err != nil {
+		return nil, err
+	}
+	return &entity, nil
+}
+
+// parseDs the data
+func (s *store) parseDs(data []byte) (string, ds.DataStruct, int64, error) {
+	var entity, err = s.parseEntry(data)
+	if err != nil {
+		return "", nil, 0, err
+	}
+	var dataStruct ds.DataStruct
+	switch ds.DataType(entity.Type) {
+	case ds.String:
+		v := str.NewString()
+		v.SetValue(entity.GetStringValue().Value)
+		dataStruct = v
+	case ds.ZSet:
+		z := zset.NewSortedSet()
+		z.SetValue(entity.GetZSetValue().Values)
+		dataStruct = z
+	case ds.List:
+		l := list.NewDoublyLinkedList()
+		l.SetValue(entity.GetListValue().Values)
+		dataStruct = l
+	case ds.Hash:
+		h := hash.NewHashMap()
+		h.SetValue(entity.GetHashValue().Values)
+		dataStruct = h
+	case ds.Set:
+		v := set.NewSet()
+		v.SetValue(entity.GetSetValue().Values)
+		dataStruct = v
+	}
+	return entity.Key, dataStruct, entity.Expiration, nil
+}
+
+// flushChanges flush changed keys to disk
+func (s *store) flushChanges() {
+	now := time.Now().UnixMilli()
+	s.keys.Scan(func(key string, k *Key) bool {
+		locker := s.getLocker(key)
+		locker.RLock()
+		defer locker.RUnlock()
+		if !k.changed || k.expired(now) {
+			return true
+		}
+		d, ok := s.values.Get(key)
+		if !ok {
+			return true
+		}
+		// save to storage
+		err := s.putKv(key, k, d)
+		if err != nil {
+			log.Println("Flush changes: ", err)
+		}
+		return true
+	})
+}
+
+// tidy removes expired and unused keys
+func (s *store) tidy(ms int64) {
+	s.Lock()
+	defer s.Unlock()
+	if s.closed {
+		return
+	}
+	now := time.Now().UnixMilli()
+	recycleTime := now - ms
+	s.keys.Scan(func(key string, k *Key) bool {
+		locker := s.getLocker(key)
+		locker.Lock()
+		defer locker.Unlock()
+		if k.expired(now) {
+			s.delKey(key)
+			return true
+		}
+		if k.lastUse != 0 && k.lastUse <= recycleTime {
+			d, ok := s.values.Get(key)
+			if ok {
+				k.changed = false
+				// save to disk
+				err := s.putKv(key, k, d)
+				if err != nil {
+					log.Println("Recycle: ", err)
+				}
+			}
+		}
+		return true
+	})
 }
 
 func (s *store) check() (int64, error) {
@@ -144,11 +320,29 @@ func (s *store) check() (int64, error) {
 	return offset, nil
 }
 
-// put a key-value pair into store
-func (s *store) put(entry *pb.Entry) error {
-	s.Lock()
-	defer s.Unlock()
-	var idx = &index{}
+func (s *store) putKv(k string, key *Key, value ds.DataStruct) error {
+	offset, err := s.check()
+	if err != nil {
+		return err
+	}
+	key.fileId = s.fileId
+	key.offset = offset
+	entry := newEntry(k, value, key.expiration)
+	data, err := entry.Marshal()
+	if err != nil {
+		return err
+	}
+	key.size = uint32(len(data))
+	_, err = s.aof.Write(data)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// putEntry a key-value pair into store
+func (s *store) putEntry(entry *pb.Entry) error {
+	var key = &Key{}
 	offset, err := s.check()
 	if err != nil {
 		return err
@@ -157,11 +351,11 @@ func (s *store) put(entry *pb.Entry) error {
 	if err != nil {
 		return err
 	}
-	idx.fileId = s.fileId
-	idx.offset = offset
-	idx.size = uint32(len(data))
-	idx.expiration = entry.Expiration
-	s.index.Set(entry.Key, idx)
+	key.fileId = s.fileId
+	key.offset = offset
+	key.size = uint32(len(data))
+	key.expiration = entry.Expiration
+	s.keys.Set(entry.Key, key)
 	_, err = s.aof.Write(data)
 	if err != nil {
 		return err
@@ -169,19 +363,15 @@ func (s *store) put(entry *pb.Entry) error {
 	return nil
 }
 
-func (s *store) putRaw(key string, data []byte, expiration int64) error {
-	s.Lock()
-	defer s.Unlock()
-	var idx = &index{}
+func (s *store) putRaw(key string, data []byte, k *Key) error {
 	offset, err := s.check()
 	if err != nil {
 		return err
 	}
-	idx.fileId = s.fileId
-	idx.offset = offset
-	idx.size = uint32(len(data))
-	idx.expiration = expiration
-	s.index.Set(key, idx)
+	k.fileId = s.fileId
+	k.offset = offset
+	k.size = uint32(len(data))
+	s.keys.Set(key, k)
 	_, err = s.aof.Write(data)
 	if err != nil {
 		return err
@@ -191,22 +381,24 @@ func (s *store) putRaw(key string, data []byte, expiration int64) error {
 
 // get a value by key
 func (s *store) get(key string) ([]byte, error) {
-	s.RLock()
-	defer s.RUnlock()
-	idx, ok := s.index.Get(key)
+	k, ok := s.keys.Get(key)
 	if !ok {
 		return nil, nil
 	}
-	if idx.fileId == s.fileId {
-		data := make([]byte, idx.size)
-		_, err := s.aof.ReadAt(data, idx.offset)
+	return s.getKey(k)
+}
+
+func (s *store) getKey(key *Key) ([]byte, error) {
+	if key.fileId == s.fileId {
+		data := make([]byte, key.size)
+		_, err := s.aof.ReadAt(data, key.offset)
 		if err != nil {
 			return nil, err
 		}
 		return data, nil
 	}
 	// read from other file
-	file := filepath.Join(s.path, "nodis."+strconv.Itoa(int(idx.fileId))+".aof")
+	file := filepath.Join(s.path, "nodis."+strconv.Itoa(int(key.fileId))+".aof")
 	f, err := s.filesystem.OpenFile(file, os.O_RDONLY)
 	if err != nil {
 		return nil, err
@@ -217,41 +409,28 @@ func (s *store) get(key string) ([]byte, error) {
 			log.Println("Close file error: ", err)
 		}
 	}()
-	data := make([]byte, idx.size)
-	_, err = f.ReadAt(data, idx.offset)
+	data := make([]byte, key.size)
+	_, err = f.ReadAt(data, key.offset)
 	if err != nil {
 		return nil, err
 	}
 	return data, nil
 }
 
-// remove a key-value pair from store
-func (s *store) remove(key string) {
+// snapshot the store
+func (s *store) snapshot(path string) {
 	s.Lock()
 	defer s.Unlock()
-	s.index.Delete(key)
-}
-
-// snapshot the store
-func (s *store) snapshot(path string, entries []*pb.Entry) {
-	s.RLock()
-	defer s.RUnlock()
 	snapshotDir := filepath.Join(path, "snapshots", time.Now().Format("20060102_150405"))
 	err := s.filesystem.MkdirAll(snapshotDir)
 	if err != nil {
 		log.Println("Snapshot mkdir error: ", err)
 		return
 	}
-	ns := newStore(snapshotDir, s.fileSize, s.filesystem)
-	for _, entry := range entries {
-		err = ns.put(entry)
-		if err != nil {
-			log.Println("Snapshot put error: ", err)
-			return
-		}
-	}
-	s.index.Scan(func(key string, index *index) bool {
-		if _, ok := ns.index.Get(key); !ok {
+	s.flushChanges()
+	ns := newStore(snapshotDir, s.fileSize, 0, s.filesystem)
+	s.keys.Scan(func(key string, k *Key) bool {
+		if _, ok := ns.keys.Get(key); !ok {
 			return true
 		}
 		data, err := s.get(key)
@@ -259,7 +438,7 @@ func (s *store) snapshot(path string, entries []*pb.Entry) {
 			log.Println("Snapshot get error: ", err)
 			return true
 		}
-		err = ns.putRaw(key, data, index.expiration)
+		err = ns.putRaw(key, data, k)
 		if err != nil {
 			log.Println("Snapshot put error: ", err)
 			return true
@@ -276,6 +455,8 @@ func (s *store) snapshot(path string, entries []*pb.Entry) {
 func (s *store) close() error {
 	s.Lock()
 	defer s.Unlock()
+	s.closed = true
+	s.flushChanges()
 	err := s.aof.Close()
 	if err != nil {
 		return err
@@ -291,13 +472,16 @@ func (s *store) close() error {
 		return err
 	}
 	indexData := &pb.Index{
-		Items: make([]*pb.Index_Item, 0, s.index.Len()),
+		Items: make([]*pb.Index_Item, 0, s.keys.Len()),
 	}
-	s.index.Scan(func(key string, i *index) bool {
+	s.keys.Scan(func(key string, k *Key) bool {
+		locker := s.getLocker(key)
+		locker.Lock()
 		indexData.Items = append(indexData.Items, &pb.Index_Item{
 			Key:  key,
-			Data: i.marshal(),
+			Data: k.marshal(),
 		})
+		locker.Unlock()
 		return true
 	})
 	data, err := proto.Marshal(indexData)
@@ -326,6 +510,7 @@ func (s *store) clear() error {
 	if err != nil {
 		return err
 	}
-	s.index.Clear()
+	s.keys.Clear()
+	s.values.Clear()
 	return nil
 }

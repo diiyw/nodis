@@ -18,10 +18,10 @@ type Options struct {
 	// Path is the path to the database.
 	Path string
 
-	// RecycleDuration is the interval at which the database is recycled .
+	// TidyDuration is the interval which the database is flushing unused keys to disk.
 	// This is useful for reducing the risk of data loss in the event of a crash.
 	// It is also used for refreshing hot keys.
-	RecycleDuration time.Duration
+	TidyDuration time.Duration
 
 	// FileSize is the size of each file. The default value is 1GB.
 	FileSize int64
@@ -41,8 +41,8 @@ type Options struct {
 }
 
 var DefaultOptions = &Options{
-	Path:            "data",
-	FileSize:        FileSizeGB,
-	RecycleDuration: 60 * time.Second,
-	LockPoolSize:    10240,
+	Path:         "data",
+	FileSize:     FileSizeGB,
+	TidyDuration: 60 * time.Second,
+	LockPoolSize: 10240,
 }
