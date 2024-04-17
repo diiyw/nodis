@@ -6,47 +6,57 @@ import (
 	"github.com/diiyw/nodis/ds"
 )
 
+var metaPool = sync.Pool{
+	New: func() any {
+		return new(metadata)
+	},
+}
+
 type metadata struct {
-	locker   *sync.RWMutex
 	key      *Key
 	ds       ds.DataStruct
+	locker   *sync.RWMutex
 	ok       bool
 	writable bool
 }
 
 func newEmptyMetadata(locker *sync.RWMutex, writable bool) *metadata {
-	return &metadata{
-		locker:   locker,
-		ok:       false,
-		writable: writable,
-	}
+	m := metaPool.Get().(*metadata)
+	m.locker = locker
+	m.writable = writable
+	return m
 }
 
 func newMetadata(key *Key, d ds.DataStruct, writable bool, locker *sync.RWMutex) *metadata {
-	meta := &metadata{
-		locker:   locker,
-		key:      key,
-		ds:       d,
-		writable: writable,
-		ok:       true,
+	m := metaPool.Get().(*metadata)
+	m.locker = locker
+	m.key = key
+	m.ds = d
+	m.writable = writable
+	m.ok = true
+	return m
+}
+
+func (m *metadata) isOk() bool {
+	return m.ok
+}
+
+func (m *metadata) markChanged() {
+	if m.ok {
+		m.key.changed = true
 	}
-	return meta
 }
 
-func (t *metadata) isOk() bool {
-	return t.ok
-}
-
-func (t *metadata) markChanged() {
-	if t.ok {
-		t.key.changed = true
-	}
-}
-
-func (t *metadata) commit() {
-	if t.writable {
-		t.locker.Unlock()
+func (m *metadata) commit() {
+	if m.writable {
+		m.locker.Unlock()
 	} else {
-		t.locker.RUnlock()
+		m.locker.RUnlock()
 	}
+	m.ds = nil
+	m.locker = nil
+	m.key = nil
+	m.ok = false
+	m.writable = false
+	metaPool.Put(m)
 }

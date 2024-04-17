@@ -29,8 +29,8 @@ func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
 	}
 	meta.key.expiration += seconds * 1000
 	meta.ds.(*str.String).Set(value)
-	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_Set, key).Value(value).Expiration(meta.key.expiration))
+	meta.commit()
 }
 
 // SetPX set a key with specified expire time, in milliseconds (a positive integer).

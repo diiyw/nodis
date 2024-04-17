@@ -1,12 +1,13 @@
 package nodis
 
 import (
-	"github.com/tidwall/btree"
 	"os"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/tidwall/btree"
 
 	"github.com/diiyw/nodis/redis"
 )
@@ -355,6 +356,9 @@ func getString(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	}
 	key := args[0].Bulk
 	v := n.Get(key)
+	if v == nil {
+		return redis.NullValue()
+	}
 	return redis.StringValue(string(v))
 }
 

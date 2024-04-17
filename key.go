@@ -92,8 +92,8 @@ func (n *Nodis) Expire(key string, seconds int64) int64 {
 		meta.key.expiration = time.Now().UnixMilli()
 	}
 	meta.key.expiration += seconds * 1000
-	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+	meta.commit()
 	return 1
 }
 
@@ -111,8 +111,8 @@ func (n *Nodis) ExpirePX(key string, milliseconds int64) int64 {
 		meta.key.expiration = time.Now().UnixMilli()
 	}
 	meta.key.expiration += milliseconds
-	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+	meta.commit()
 	return 1
 }
 
@@ -127,8 +127,8 @@ func (n *Nodis) ExpireNX(key string, seconds int64) int64 {
 		return 0
 	}
 	meta.key.expiration = time.Now().UnixMilli() + seconds*1000
-	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+	meta.commit()
 	return 1
 }
 
@@ -144,8 +144,8 @@ func (n *Nodis) ExpireXX(key string, seconds int64) int64 {
 		return 0
 	}
 	meta.key.expiration += seconds * 1000
-	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+	meta.commit()
 	return 1
 }
 
@@ -201,8 +201,8 @@ func (n *Nodis) ExpireAt(key string, timestamp time.Time) int64 {
 		return 0
 	}
 	meta.key.expiration = timestamp.UnixMilli()
-	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+	meta.commit()
 	return 1
 }
 
@@ -218,8 +218,8 @@ func (n *Nodis) ExpireAtNX(key string, timestamp time.Time) int64 {
 		return 0
 	}
 	meta.key.expiration = timestamp.UnixMilli()
-	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+	meta.commit()
 	return 1
 }
 
@@ -235,8 +235,8 @@ func (n *Nodis) ExpireAtXX(key string, timestamp time.Time) int64 {
 		return 0
 	}
 	meta.key.expiration = timestamp.UnixMilli()
-	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+	meta.commit()
 	return 1
 }
 
@@ -341,8 +341,9 @@ func (n *Nodis) Type(key string) string {
 		meta.commit()
 		return "none"
 	}
+	v := ds.DataTypeMap[meta.ds.Type()]
 	meta.commit()
-	return ds.DataTypeMap[meta.ds.Type()]
+	return v
 }
 
 // Scan the keys

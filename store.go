@@ -25,6 +25,9 @@ import (
 )
 
 type store struct {
+	locks  []*sync.RWMutex
+	keys   btree.Map[string, *Key]
+	values btree.Map[string, ds.DataStruct]
 	sync.RWMutex
 	fileSize     int64
 	fileId       uint16
@@ -32,10 +35,7 @@ type store struct {
 	current      string
 	indexFile    string
 	aof          fs.File
-	keys         btree.Map[string, *Key]
-	values       btree.Map[string, ds.DataStruct]
 	filesystem   fs.Fs
-	locks        []*sync.RWMutex
 	lockPoolSize int
 	closed       bool
 }
@@ -162,21 +162,18 @@ func (s *store) delKey(key string) {
 	s.values.Delete(key)
 }
 
-func (s *store) fromStorage(key *Key, writable bool, locker *sync.RWMutex) *metadata {
+func (s *store) fromStorage(k *Key, writable bool, locker *sync.RWMutex) *metadata {
 	// try get from storage
-	v, err := s.getKey(key)
+	v, err := s.getKey(k)
 	if err == nil && len(v) > 0 {
-		key, d, expiration, err := s.parseDs(v)
+		key, value, err := s.parseDs(v)
 		if err != nil {
 			log.Println("Parse DataStruct:", err)
 			return newEmptyMetadata(locker, writable)
 		}
-		if d != nil {
-			s.values.Set(key, d)
-			k := newKey()
-			k.expiration = expiration
-			s.keys.Set(key, k)
-			return newMetadata(k, d, writable, locker)
+		if value != nil {
+			s.values.Set(key, value)
+			return newMetadata(k, value, writable, locker)
 		}
 	}
 	return newEmptyMetadata(locker, writable)
@@ -195,10 +192,10 @@ func (s *store) parseEntry(data []byte) (*pb.Entry, error) {
 }
 
 // parseDs the data
-func (s *store) parseDs(data []byte) (string, ds.DataStruct, int64, error) {
+func (s *store) parseDs(data []byte) (string, ds.DataStruct, error) {
 	var entity, err = s.parseEntry(data)
 	if err != nil {
-		return "", nil, 0, err
+		return "", nil, err
 	}
 	var dataStruct ds.DataStruct
 	switch ds.DataType(entity.Type) {
@@ -223,7 +220,7 @@ func (s *store) parseDs(data []byte) (string, ds.DataStruct, int64, error) {
 		v.SetValue(entity.GetSetValue().Values)
 		dataStruct = v
 	}
-	return entity.Key, dataStruct, entity.Expiration, nil
+	return entity.Key, dataStruct, nil
 }
 
 // flushChanges flush changed keys to disk

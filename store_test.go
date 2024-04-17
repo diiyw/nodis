@@ -274,7 +274,7 @@ func TestStore_parseDs(t *testing.T) {
 	n := Open(opt)
 	n.Set("test", []byte("test"))
 	data := n.GetEntry("test")
-	k, d, _, err := n.store.parseDs(data)
+	k, d, err := n.store.parseDs(data)
 	if err != nil {
 		t.Errorf("parseDs() = %v, want %v", err, nil)
 	}

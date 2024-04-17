@@ -1,16 +1,24 @@
 package pb
 
+import sync "sync"
+
 type Op struct {
 	*Operation
 }
 
+var opPool = sync.Pool{
+	New: func() any {
+		return &Op{
+			Operation: &Operation{},
+		}
+	},
+}
+
 func NewOp(typ OpType, key string) *Op {
-	return &Op{
-		Operation: &Operation{
-			Type: typ,
-			Key:  key,
-		},
-	}
+	op := opPool.Get().(*Op)
+	op.Type = typ
+	op.Key = key
+	return op
 }
 
 func (o *Op) Value(v []byte) *Op {
@@ -124,4 +132,9 @@ func (o *Op) IncrInt(i int64) *Op {
 func (o *Op) Before(before bool) *Op {
 	o.Operation.Before = before
 	return o
+}
+
+func (o *Op) Reset() {
+	o.Operation.Reset()
+	opPool.Put(o)
 }

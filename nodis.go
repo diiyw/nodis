@@ -121,6 +121,7 @@ func (n *Nodis) notify(ops ...*pb.Op) {
 			for _, op := range ops {
 				if w.Matched(op.Key) {
 					w.Push(op.Operation)
+					op.Reset()
 				}
 			}
 		}
