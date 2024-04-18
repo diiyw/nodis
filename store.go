@@ -25,10 +25,10 @@ import (
 )
 
 type store struct {
-	locks  []*sync.RWMutex
-	keys   btree.Map[string, *Key]
-	values btree.Map[string, ds.DataStruct]
-	sync.RWMutex
+	mu           sync.Mutex
+	metaPool     []*metadata
+	keys         btree.Map[string, *Key]
+	values       btree.Map[string, ds.DataStruct]
 	fileSize     int64
 	fileId       uint16
 	path         string
@@ -36,20 +36,22 @@ type store struct {
 	indexFile    string
 	aof          fs.File
 	filesystem   fs.Fs
-	lockPoolSize int
+	metaPoolSize int
 	closed       bool
 }
 
-func newStore(path string, fileSize int64, lockPoolSize int, filesystem fs.Fs) *store {
+func newStore(path string, fileSize int64, metaPoolSize int, filesystem fs.Fs) *store {
 	s := &store{
 		path:         path,
 		fileSize:     fileSize,
 		indexFile:    filepath.Join(path, "nodis.index"),
-		lockPoolSize: lockPoolSize,
-		locks:        make([]*sync.RWMutex, lockPoolSize),
+		metaPoolSize: metaPoolSize,
+		metaPool:     make([]*metadata, metaPoolSize),
 	}
-	for i := 0; i < lockPoolSize; i++ {
-		s.locks[i] = &sync.RWMutex{}
+	for i := 0; i < metaPoolSize; i++ {
+		s.metaPool[i] = &metadata{
+			Mutex: &sync.Mutex{},
+		}
 	}
 	_ = filesystem.MkdirAll(path)
 	indexFile, err := filesystem.OpenFile(s.indexFile, os.O_RDWR|os.O_CREATE|os.O_APPEND)
@@ -97,86 +99,89 @@ func fnv32(key string) uint32 {
 	return h
 }
 
-func (s *store) spread(hashCode uint32) *sync.RWMutex {
-	tableSize := uint32(s.lockPoolSize)
-	return s.locks[(tableSize-1)&hashCode]
+func (s *store) spread(hashCode uint32) *metadata {
+	tableSize := uint32(s.metaPoolSize)
+	return s.metaPool[(tableSize-1)&hashCode]
 }
 
-func (s *store) getLocker(key string) *sync.RWMutex {
+func (s *store) getMetadata(key string) *metadata {
 	return s.spread(fnv32(key))
 }
 
 func (s *store) writeKey(key string, newFn func() ds.DataStruct) *metadata {
-	locker := s.getLocker(key)
-	locker.Lock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	meta := s.getMetadata(key)
 	k, ok := s.keys.Get(key)
 	if ok {
 		if k.expired(time.Now().UnixMilli()) {
 			if newFn == nil {
-				return newEmptyMetadata(locker, true)
+				return meta
 			}
 		}
 		d, ok := s.values.Get(key)
 		if ok {
-			return newMetadata(k, d, true, locker)
+			meta.set(k, d)
+			return meta
 		}
-		return s.fromStorage(k, true, locker)
+		return s.fromStorage(k, meta)
 	}
 	if newFn != nil {
-		s.Lock()
-		defer s.Unlock()
 		d := newFn()
 		if d == nil {
-			return newEmptyMetadata(locker, true)
+			return meta
 		}
 		k = newKey()
 		s.keys.Set(key, k)
 		s.values.Set(key, d)
-		meta := newMetadata(k, d, true, locker)
+		meta.set(k, d)
 		meta.markChanged()
 		return meta
 	}
-	return newEmptyMetadata(locker, true)
+	return meta
 }
 
 func (s *store) readKey(key string) *metadata {
-	locker := s.getLocker(key)
-	locker.RLock()
+	meta := s.getMetadata(key)
 	k, ok := s.keys.Get(key)
 	if ok {
 		if k.expired(time.Now().UnixMilli()) {
-			return newEmptyMetadata(locker, false)
+			return meta
 		}
 		d, ok := s.values.Get(key)
 		if !ok {
 			// read from storage
-			return s.fromStorage(k, false, locker)
+			return s.fromStorage(k, meta)
 		}
-		return newMetadata(k, d, false, locker)
+		meta.set(k, d)
+		return meta
 	}
-	return newEmptyMetadata(locker, false)
+	return meta
 }
 
 func (s *store) delKey(key string) {
+	s.mu.Lock()
 	s.keys.Delete(key)
 	s.values.Delete(key)
+	s.mu.Unlock()
 }
 
-func (s *store) fromStorage(k *Key, writable bool, locker *sync.RWMutex) *metadata {
+func (s *store) fromStorage(k *Key, meta *metadata) *metadata {
 	// try get from storage
 	v, err := s.getKey(k)
 	if err == nil && len(v) > 0 {
 		key, value, err := s.parseDs(v)
 		if err != nil {
 			log.Println("Parse DataStruct:", err)
-			return newEmptyMetadata(locker, writable)
+			return meta
 		}
 		if value != nil {
 			s.values.Set(key, value)
-			return newMetadata(k, value, writable, locker)
+			meta.set(k, value)
+			return meta
 		}
 	}
-	return newEmptyMetadata(locker, writable)
+	return meta
 }
 
 func (s *store) parseEntry(data []byte) (*pb.Entry, error) {
@@ -227,9 +232,8 @@ func (s *store) parseDs(data []byte) (string, ds.DataStruct, error) {
 func (s *store) flushChanges() {
 	now := time.Now().UnixMilli()
 	s.keys.Scan(func(key string, k *Key) bool {
-		locker := s.getLocker(key)
-		locker.RLock()
-		defer locker.RUnlock()
+		meta := s.getMetadata(key)
+		defer meta.commit()
 		if !k.changed || k.expired(now) {
 			return true
 		}
@@ -248,19 +252,19 @@ func (s *store) flushChanges() {
 
 // tidy removes expired and unused keys
 func (s *store) tidy(ms int64) {
-	s.Lock()
-	defer s.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.closed {
 		return
 	}
 	now := time.Now().UnixMilli()
 	recycleTime := now - ms
 	s.keys.Scan(func(key string, k *Key) bool {
-		locker := s.getLocker(key)
-		locker.Lock()
-		defer locker.Unlock()
+		meta := s.getMetadata(key)
+		defer meta.commit()
 		if k.expired(now) {
-			s.delKey(key)
+			s.keys.Delete(key)
+			s.values.Delete(key)
 			return true
 		}
 		if k.lastUse != 0 && k.lastUse <= recycleTime {
@@ -416,8 +420,8 @@ func (s *store) getKey(key *Key) ([]byte, error) {
 
 // snapshot the store
 func (s *store) snapshot(path string) {
-	s.Lock()
-	defer s.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	snapshotDir := filepath.Join(path, "snapshots", time.Now().Format("20060102_150405"))
 	err := s.filesystem.MkdirAll(snapshotDir)
 	if err != nil {
@@ -450,8 +454,8 @@ func (s *store) snapshot(path string) {
 
 // close the store
 func (s *store) close() error {
-	s.Lock()
-	defer s.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.closed = true
 	s.flushChanges()
 	err := s.aof.Close()
@@ -472,13 +476,12 @@ func (s *store) close() error {
 		Items: make([]*pb.Index_Item, 0, s.keys.Len()),
 	}
 	s.keys.Scan(func(key string, k *Key) bool {
-		locker := s.getLocker(key)
-		locker.Lock()
+		meta := s.getMetadata(key)
 		indexData.Items = append(indexData.Items, &pb.Index_Item{
 			Key:  key,
 			Data: k.marshal(),
 		})
-		locker.Unlock()
+		meta.commit()
 		return true
 	})
 	data, err := proto.Marshal(indexData)
@@ -501,8 +504,8 @@ func (s *store) close() error {
 
 // clear the store
 func (s *store) clear() error {
-	s.Lock()
-	defer s.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	err := s.aof.Truncate(0)
 	if err != nil {
 		return err

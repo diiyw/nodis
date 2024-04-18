@@ -24,9 +24,9 @@ func Serve(addr string, handler func(cmd Value, args []Value) Value) error {
 func handleConn(conn net.Conn, handler func(cmd Value, args []Value) Value) {
 	writer := NewWriter(conn)
 	defer func() {
-		if r := recover(); r != nil {
-			_ = writer.Write(ErrorValue(r.(error).Error()))
-		}
+		// if r := recover(); r != nil {
+		// 	_ = writer.Write(ErrorValue(r.(error).Error()))
+		// }
 		conn.Close()
 	}()
 	resp := NewResp(conn)

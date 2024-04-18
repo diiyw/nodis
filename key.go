@@ -163,8 +163,8 @@ func (n *Nodis) ExpireLT(key string, seconds int64) int64 {
 	ms := seconds * 1000
 	if meta.key.expiration > time.Now().UnixMilli()-ms {
 		meta.key.expiration -= ms
-		meta.commit()
 		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		meta.commit()
 		return 1
 	}
 	meta.commit()
@@ -185,8 +185,8 @@ func (n *Nodis) ExpireGT(key string, seconds int64) int64 {
 	ms := seconds * 1000
 	if meta.key.expiration < now+ms {
 		meta.key.expiration += ms
-		meta.commit()
 		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		meta.commit()
 		return 1
 	}
 	meta.commit()
@@ -284,7 +284,7 @@ func (n *Nodis) ExpireAtGT(key string, timestamp time.Time) int64 {
 func (n *Nodis) Keys(pattern string) []string {
 	var keys []string
 	now := time.Now().UnixMilli()
-	n.store.RLock()
+	n.store.mu.Lock()
 	n.store.keys.Scan(func(key string, k *Key) bool {
 		matched, _ := filepath.Match(pattern, key)
 		if matched && !k.expired(now) {
@@ -292,7 +292,7 @@ func (n *Nodis) Keys(pattern string) []string {
 		}
 		return true
 	})
-	n.store.RUnlock()
+	n.store.mu.Unlock()
 	return keys
 }
 

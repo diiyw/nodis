@@ -33,8 +33,8 @@ func Open(opt *Options) *Nodis {
 	if opt.Filesystem == nil {
 		opt.Filesystem = &fs.Memory{}
 	}
-	if opt.LockPoolSize == 0 {
-		opt.LockPoolSize = 10240
+	if opt.MetaPoolSize == 0 {
+		opt.MetaPoolSize = 10240
 	}
 	n := &Nodis{
 		options: opt,
@@ -50,7 +50,7 @@ func Open(opt *Options) *Nodis {
 	} else if !isDir {
 		panic("Path is not a directory")
 	}
-	n.store = newStore(opt.Path, opt.FileSize, opt.LockPoolSize, opt.Filesystem)
+	n.store = newStore(opt.Path, opt.FileSize, opt.MetaPoolSize, opt.Filesystem)
 	go func() {
 		if opt.TidyDuration != 0 {
 			for {

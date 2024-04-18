@@ -259,8 +259,8 @@ func (n *Nodis) ZRem(key string, members ...string) int64 {
 			removed++
 		}
 	}
-	meta.commit()
 	meta.key.changed = removed > 0
+	meta.commit()
 	if removed > 0 {
 		n.notify(pb.NewOp(pb.OpType_ZRem, key).Members(members))
 	}
@@ -274,8 +274,8 @@ func (n *Nodis) ZRemRangeByRank(key string, start int64, stop int64) int64 {
 		return 0
 	}
 	removed := meta.ds.(*zset.SortedSet).ZRemRangeByRank(start, stop)
-	meta.commit()
 	meta.key.changed = removed > 0
+	meta.commit()
 	if removed > 0 {
 		n.notify(pb.NewOp(pb.OpType_ZRemRangeByRank, key).Start(start).Stop(stop))
 	}
@@ -289,8 +289,8 @@ func (n *Nodis) ZRemRangeByScore(key string, min float64, max float64) int64 {
 		return 0
 	}
 	removed := meta.ds.(*zset.SortedSet).ZRemRangeByScore(min, max)
-	meta.commit()
 	meta.key.changed = removed > 0
+	meta.commit()
 	if removed > 0 {
 		n.notify(pb.NewOp(pb.OpType_ZRemRangeByScore, key).Min(min).Max(max))
 	}
