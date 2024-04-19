@@ -9,8 +9,8 @@
 
 English | [简体中文](https://github.com/diiyw/nodis/blob/main/README_zh-cn.md)
 
-A Golang implemented Redis data structure. 
-It is a simple and easy to embed in your application.
+Redis re-implemented using golang. 
+Simple way to embed in your application.
 
 ## Supported Data Types
 

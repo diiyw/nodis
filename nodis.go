@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/diiyw/nodis/fs"
@@ -20,7 +19,6 @@ var (
 )
 
 type Nodis struct {
-	sync.RWMutex
 	options  *Options
 	store    *store
 	watchers []*watch.Watcher

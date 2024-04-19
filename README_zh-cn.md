@@ -9,7 +9,7 @@
 
 [English](https://github.com/diiyw/nodis/blob/main/README.md) | 简体中文
 
-Nodis 是一个简单可嵌入到应用中内存数据库，实现Redis的数据结构。
+Nodis 是使用GO语言实现的、简单可嵌入到应用中内存数据库。
 
 ## 支持的类型
 

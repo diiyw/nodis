@@ -231,7 +231,7 @@ func keys(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	keys := n.Keys(pattern)
 	var k = make([]redis.Value, 0, len(keys))
 	for _, v := range keys {
-		k = append(k, redis.StringValue(v))
+		k = append(k, redis.BulkValue(v))
 	}
 	return redis.ArrayValue(k...)
 }
@@ -262,7 +262,7 @@ func typ(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 		return redis.ErrorValue("TYPE requires at least one argument")
 	}
 	key := args[0].Bulk
-	return redis.StringValue(n.Type(key))
+	return redis.BulkValue(n.Type(key))
 }
 
 func scan(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
@@ -283,7 +283,7 @@ func scan(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	r[0] = redis.BulkValue(strconv.FormatInt(cursor, 10))
 	var k = make([]redis.Value, 0, len(keys))
 	for _, v := range keys {
-		k = append(k, redis.StringValue(v))
+		k = append(k, redis.BulkValue(v))
 	}
 	r[1] = redis.ArrayValue(k...)
 	return redis.ArrayValue(r...)
@@ -329,7 +329,7 @@ func setString(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 		return redis.StringValue("OK")
 	}
 	if get != nil {
-		return redis.StringValue(string(get))
+		return redis.BulkValue(string(get))
 	}
 	return redis.StringValue("OK")
 }
@@ -359,7 +359,7 @@ func getString(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	if v == nil {
 		return redis.NullValue()
 	}
-	return redis.StringValue(string(v))
+	return redis.BulkValue(string(v))
 }
 
 func setBit(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
@@ -470,7 +470,7 @@ func sDiff(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	results := n.SDiff(keys...)
 	var r = make([]redis.Value, 0, len(results))
 	for _, v := range results {
-		r = append(r, redis.StringValue(v))
+		r = append(r, redis.BulkValue(v))
 	}
 	return redis.ArrayValue(r...)
 }
@@ -486,7 +486,7 @@ func sInter(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	results := n.SInter(keys...)
 	var r = make([]redis.Value, 0, len(results))
 	for _, v := range results {
-		r = append(r, redis.StringValue(v))
+		r = append(r, redis.BulkValue(v))
 	}
 	return redis.ArrayValue(r...)
 }
@@ -513,7 +513,7 @@ func sMembers(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	results := n.SMembers(key)
 	var r = make([]redis.Value, 0, len(results))
 	for _, v := range results {
-		r = append(r, redis.StringValue(v))
+		r = append(r, redis.BulkValue(v))
 	}
 	return redis.ArrayValue(r...)
 }
@@ -559,7 +559,7 @@ func hGet(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	}
 	key := args[0].Bulk
 	field := args[1].Bulk
-	return redis.StringValue(string(n.HGet(key, field)))
+	return redis.BulkValue(string(n.HGet(key, field)))
 }
 
 func hDel(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
@@ -590,7 +590,7 @@ func hKeys(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	results := n.HKeys(key)
 	var r = make([]redis.Value, 0, len(results))
 	for _, v := range results {
-		r = append(r, redis.StringValue(v))
+		r = append(r, redis.BulkValue(v))
 	}
 	return redis.ArrayValue(r...)
 }
@@ -617,7 +617,7 @@ func hGetAll(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	results := n.HGetAll(key)
 	var r = make(map[string]redis.Value)
 	for k, v := range results {
-		r[k] = redis.StringValue(string(v))
+		r[k] = redis.BulkValue(string(v))
 	}
 	return redis.MapValue(r)
 }
@@ -668,7 +668,7 @@ func hMGet(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	results := n.HMGet(key, fields...)
 	var r = make([]redis.Value, 0, len(results))
 	for _, v := range results {
-		r = append(r, redis.StringValue(string(v)))
+		r = append(r, redis.BulkValue(string(v)))
 	}
 	return redis.ArrayValue(r...)
 }
@@ -728,7 +728,7 @@ func hVals(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	results := n.HVals(key)
 	var r = make([]redis.Value, 0, len(results))
 	for _, v := range results {
-		r = append(r, redis.StringValue(string(v)))
+		r = append(r, redis.BulkValue(string(v)))
 	}
 	return redis.ArrayValue(r...)
 }
@@ -776,7 +776,7 @@ func lPop(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	}
 	var r = make([]redis.Value, 0, len(v))
 	for _, vv := range v {
-		r = append(r, redis.StringValue(string(vv)))
+		r = append(r, redis.BulkValue(string(vv)))
 	}
 	return redis.ArrayValue(r...)
 }
@@ -799,7 +799,7 @@ func rPop(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	}
 	var r = make([]redis.Value, 0, len(v))
 	for _, vv := range v {
-		r = append(r, redis.StringValue(string(vv)))
+		r = append(r, redis.BulkValue(string(vv)))
 	}
 	return redis.ArrayValue(r...)
 }
@@ -885,7 +885,7 @@ func lRange(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	results := n.LRange(key, start, end)
 	var r = make([]redis.Value, 0, len(results))
 	for _, v := range results {
-		r = append(r, redis.StringValue(string(v)))
+		r = append(r, redis.BulkValue(string(v)))
 	}
 	return redis.ArrayValue(r...)
 }
@@ -1021,7 +1021,7 @@ func zRange(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	results := n.ZRange(key, start, stop)
 	var r = make([]redis.Value, 0, len(results))
 	for _, v := range results {
-		r = append(r, redis.StringValue(v))
+		r = append(r, redis.BulkValue(v))
 	}
 	return redis.ArrayValue(r...)
 }
@@ -1044,7 +1044,7 @@ func zRevRange(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	results := n.ZRevRange(key, start, stop)
 	var r = make([]redis.Value, 0, len(results))
 	for _, v := range results {
-		r = append(r, redis.StringValue(v))
+		r = append(r, redis.BulkValue(v))
 	}
 	return redis.ArrayValue(r...)
 }
@@ -1059,7 +1059,7 @@ func zRangeByScore(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	results := n.ZRangeByScore(key, min, max)
 	var r = make([]redis.Value, 0, len(results))
 	for _, v := range results {
-		r = append(r, redis.StringValue(v))
+		r = append(r, redis.BulkValue(v))
 	}
 	return redis.ArrayValue(r...)
 }
@@ -1074,7 +1074,7 @@ func zRevRangeByScore(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value
 	results := n.ZRevRangeByScore(key, min, max)
 	var r = make([]redis.Value, 0, len(results))
 	for _, v := range results {
-		r = append(r, redis.StringValue(v))
+		r = append(r, redis.BulkValue(v))
 	}
 	return redis.ArrayValue(r...)
 }
