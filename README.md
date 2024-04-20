@@ -133,21 +133,21 @@ BenchmarkZRank-12       	11430135	        104.1 ns/op	       7 B/op	       0 all
 BenchmarkHSet-12        	 1341817	        863.5 ns/op	     743 B/op	      11 allocs/op
 BenchmarkHGet-12        	 9801158	        105.9 ns/op	       7 B/op	       0 allocs/op
 ```
-Linux VM: 2C/8GB
+Linux VM: 4C/8GB
 ```bash
 goos: linux
 goarch: amd64
 pkg: github.com/diiyw/nodis/bench             
-BenchmarkSet-2        	  750900	      1828 ns/op	     591 B/op	       8 allocs/op
-BenchmarkGet-2        	 4765485	       247.9 ns/op	      55 B/op	       1 allocs/op
-BenchmarkLPush-2      	  851473	      1866 ns/op	     663 B/op	      10 allocs/op
-BenchmarkLPop-2       	18313623	        56.78 ns/op	      49 B/op	       1 allocs/op
-BenchmarkSAdd-2       	  857107	      2231 ns/op	     710 B/op	      11 allocs/op
-BenchmarkSMembers-2   	 4297828	       306.2 ns/op	      56 B/op	       2 allocs/op
-BenchmarkZAdd-2       	  788445	      2082 ns/op	     598 B/op	      11 allocs/op
-BenchmarkZRank-2      	 3196694	       329.8 ns/op	      55 B/op	       1 allocs/op
-BenchmarkHSet-2       	  823741	      2200 ns/op	     790 B/op	      12 allocs/op
-BenchmarkHGet-2       	 4493481	       290.2 ns/op	      55 B/op	       1 allocs/op
+BenchmarkSet-4        	  806912	      1658 ns/op	     543 B/op	       7 allocs/op
+BenchmarkGet-4        	 5941904	       190.6 ns/op	       7 B/op	       0 allocs/op
+BenchmarkLPush-4      	  852932	      1757 ns/op	     615 B/op	       9 allocs/op
+BenchmarkLPop-4       	40668902	        27.22 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSAdd-4       	  706376	      1913 ns/op	     662 B/op	      10 allocs/op
+BenchmarkSMembers-4   	 4819993	       208.1 ns/op	       8 B/op	       1 allocs/op
+BenchmarkZAdd-4       	  729039	      2013 ns/op	     550 B/op	      10 allocs/op
+BenchmarkZRank-4      	 4959448	       246.4 ns/op	       7 B/op	       0 allocs/op
+BenchmarkHSet-4       	  735676	      1971 ns/op	     742 B/op	      11 allocs/op
+BenchmarkHGet-4       	 4442625	       243.4 ns/op	       7 B/op	       0 allocs/op
 ```
 
 ## Note
