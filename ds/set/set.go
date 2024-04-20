@@ -8,7 +8,7 @@ import (
 )
 
 type Set struct {
-	data btree.Set[string]
+	data btree.Map[string, struct{}]
 }
 
 // NewSet creates a new set
@@ -23,7 +23,7 @@ func (s *Set) SAdd(member ...string) int64 {
 
 func (s *Set) sAdd(member ...string) int64 {
 	for _, m := range member {
-		s.data.Insert(m)
+		s.data.Set(m, struct{}{})
 	}
 	return int64(len(member))
 }
@@ -36,10 +36,10 @@ func (s *Set) SCard() int64 {
 // SDiff gets the difference between sets.
 func (s *Set) SDiff(sets ...*Set) []string {
 	diff := make([]string, 0, 32)
-	s.data.Scan(func(member string) bool {
+	s.data.Scan(func(member string, _ struct{}) bool {
 		found := false
 		for _, set := range sets {
-			found = set.data.Contains(member)
+			_, found = set.data.Get(member)
 			if found {
 				break
 			}
@@ -63,10 +63,10 @@ func (s *Set) SDiffStore(destination *Set, sets ...*Set) {
 // SInter gets the intersection between sets.
 func (s *Set) SInter(sets ...*Set) []string {
 	inter := make([]string, 0, 32)
-	s.data.Scan(func(member string) bool {
+	s.data.Scan(func(member string, _ struct{}) bool {
 		found := true
 		for _, set := range sets {
-			found = set.data.Contains(member)
+			_, found = set.data.Get(member)
 			if !found {
 				break
 			}
@@ -94,7 +94,8 @@ func (s *Set) SMembers() []string {
 
 // SIsMember checks if a member is in the set.
 func (s *Set) SIsMember(member string) bool {
-	return s.data.Contains(member)
+	_, ok := s.data.Get(member)
+	return ok
 }
 
 // SRem removes a member from the set.
@@ -116,7 +117,7 @@ func (s *Set) SPop(count int64) []string {
 		count = int64(s.data.Len())
 	}
 	members := make([]string, 0, count)
-	s.data.Scan(func(member string) bool {
+	s.data.Scan(func(member string, _ struct{}) bool {
 		if count > 0 {
 			s.data.Delete(member)
 			members = append(members, member)
@@ -131,8 +132,8 @@ func (s *Set) SPop(count int64) []string {
 func (s *Set) SUnion(sets ...*Set) []string {
 	union := s.data.Keys()
 	for _, set := range sets {
-		set.data.Scan(func(member string) bool {
-			if !s.data.Contains(member) {
+		set.data.Scan(func(member string, _ struct{}) bool {
+			if _, ok := s.data.Get(member); !ok {
 				union = append(union, member)
 			}
 			return true
@@ -155,7 +156,7 @@ func (s *Set) SScan(cursor int64, match string, count int64) (int64, []string) {
 	if cursor >= int64(s.data.Len()) {
 		return 0, nil
 	}
-	s.data.Scan(func(member string) bool {
+	s.data.Scan(func(member string, _ struct{}) bool {
 		if count > 0 && int64(len(keys)) >= count {
 			return false
 		}
@@ -180,6 +181,6 @@ func (s *Set) GetValue() []string {
 // SetValue the bytes to string
 func (s *Set) SetValue(members []string) {
 	for _, member := range members {
-		s.data.Insert(member)
+		s.data.Set(member, struct{}{})
 	}
 }

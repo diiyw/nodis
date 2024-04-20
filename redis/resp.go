@@ -9,13 +9,14 @@ import (
 )
 
 const (
-	STRING  = '+'
-	ERROR   = '-'
-	INTEGER = ':'
-	BULK    = '$'
-	ARRAY   = '*'
-	MAP     = '%'
-	DOUBLE  = ','
+	StringType  = '+'
+	ErrType     = '-'
+	IntegerType = ':'
+	BulkType    = '$'
+	ArrayType   = '*'
+	MapType     = '%'
+	DoubleType  = ','
+	NullType    = '_'
 )
 
 var (
@@ -42,7 +43,7 @@ var (
 )
 
 type Value struct {
-	typ     string
+	typ     uint8
 	Str     string
 	Integer int64
 	Bulk    string
@@ -54,35 +55,35 @@ type Value struct {
 }
 
 func StringValue(v string) Value {
-	return Value{typ: "string", Str: v}
+	return Value{typ: StringType, Str: v}
 }
 
 func ErrorValue(v string) Value {
-	return Value{typ: "error", Str: v}
+	return Value{typ: ErrType, Str: v}
 }
 
 func BulkValue(v string) Value {
-	return Value{typ: "bulk", Bulk: v}
+	return Value{typ: BulkType, Bulk: v}
 }
 
 func IntegerValue(v int64) Value {
-	return Value{typ: "integer", Integer: v}
+	return Value{typ: IntegerType, Integer: v}
 }
 
 func DoubleValue(v float64) Value {
-	return Value{typ: "double", Double: v}
+	return Value{typ: DoubleType, Double: v}
 }
 
 func ArrayValue(v ...Value) Value {
-	return Value{typ: "array", Array: v}
+	return Value{typ: ArrayType, Array: v}
 }
 
 func MapValue(v map[string]Value) Value {
-	return Value{typ: "map", Map: v}
+	return Value{typ: MapType, Map: v}
 }
 
 func NullValue() Value {
-	return Value{typ: "null"}
+	return Value{typ: NullType}
 }
 
 type Resp struct {
@@ -128,9 +129,9 @@ func (r *Resp) Read() (Value, error) {
 	}
 
 	switch _type {
-	case ARRAY:
+	case ArrayType:
 		return r.readArray()
-	case BULK:
+	case BulkType:
 		return r.readBulk()
 	default:
 		log.Printf("Unknown type: %v \n", string(_type))
@@ -143,7 +144,7 @@ func (r *Resp) readArray() (Value, error) {
 		Options: make(map[string]bool),
 		Args:    make(map[string]Value),
 	}
-	v.typ = "array"
+	v.typ = ArrayType
 
 	// read length of array
 	l, _, err := r.readInteger()
@@ -185,7 +186,7 @@ func (r *Resp) readArray() (Value, error) {
 func (r *Resp) readBulk() (Value, error) {
 	v := Value{}
 
-	v.typ = "bulk"
+	v.typ = BulkType
 
 	l, _, err := r.readInteger()
 	if err != nil {
@@ -207,21 +208,21 @@ func (r *Resp) readBulk() (Value, error) {
 // Marshal Value to bytes
 func (v Value) Marshal() []byte {
 	switch v.typ {
-	case "array":
+	case ArrayType:
 		return v.marshalArray()
-	case "bulk":
+	case BulkType:
 		return v.marshalBulk()
-	case "string":
+	case StringType:
 		return v.marshalString()
-	case "null":
+	case NullType:
 		return v.marshallNull()
-	case "error":
+	case ErrType:
 		return v.marshallError()
-	case "integer":
+	case IntegerType:
 		return v.marshallInteger()
-	case "map":
+	case MapType:
 		return v.marshallMap()
-	case "double":
+	case DoubleType:
 		return v.marshallDouble()
 	default:
 		return []byte{}
@@ -230,7 +231,7 @@ func (v Value) Marshal() []byte {
 
 func (v Value) marshalString() []byte {
 	var bytes []byte
-	bytes = append(bytes, STRING)
+	bytes = append(bytes, StringType)
 	bytes = append(bytes, v.Str...)
 	bytes = append(bytes, '\r', '\n')
 
@@ -239,7 +240,7 @@ func (v Value) marshalString() []byte {
 
 func (v Value) marshalBulk() []byte {
 	var bytes []byte
-	bytes = append(bytes, BULK)
+	bytes = append(bytes, BulkType)
 	bytes = append(bytes, strconv.Itoa(len(v.Bulk))...)
 	bytes = append(bytes, '\r', '\n')
 	bytes = append(bytes, v.Bulk...)
@@ -251,7 +252,7 @@ func (v Value) marshalBulk() []byte {
 func (v Value) marshalArray() []byte {
 	l := len(v.Array)
 	var bytes []byte
-	bytes = append(bytes, ARRAY)
+	bytes = append(bytes, ArrayType)
 	bytes = append(bytes, strconv.Itoa(l)...)
 	bytes = append(bytes, '\r', '\n')
 
@@ -264,7 +265,7 @@ func (v Value) marshalArray() []byte {
 
 func (v Value) marshallError() []byte {
 	var bytes []byte
-	bytes = append(bytes, ERROR)
+	bytes = append(bytes, ErrType)
 	bytes = append(bytes, v.Str...)
 	bytes = append(bytes, '\r', '\n')
 
@@ -277,7 +278,7 @@ func (v Value) marshallNull() []byte {
 
 func (v Value) marshallInteger() []byte {
 	var bytes []byte
-	bytes = append(bytes, INTEGER)
+	bytes = append(bytes, IntegerType)
 	bytes = append(bytes, strconv.FormatInt(v.Integer, 10)...)
 	bytes = append(bytes, '\r', '\n')
 	return bytes
@@ -285,7 +286,7 @@ func (v Value) marshallInteger() []byte {
 
 func (v Value) marshallDouble() []byte {
 	var bytes []byte
-	bytes = append(bytes, DOUBLE)
+	bytes = append(bytes, DoubleType)
 	bytes = append(bytes, strconv.FormatFloat(v.Double, 'f', -1, 64)...)
 	bytes = append(bytes, '\r', '\n')
 	return bytes
@@ -293,7 +294,7 @@ func (v Value) marshallDouble() []byte {
 
 func (v Value) marshallMap() []byte {
 	var bytes []byte
-	bytes = append(bytes, MAP)
+	bytes = append(bytes, MapType)
 	bytes = append(bytes, strconv.Itoa(len(v.Map))...)
 	bytes = append(bytes, '\r', '\n')
 	for k, v := range v.Map {

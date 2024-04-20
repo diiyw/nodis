@@ -122,16 +122,16 @@ Windows 11: 12C/32G
 goos: windows
 goarch: amd64
 pkg: github.com/diiyw/nodis/bench
-BenchmarkSet-12         	 1499077	       760.3 ns/op	     591 B/op	       8 allocs/op
-BenchmarkGet-12         	 8211410	       130.9 ns/op	      55 B/op	       1 allocs/op
-BenchmarkLPush-12       	 1000000	      1355 ns/op	     663 B/op	      10 allocs/op
-BenchmarkLPop-12        	25775683	       46.52 ns/op	      49 B/op	       1 allocs/op
-BenchmarkSAdd-12        	 1270429	       857.2 ns/op	     711 B/op	      11 allocs/op
-BenchmarkSMembers-12    	 9298605	       128.3 ns/op	      56 B/op	       2 allocs/op
-BenchmarkZAdd-12        	 1358121	       946.8 ns/op	     598 B/op	      11 allocs/op
-BenchmarkZRank-12       	 8748981	       137.4 ns/op	      55 B/op	       1 allocs/op
-BenchmarkHSet-12        	 1295605	       861.9 ns/op	     791 B/op	      12 allocs/op
-BenchmarkHGet-12        	 7266126	       144.3 ns/op	      55 B/op	       1 allocs/op
+BenchmarkSet-12         	 1469863	        715.9 ns/op	     543 B/op	       7 allocs/op
+BenchmarkGet-12         	12480278	        96.47 ns/op	       7 B/op	       0 allocs/op
+BenchmarkLPush-12       	 1484466	        786.2 ns/op	     615 B/op	       9 allocs/op
+BenchmarkLPop-12        	77275986	        15.10 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSAdd-12        	 1542252	        831.9 ns/op	     663 B/op	      10 allocs/op
+BenchmarkSMembers-12    	12739020	        95.18 ns/op	       8 B/op	       1 allocs/op
+BenchmarkZAdd-12        	 1000000	        1177 ns/op	     550 B/op	      10 allocs/op
+BenchmarkZRank-12       	11430135	        104.1 ns/op	       7 B/op	       0 allocs/op
+BenchmarkHSet-12        	 1341817	        863.5 ns/op	     743 B/op	      11 allocs/op
+BenchmarkHGet-12        	 9801158	        105.9 ns/op	       7 B/op	       0 allocs/op
 ```
 Linux VM: 2C/8GB
 ```bash

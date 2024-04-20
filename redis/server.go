@@ -36,7 +36,7 @@ func handleConn(conn net.Conn, handler func(cmd Value, args []Value) Value) {
 			return
 		}
 
-		if value.typ != "array" {
+		if value.typ != ArrayType {
 			log.Println("Invalid request, expected array")
 			continue
 		}

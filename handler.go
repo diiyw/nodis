@@ -19,7 +19,7 @@ func init() {
 	redisCommands.Set("CONFIG", config)
 	redisCommands.Set("PING", ping)
 	redisCommands.Set("QUIT", quit)
-	redisCommands.Set("FLUSHDB", flushdb)
+	redisCommands.Set("FLUSHDB", flushDB)
 	redisCommands.Set("INFO", info)
 	redisCommands.Set("DEL", del)
 	redisCommands.Set("EXISTS", exists)
@@ -106,31 +106,23 @@ func client(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 
 func config(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	if len(args) == 0 {
-		return redis.ErrorValue("CONFIG subcommand must be provided")
+		return redis.ErrorValue("CONFIG GET requires at least one argument")
 	}
-	switch strings.ToUpper(args[0].Bulk) {
-	case "GET":
-		if len(args) == 1 {
-			return redis.ErrorValue("CONFIG GET requires at least one argument")
-		}
-		if args[1].Bulk == "databases" {
+	if cmd.Options["GET"] {
+		if args[0].Bulk == "databases" {
 			return redis.ArrayValue(redis.StringValue("databases"), redis.IntegerValue(0))
 		}
-		return redis.BulkValue("CONFIG GET")
-	case "SET":
-		if len(args) == 1 {
-			return redis.ErrorValue("CONFIG SET requires at least one argument")
-		}
-		return redis.BulkValue("CONFIG SET")
-	default:
-		return redis.ErrorValue("CONFIG subcommand must be provided")
 	}
+	if cmd.Options["SET"] {
+
+	}
+	return redis.NullValue()
 }
 
 func info(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	memStats := runtime.MemStats{}
 	runtime.ReadMemStats(&memStats)
-	usedMemory := strconv.FormatUint(memStats.Sys, 10)
+	usedMemory := strconv.FormatUint(memStats.HeapInuse+memStats.StackInuse, 10)
 	pid := strconv.Itoa(os.Getpid())
 	return redis.BulkValue(`# Server
 redis_version:6.0.0
@@ -138,13 +130,13 @@ nodis_version:1.3.0
 os:` + runtime.GOOS + `
 process_id:` + pid + `
 # Memory
-used_memory:` + usedMemory)
+used_memory:` + usedMemory + `
+`)
 }
 
-func flushdb(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
+func flushDB(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	n.Clear()
 	return redis.StringValue("OK")
-
 }
 
 func quit(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
@@ -153,7 +145,7 @@ func quit(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 
 func ping(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	if len(args) == 0 {
-		return redis.StringValue("PONG")
+		return redis.BulkValue("PONG")
 	}
 	return redis.BulkValue(args[0].Bulk)
 }
