@@ -32,7 +32,7 @@ Nodis 是使用GO语言实现的、简单可嵌入到应用中内存数据库。
 ## Get Started
 
 ```bash
- go get github.com/diiyw/nodis@v1.2.0
+ go get github.com/diiyw/nodis@v1.5.0
 ```
 ```go
 package main

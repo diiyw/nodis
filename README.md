@@ -31,9 +31,28 @@ Simple way to embed in your application.
 - Support watch changes from remote. (^v1.2.0)
 - Support redis protocol. (^v1.3.0)
 
+## Supported Commands
+| **Client Handling** | **Configuration** | **Key Commands** | **String Commands** | **Set Commands** | **Hash Commands** | **List Commands** | **Sorted Set Commands** |
+|---------------------|-----------------|-----------------|---------------------|-----------------|-----------------|------------------|----------------|
+| CLIENT              | FLUSHALL       	| DEL             | GET                 | SADD            | HSET            | LPUSH            | ZADD                  |
+| PING                | FLUSHDB     	| EXISTS          | SET                 | SSCAN           | HGET            | RPUSH            | ZCARD                 |
+| QUIT                | SAVE       		| EXPIRE          | INCR                | SCARD           | HDEL            | LPOP             | ZRANK                 |
+|                     | INFO          	| EXPIREAT        | DECR                | SPOP            | HLEN            | RPOP             | ZREVRANK              |
+|                     |             	| KEYS            | SETBIT              | SDIFF           | HKEYS           | LLEN             | ZSCORE                |
+|                     |                 | TTL             | GETBIT              | SINTER          | HEXISTS         | LINDEX           | ZINCRBY               |
+|                     |                 | RENAME          | INCR              	| SISMEMBER       | HGETALL         | LINSERT          | ZRANGE                |
+|                     |                 | TYPE            | DESR                | SMEMBERS        | HINCRBY         | LPUSHX           | ZREVRANGE             |
+|                     |                 | SCAN            |                     | SREM            | HCRBYFLOAT    	| RPUSHX           | ZRANGEBYSCORE         |
+|                     |                 |                 |                     |                 | HSETNX          | LREM             | ZREVRANGEBYSCORE      |
+|                     |                 |                 |                     |                 | HMGET           | LSET             | ZREM                  |
+|                     |                 |                 |                     |                 | HMSET           | LRANGE           | ZREMRANGEBYRANK       |
+|                     |                 |                 |                     |                 | HCLEAR          | LPOPRPUSH        | ZREMRANGEBYSCORE      |
+|                     |                 |                 |                     |                 | HSCAN           | RPOPLPUSH        | ZCLEAR                |
+|                     |                 |                 |                     |                 | HVALS           |                  | ZEXISTS               |
+
 ## Get Started
 ```bash
- go get github.com/diiyw/nodis@v1.2.0
+ go get github.com/diiyw/nodis@v1.5.0
 ```
 Or use test version
 ```bash

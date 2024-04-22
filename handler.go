@@ -19,7 +19,9 @@ func init() {
 	redisCommands.Set("CONFIG", config)
 	redisCommands.Set("PING", ping)
 	redisCommands.Set("QUIT", quit)
+	redisCommands.Set("FLUSHALL", flushDB)
 	redisCommands.Set("FLUSHDB", flushDB)
+	redisCommands.Set("SAVE", save)
 	redisCommands.Set("INFO", info)
 	redisCommands.Set("DEL", del)
 	redisCommands.Set("EXISTS", exists)
@@ -110,11 +112,8 @@ func config(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	}
 	if cmd.Options["GET"] {
 		if args[0].Bulk == "databases" {
-			return redis.ArrayValue(redis.StringValue("databases"), redis.IntegerValue(0))
+			return redis.ArrayValue(redis.BulkValue("databases"), redis.BulkValue("0"))
 		}
-	}
-	if cmd.Options["SET"] {
-
 	}
 	return redis.NullValue()
 }
@@ -706,7 +705,7 @@ func hScan(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	r[0] = redis.BulkValue(strconv.FormatInt(cursor, 10))
 	var ret = make([]redis.Value, 0, len(results))
 	for k, v := range results {
-		ret = append(ret, redis.StringValue(k), redis.BulkValue(string(v)))
+		ret = append(ret, redis.BulkValue(k), redis.BulkValue(string(v)))
 	}
 	r[1] = redis.ArrayValue(ret...)
 	return redis.ArrayValue(r...)
@@ -1006,7 +1005,7 @@ func zRange(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 		results := n.ZRangeWithScores(key, start, stop)
 		var r = make([]redis.Value, 0, len(results)*2)
 		for _, v := range results {
-			r = append(r, redis.StringValue(v.Member), redis.BulkValue(strconv.FormatFloat(v.Score, 'f', -1, 64)))
+			r = append(r, redis.BulkValue(v.Member), redis.BulkValue(strconv.FormatFloat(v.Score, 'f', -1, 64)))
 		}
 		return redis.ArrayValue(r...)
 	}
@@ -1029,7 +1028,7 @@ func zRevRange(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 		results := n.ZRevRangeWithScores(key, start, stop)
 		var r = make([]redis.Value, 0, len(results)*2)
 		for _, v := range results {
-			r = append(r, redis.StringValue(v.Member), redis.BulkValue(strconv.FormatFloat(v.Score, 'f', -1, 64)))
+			r = append(r, redis.BulkValue(v.Member), redis.BulkValue(strconv.FormatFloat(v.Score, 'f', -1, 64)))
 		}
 		return redis.ArrayValue(r...)
 	}
@@ -1124,4 +1123,11 @@ func zExists(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 		r = 1
 	}
 	return redis.IntegerValue(r)
+}
+
+func save(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
+	n.store.mu.Lock()
+	n.store.flushChanges()
+	n.store.mu.Unlock()
+	return redis.StringValue("OK")
 }
