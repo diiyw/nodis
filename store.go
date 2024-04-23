@@ -228,8 +228,8 @@ func (s *store) parseDs(data []byte) (string, ds.DataStruct, error) {
 	return entity.Key, dataStruct, nil
 }
 
-// flushChanges flush changed keys to disk
-func (s *store) flushChanges() {
+// save flush changed keys to disk
+func (s *store) save() {
 	now := time.Now().UnixMilli()
 	s.keys.Scan(func(key string, k *Key) bool {
 		meta := s.getMetadata(key)
@@ -428,7 +428,7 @@ func (s *store) snapshot(path string) {
 		log.Println("Snapshot mkdir error: ", err)
 		return
 	}
-	s.flushChanges()
+	s.save()
 	ns := newStore(snapshotDir, s.fileSize, 0, s.filesystem)
 	s.keys.Scan(func(key string, k *Key) bool {
 		if _, ok := ns.keys.Get(key); !ok {
@@ -457,7 +457,7 @@ func (s *store) close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.closed = true
-	s.flushChanges()
+	s.save()
 	err := s.aof.Close()
 	if err != nil {
 		return err

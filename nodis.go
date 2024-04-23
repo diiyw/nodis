@@ -4,13 +4,15 @@ import (
 	"errors"
 	"log"
 	"os"
-	"strings"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/diiyw/nodis/fs"
 	"github.com/diiyw/nodis/pb"
 	"github.com/diiyw/nodis/redis"
 	nSync "github.com/diiyw/nodis/sync"
+	"github.com/diiyw/nodis/utils"
 	"github.com/diiyw/nodis/watch"
 )
 
@@ -237,10 +239,17 @@ func (n *Nodis) Subscribe(addr string) error {
 
 func (n *Nodis) Serve(addr string) error {
 	log.Println("Nodis listen on", addr)
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
+	go func() {
+		<-c
+		log.Printf("Nodis closed %v \n", n.Close())
+		os.Exit(0)
+	}()
 	return redis.Serve(addr, func(cmd redis.Value, args []redis.Value) redis.Value {
-		c, ok := redisCommands.Get(strings.ToUpper(cmd.Bulk))
-		if !ok {
-			return redis.ErrorValue("Unsupported command")
+		c := getCommand(utils.ToUpper(cmd.Bulk))
+		if c == nil {
+			return redis.ErrorValue("Unsupported command '" + cmd.Bulk + "' ")
 		}
 		return c(n, cmd, args)
 	})

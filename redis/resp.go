@@ -3,95 +3,19 @@ package redis
 import (
 	"bufio"
 	"io"
-	"log"
 	"strconv"
-	"strings"
+
+	"github.com/diiyw/nodis/utils"
 )
-
-const (
-	StringType  = '+'
-	ErrType     = '-'
-	IntegerType = ':'
-	BulkType    = '$'
-	ArrayType   = '*'
-	MapType     = '%'
-	DoubleType  = ','
-	NullType    = '_'
-)
-
-var (
-	options = map[string]bool{
-		"NX":         true,
-		"XX":         true,
-		"KEEPTTL":    true,
-		"GET":        true,
-		"LT":         true,
-		"GT":         true,
-		"CH":         true,
-		"INCR":       true,
-		"WITHSCORES": true,
-	}
-
-	args = map[string]bool{
-		"EX":    true,
-		"PX":    true,
-		"EXAT":  true,
-		"PXAT":  true,
-		"MATCH": true,
-		"COUNT": true,
-	}
-)
-
-type Value struct {
-	typ     uint8
-	Str     string
-	Integer int64
-	Bulk    string
-	Double  float64
-	Array   []Value
-	Map     map[string]Value
-	Options map[string]bool
-	Args    map[string]Value
-}
-
-func StringValue(v string) Value {
-	return Value{typ: StringType, Str: v}
-}
-
-func ErrorValue(v string) Value {
-	return Value{typ: ErrType, Str: v}
-}
-
-func BulkValue(v string) Value {
-	return Value{typ: BulkType, Bulk: v}
-}
-
-func IntegerValue(v int64) Value {
-	return Value{typ: IntegerType, Integer: v}
-}
-
-func DoubleValue(v float64) Value {
-	return Value{typ: DoubleType, Double: v}
-}
-
-func ArrayValue(v ...Value) Value {
-	return Value{typ: ArrayType, Array: v}
-}
-
-func MapValue(v map[string]Value) Value {
-	return Value{typ: MapType, Map: v}
-}
-
-func NullValue() Value {
-	return Value{typ: NullType}
-}
 
 type Resp struct {
 	reader *bufio.Reader
 }
 
 func NewResp(rd io.Reader) *Resp {
-	return &Resp{reader: bufio.NewReader(rd)}
+	return &Resp{
+		reader: bufio.NewReader(rd),
+	}
 }
 
 func (r *Resp) readLine() (line []byte, n int, err error) {
@@ -134,8 +58,8 @@ func (r *Resp) Read() (Value, error) {
 	case BulkType:
 		return r.readBulk()
 	default:
-		log.Printf("Unknown type: %v \n", string(_type))
-		return Value{}, nil
+		// read inline
+		return r.readInline(_type)
 	}
 }
 
@@ -165,7 +89,7 @@ func (r *Resp) readArray() (Value, error) {
 			arg = ""
 			continue
 		}
-		b := strings.ToUpper(val.Bulk)
+		b := utils.ToUpper(val.Bulk)
 		// options are special case
 		if options[b] && i != 0 {
 			v.Options[b] = true
@@ -202,6 +126,96 @@ func (r *Resp) readBulk() (Value, error) {
 	// Read the trailing CRLF
 	r.readLine()
 
+	return v, nil
+}
+
+func (r *Resp) readUtil(first, end byte) (data []byte, isEnd bool, err error) {
+	if first != 0 {
+		data = append(data, first)
+	}
+	var prev = byte(0)
+	for {
+		b, err := r.reader.ReadByte()
+		if err != nil {
+			return nil, isEnd, err
+		}
+		if b == '\r' {
+			continue
+		}
+		if b == '\n' {
+			isEnd = true
+			break
+		}
+		if b == end && prev != '\\' {
+			break
+		}
+		prev = b
+		data = append(data, b)
+	}
+	return data, isEnd, nil
+}
+
+func (r *Resp) readInline(first uint8) (Value, error) {
+	v := Value{
+		typ:   ArrayType,
+		Array: make([]Value, 0),
+	}
+	var c = Value{
+		Options: make(map[string]bool),
+		Args:    make(map[string]Value),
+	}
+	block, isEnd, err := r.readUtil(first, ' ')
+	if err != nil {
+		return v, err
+	}
+	c.Bulk = string(block)
+	v.Array = append(v.Array, c)
+	if isEnd {
+		return v, nil
+	}
+	var arg string
+	for {
+		first, err := r.reader.ReadByte()
+		if err != nil {
+			if err != io.EOF {
+				return v, err
+			}
+			break
+		}
+		if first == ' ' || first == '\t' {
+			continue
+		}
+		if first == '\'' || first == '"' {
+			block, isEnd, err = r.readUtil(0, first)
+		} else {
+			block, isEnd, err = r.readUtil(first, ' ')
+		}
+		if err != nil {
+			return v, err
+		}
+		strV := string(block)
+		if arg != "" {
+			c.Args[arg] = BulkValue(strV)
+			arg = ""
+			continue
+		}
+		b := utils.ToUpper(strV)
+		// options are special case
+		if options[b] {
+			c.Options[b] = true
+			continue
+		}
+		// args are special case
+		if args[b] {
+			arg = b
+			continue
+		}
+		// append parsed value to array
+		v.Array = append(v.Array, BulkValue(strV))
+		if isEnd {
+			break
+		}
+	}
 	return v, nil
 }
 

@@ -73,7 +73,12 @@ func main() {
 	n.LPush("list", []byte("value1"))
 }
 ```
-- Watch changes from remote `Server`
+## Examples
+
+<details>
+	<summary> Watch changes</summary>
+
+Server: 
 ```go
 package main
 
@@ -135,8 +140,43 @@ func main() {
 	select {}
 }
 ```
+</details>
+<details>
+	<summary> Simple Redis Server</summary>
+
+```go	
+package main
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/diiyw/nodis"
+)
+
+func main() {
+	opt := nodis.DefaultOptions
+	n := nodis.Open(opt)
+	if err := n.Serve(":6380"); err != nil {
+		fmt.Printf("Serve() = %v", err)
+	}
+}
+```
+You can use redis-cli to connect to the server.
+
+```bash
+redis-cli -p 6380
+> set key value
+```
+
+</details>
+
 ## Benchmark
+<details>
+	<summary>Embed benchmark</summary>
+
 Windows 11: 12C/32G
+
 ```bash
 goos: windows
 goarch: amd64
@@ -152,7 +192,9 @@ BenchmarkZRank-12       	11430135	        104.1 ns/op	       7 B/op	       0 all
 BenchmarkHSet-12        	 1341817	        863.5 ns/op	     743 B/op	      11 allocs/op
 BenchmarkHGet-12        	 9801158	        105.9 ns/op	       7 B/op	       0 allocs/op
 ```
+
 Linux VM: 4C/8GB
+
 ```bash
 goos: linux
 goarch: amd64
@@ -168,6 +210,8 @@ BenchmarkZRank-4      	 4959448	       246.4 ns/op	       7 B/op	       0 allocs
 BenchmarkHSet-4       	  735676	      1971 ns/op	     742 B/op	      11 allocs/op
 BenchmarkHGet-4       	 4442625	       243.4 ns/op	       7 B/op	       0 allocs/op
 ```
+
+</details>
 
 ## Note
 If you want to persist data, please make sure to call the `Close()` method when your application exits.

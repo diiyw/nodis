@@ -4,103 +4,181 @@ import (
 	"os"
 	"runtime"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/tidwall/btree"
-
 	"github.com/diiyw/nodis/redis"
+	"github.com/diiyw/nodis/utils"
 )
 
-var redisCommands btree.Map[string, func(*Nodis, redis.Value, []redis.Value) redis.Value]
-
-func init() {
-	redisCommands.Set("CLIENT", client)
-	redisCommands.Set("CONFIG", config)
-	redisCommands.Set("PING", ping)
-	redisCommands.Set("QUIT", quit)
-	redisCommands.Set("FLUSHALL", flushDB)
-	redisCommands.Set("FLUSHDB", flushDB)
-	redisCommands.Set("SAVE", save)
-	redisCommands.Set("INFO", info)
-	redisCommands.Set("DEL", del)
-	redisCommands.Set("EXISTS", exists)
-	redisCommands.Set("EXPIRE", expire)
-	redisCommands.Set("EXPIREAT", expireAt)
-	redisCommands.Set("KEYS", keys)
-	redisCommands.Set("TTL", ttl)
-	redisCommands.Set("RENAME", rename)
-	redisCommands.Set("TYPE", typ)
-	redisCommands.Set("SCAN", scan)
-	redisCommands.Set("SET", setString)
-	redisCommands.Set("GET", getString)
-	redisCommands.Set("INCR", incr)
-	redisCommands.Set("DESR", decr)
-	redisCommands.Set("SETBIT", setBit)
-	redisCommands.Set("GETBIT", getBit)
-	redisCommands.Set("BITCOUNT", bitCount)
-	redisCommands.Set("SADD", sAdd)
-	redisCommands.Set("SSCAN", sScan)
-	redisCommands.Set("SCARD", scard)
-	redisCommands.Set("SPOP", sPop)
-	redisCommands.Set("SDIFF", sDiff)
-	redisCommands.Set("SINTER", sInter)
-	redisCommands.Set("SISMEMBER", sIsMember)
-	redisCommands.Set("SMEMBERS", sMembers)
-	redisCommands.Set("SREM", sRem)
-	redisCommands.Set("HSET", hSet)
-	redisCommands.Set("HGET", hGet)
-	redisCommands.Set("HDEL", hDel)
-	redisCommands.Set("HLEN", hLen)
-	redisCommands.Set("HKEYS", hKeys)
-	redisCommands.Set("HEXISTS", hExists)
-	redisCommands.Set("HGETALL", hGetAll)
-	redisCommands.Set("HINCRBY", hIncrBy)
-	redisCommands.Set("HINCRBYFLOAT", hIncrByFloat)
-	redisCommands.Set("HSETNX", hSetNX)
-	redisCommands.Set("HMGET", hMGet)
-	redisCommands.Set("HMSET", hMSet)
-	redisCommands.Set("HCLEAR", hClear)
-	redisCommands.Set("HSCAN", hScan)
-	redisCommands.Set("HVALS", hVals)
-	redisCommands.Set("LPUSH", lPush)
-	redisCommands.Set("RPUSH", rPush)
-	redisCommands.Set("LPOP", lPop)
-	redisCommands.Set("RPOP", rPop)
-	redisCommands.Set("LLEN", llen)
-	redisCommands.Set("LINDEX", lIndex)
-	redisCommands.Set("LINSERT", lInsert)
-	redisCommands.Set("LPUSHX", lPushx)
-	redisCommands.Set("RPUSHX", rPushx)
-	redisCommands.Set("LREM", lRem)
-	redisCommands.Set("LSET", lSet)
-	redisCommands.Set("LRANGE", lRange)
-	redisCommands.Set("LPOPRPUSH", lPopRPush)
-	redisCommands.Set("RPOPLPUSH", rPopLPush)
-	redisCommands.Set("ZADD", zAdd)
-	redisCommands.Set("ZCARD", zCard)
-	redisCommands.Set("ZRANK", zRank)
-	redisCommands.Set("ZREVRANK", zRevRank)
-	redisCommands.Set("ZSCORE", zScore)
-	redisCommands.Set("ZINCRBY", zIncrBy)
-	redisCommands.Set("ZRANGE", zRange)
-	redisCommands.Set("ZREVRANGE", zRevRange)
-	redisCommands.Set("ZRANGEBYSCORE", zRangeByScore)
-	redisCommands.Set("ZREVRANGEBYSCORE", zRevRangeByScore)
-	redisCommands.Set("ZREM", zRem)
-	redisCommands.Set("ZREMRANGEBYRANK", zRemRangeByRank)
-	redisCommands.Set("ZREMRANGEBYSCORE", zRemRangeByScore)
-	redisCommands.Set("ZCLEAR", zClear)
-	redisCommands.Set("ZEXISTS", zExists)
+func getCommand(name string) func(*Nodis, redis.Value, []redis.Value) redis.Value {
+	switch name {
+	case "CLIENT":
+		return client
+	case "CONFIG":
+		return config
+	case "PING":
+		return ping
+	case "QUIT":
+		return quit
+	case "FLUSHALL":
+		return flushDB
+	case "FLUSHDB":
+		return flushDB
+	case "SAVE":
+		return save
+	case "INFO":
+		return info
+	case "DEL":
+		return del
+	case "EXISTS":
+		return exists
+	case "EXPIRE":
+		return expire
+	case "EXPIREAT":
+		return expireAt
+	case "KEYS":
+		return keys
+	case "TTL":
+		return ttl
+	case "RENAME":
+		return rename
+	case "TYPE":
+		return typ
+	case "SCAN":
+		return scan
+	case "SET":
+		return setString
+	case "GET":
+		return getString
+	case "INCR":
+		return incr
+	case "DESR":
+		return decr
+	case "SETBIT":
+		return setBit
+	case "GETBIT":
+		return getBit
+	case "BITCOUNT":
+		return bitCount
+	case "SADD":
+		return sAdd
+	case "SSCAN":
+		return sScan
+	case "SCARD":
+		return scard
+	case "SPOP":
+		return sPop
+	case "SDIFF":
+		return sDiff
+	case "SINTER":
+		return sInter
+	case "SISMEMBER":
+		return sIsMember
+	case "SMEMBERS":
+		return sMembers
+	case "SREM":
+		return sRem
+	case "HSET":
+		return hSet
+	case "HGET":
+		return hGet
+	case "HDEL":
+		return hDel
+	case "HLEN":
+		return hLen
+	case "HKEYS":
+		return hKeys
+	case "HEXISTS":
+		return hExists
+	case "HGETALL":
+		return hGetAll
+	case "HINCRBY":
+		return hIncrBy
+	case "HINCRBYFLOAT":
+		return hIncrByFloat
+	case "HSETNX":
+		return hSetNX
+	case "HMGET":
+		return hMGet
+	case "HMSET":
+		return hMSet
+	case "HCLEAR":
+		return hClear
+	case "HSCAN":
+		return hScan
+	case "HVALS":
+		return hVals
+	case "LPUSH":
+		return lPush
+	case "RPUSH":
+		return rPush
+	case "LPOP":
+		return lPop
+	case "RPOP":
+		return rPop
+	case "LLEN":
+		return llen
+	case "LINDEX":
+		return lIndex
+	case "LINSERT":
+		return lInsert
+	case "LPUSHX":
+		return lPushx
+	case "RPUSHX":
+		return rPushx
+	case "LREM":
+		return lRem
+	case "LSET":
+		return lSet
+	case "LRANGE":
+		return lRange
+	case "LPOPRPUSH":
+		return lPopRPush
+	case "RPOPLPUSH":
+		return rPopLPush
+	case "ZADD":
+		return zAdd
+	case "ZCARD":
+		return zCard
+	case "ZRANK":
+		return zRank
+	case "ZREVRANK":
+		return zRevRank
+	case "ZSCORE":
+		return zScore
+	case "ZINCRBY":
+		return zIncrBy
+	case "ZRANGE":
+		return zRange
+	case "ZREVRANGE":
+		return zRevRange
+	case "ZRANGEBYSCORE":
+		return zRangeByScore
+	case "ZREVRANGEBYSCORE":
+		return zRevRangeByScore
+	case "ZREM":
+		return zRem
+	case "ZREMRANGEBYRANK":
+		return zRemRangeByRank
+	case "ZREMRANGEBYSCORE":
+		return zRemRangeByScore
+	case "ZCLEAR":
+		return zClear
+	case "ZEXISTS":
+		return zExists
+	}
+	return nil
 }
 
 func client(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	if len(args) == 0 {
 		return redis.ErrorValue("CLIENT subcommand must be provided")
 	}
-	switch strings.ToUpper(args[0].Bulk) {
+	switch utils.ToUpper(args[0].Bulk) {
 	case "LIST":
 		return redis.ArrayValue()
+	case "SETNAME":
+		return redis.StringValue("OK")
 	default:
 		return redis.ErrorValue("CLIENT subcommand must be provided")
 	}
@@ -124,8 +202,7 @@ func info(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	usedMemory := strconv.FormatUint(memStats.HeapInuse+memStats.StackInuse, 10)
 	pid := strconv.Itoa(os.Getpid())
 	return redis.BulkValue(`# Server
-redis_version:6.0.0
-nodis_version:1.3.0
+redis_version:nodis-1.5.0
 os:` + runtime.GOOS + `
 process_id:` + pid + `
 # Memory
@@ -821,7 +898,7 @@ func lInsert(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 		return redis.ErrorValue("LINSERT requires at least four arguments")
 	}
 	key := args[0].Bulk
-	before := strings.ToUpper(args[1].Bulk) == "BEFORE"
+	before := utils.ToUpper(args[1].Bulk) == "BEFORE"
 	pivot := []byte(args[2].Bulk)
 	value := []byte(args[3].Bulk)
 	return redis.IntegerValue(n.LInsert(key, pivot, value, before))
@@ -1127,7 +1204,7 @@ func zExists(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 
 func save(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	n.store.mu.Lock()
-	n.store.flushChanges()
+	n.store.save()
 	n.store.mu.Unlock()
 	return redis.StringValue("OK")
 }

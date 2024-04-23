@@ -48,9 +48,7 @@ func handleConn(conn net.Conn, handler func(cmd Value, args []Value) Value) {
 		cmd := value.Array[0]
 		cmd.Options = value.Options
 		cmd.Args = value.Args
-		args := value.Array[1:]
-
-		result := handler(cmd, args)
+		result := handler(cmd, value.Array[1:])
 		_ = writer.Write(result)
 	}
 }
