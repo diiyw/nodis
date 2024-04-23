@@ -29,7 +29,7 @@ Simple way to embed in your application.
 - Support custom data storage as backend.(e.g. S3, Browser, etc.)
 - Running on browser with WebAssembly. (^v1.2.0)
 - Support watch changes from remote. (^v1.2.0)
-- Support redis protocol. (^v1.3.0)
+- Support redis protocol. (^v1.5.0)
 
 ## Supported Commands
 | **Client Handling** | **Configuration** | **Key Commands** | **String Commands** | **Set Commands** | **Hash Commands** | **List Commands** | **Sorted Set Commands** |
@@ -42,7 +42,7 @@ Simple way to embed in your application.
 |                     |                 | TTL             | GETBIT              | SINTER          | HEXISTS         | LINDEX           | ZINCRBY               |
 |                     |                 | RENAME          | INCR              	| SISMEMBER       | HGETALL         | LINSERT          | ZRANGE                |
 |                     |                 | TYPE            | DESR                | SMEMBERS        | HINCRBY         | LPUSHX           | ZREVRANGE             |
-|                     |                 | SCAN            |                     | SREM            | HCRBYFLOAT    	| RPUSHX           | ZRANGEBYSCORE         |
+|                     |                 | SCAN            |                     | SREM            | HICRBYFLOAT    	| RPUSHX           | ZRANGEBYSCORE         |
 |                     |                 |                 |                     |                 | HSETNX          | LREM             | ZREVRANGEBYSCORE      |
 |                     |                 |                 |                     |                 | HMGET           | LSET             | ZREM                  |
 |                     |                 |                 |                     |                 | HMSET           | LRANGE           | ZREMRANGEBYRANK       |
