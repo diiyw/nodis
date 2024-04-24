@@ -87,7 +87,17 @@ func (n *Nodis) Get(key string) []byte {
 // Incr increment the integer value of a key by one
 func (n *Nodis) Incr(key string) int64 {
 	meta := n.store.writeKey(key, n.newStr)
-	v := meta.ds.(*str.String).Incr()
+	v := meta.ds.(*str.String).Incr(1)
+	m := make([]byte, 8)
+	binary.LittleEndian.PutUint64(m, uint64(v))
+	n.notify(pb.NewOp(pb.OpType_Set, key).Value(m))
+	meta.commit()
+	return v
+}
+
+func (n *Nodis) IncrBy(key string, increment int64) int64 {
+	meta := n.store.writeKey(key, n.newStr)
+	v := meta.ds.(*str.String).Incr(increment)
 	m := make([]byte, 8)
 	binary.LittleEndian.PutUint64(m, uint64(v))
 	n.notify(pb.NewOp(pb.OpType_Set, key).Value(m))
@@ -98,7 +108,17 @@ func (n *Nodis) Incr(key string) int64 {
 // Decr decrement the integer value of a key by one
 func (n *Nodis) Decr(key string) int64 {
 	meta := n.store.writeKey(key, n.newStr)
-	v := meta.ds.(*str.String).Decr()
+	v := meta.ds.(*str.String).Decr(1)
+	m := make([]byte, 8)
+	binary.LittleEndian.PutUint64(m, uint64(v))
+	n.notify(pb.NewOp(pb.OpType_Set, key).Value(m))
+	meta.commit()
+	return v
+}
+
+func (n *Nodis) DecrBy(key string, decrement int64) int64 {
+	meta := n.store.writeKey(key, n.newStr)
+	v := meta.ds.(*str.String).Decr(decrement)
 	m := make([]byte, 8)
 	binary.LittleEndian.PutUint64(m, uint64(v))
 	n.notify(pb.NewOp(pb.OpType_Set, key).Value(m))

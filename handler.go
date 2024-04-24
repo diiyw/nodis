@@ -18,6 +18,8 @@ func getCommand(name string) func(*Nodis, redis.Value, []redis.Value) redis.Valu
 		return config
 	case "PING":
 		return ping
+	case "ECHO":
+		return echo
 	case "QUIT":
 		return quit
 	case "FLUSHALL":
@@ -48,12 +50,18 @@ func getCommand(name string) func(*Nodis, redis.Value, []redis.Value) redis.Valu
 		return scan
 	case "SET":
 		return setString
+	case "SETEX":
+		return setex
 	case "GET":
 		return getString
 	case "INCR":
 		return incr
+	case "INCRBY":
+		return incrBy
 	case "DESR":
 		return decr
+	case "DECRBY":
+		return decrBy
 	case "SETBIT":
 		return setBit
 	case "GETBIT":
@@ -222,6 +230,13 @@ func quit(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 func ping(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	if len(args) == 0 {
 		return redis.BulkValue("PONG")
+	}
+	return redis.BulkValue(args[0].Bulk)
+}
+
+func echo(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
+	if len(args) == 0 {
+		return redis.NullValue()
 	}
 	return redis.BulkValue(args[0].Bulk)
 }
@@ -402,6 +417,17 @@ func setString(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	return redis.StringValue("OK")
 }
 
+func setex(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
+	if len(args) < 3 {
+		return redis.ErrorValue("SETEX requires at least three arguments")
+	}
+	key := args[0].Bulk
+	seconds, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
+	value := []byte(args[2].Bulk)
+	n.SetEX(key, value, seconds)
+	return redis.StringValue("OK")
+}
+
 func incr(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	if len(args) == 0 {
 		return redis.ErrorValue("INCR requires at least one argument")
@@ -410,12 +436,30 @@ func incr(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	return redis.IntegerValue(n.Incr(key))
 }
 
+func incrBy(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
+	if len(args) < 2 {
+		return redis.ErrorValue("INCRBY requires at least two arguments")
+	}
+	key := args[0].Bulk
+	value, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
+	return redis.IntegerValue(n.IncrBy(key, value))
+}
+
 func decr(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	if len(args) == 0 {
 		return redis.ErrorValue("DECR requires at least one argument")
 	}
 	key := args[0].Bulk
-	return redis.IntegerValue(n.Incr(key))
+	return redis.IntegerValue(n.Decr(key))
+}
+
+func decrBy(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
+	if len(args) < 2 {
+		return redis.ErrorValue("INCRBY requires at least two arguments")
+	}
+	key := args[0].Bulk
+	value, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
+	return redis.IntegerValue(n.DecrBy(key, value))
 }
 
 func getString(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
@@ -683,11 +727,12 @@ func hGetAll(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	}
 	key := args[0].Bulk
 	results := n.HGetAll(key)
-	var r = make(map[string]redis.Value)
+	var r = make([]redis.Value, 0)
 	for k, v := range results {
-		r[k] = redis.BulkValue(string(v))
+		r = append(r, redis.BulkValue(string(k)))
+		r = append(r, redis.BulkValue(string(v)))
 	}
-	return redis.MapValue(r)
+	return redis.ArrayValue(r...)
 }
 
 func hIncrBy(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
@@ -993,7 +1038,7 @@ func zAdd(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	member := args[2].Bulk
 	if cmd.Options["INCR"] {
 		score = n.ZIncrBy(key, member, score)
-		return redis.DoubleValue(score)
+		return redis.BulkValue(strconv.FormatFloat(score, 'f', -1, 64))
 	}
 	if cmd.Options["XX"] {
 		return redis.IntegerValue(n.ZAddXX(key, member, score))
@@ -1057,7 +1102,8 @@ func zScore(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	}
 	key := args[0].Bulk
 	member := args[1].Bulk
-	return redis.DoubleValue(n.ZScore(key, member))
+	score := n.ZScore(key, member)
+	return redis.BulkValue(strconv.FormatFloat(score, 'f', -1, 64))
 }
 
 func zIncrBy(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
@@ -1068,7 +1114,7 @@ func zIncrBy(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	score, _ := strconv.ParseFloat(args[1].Bulk, 64)
 	member := args[2].Bulk
 	v := n.ZIncrBy(key, member, score)
-	return redis.DoubleValue(v)
+	return redis.BulkValue(strconv.FormatFloat(v, 'f', -1, 64))
 }
 
 func zRange(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {

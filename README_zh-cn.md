@@ -36,19 +36,19 @@ English | [简体中文](https://github.com/diiyw/nodis/blob/main/README_zh-cn.m
 | CLIENT              | FLUSHALL       	| DEL             | GET                 | SADD            | HSET            | LPUSH            | ZADD                  |
 | PING                | FLUSHDB     	| EXISTS          | SET                 | SSCAN           | HGET            | RPUSH            | ZCARD                 |
 | QUIT                | SAVE       		| EXPIRE          | INCR                | SCARD           | HDEL            | LPOP             | ZRANK                 |
-|                     | INFO          	| EXPIREAT        | DECR                | SPOP            | HLEN            | RPOP             | ZREVRANK              |
+| ECHO                | INFO          	| EXPIREAT        | DECR                | SPOP            | HLEN            | RPOP             | ZREVRANK              |
 |                     |             	| KEYS            | SETBIT              | SDIFF           | HKEYS           | LLEN             | ZSCORE                |
 |                     |                 | TTL             | GETBIT              | SINTER          | HEXISTS         | LINDEX           | ZINCRBY               |
 |                     |                 | RENAME          | INCR              	| SISMEMBER       | HGETALL         | LINSERT          | ZRANGE                |
 |                     |                 | TYPE            | DESR                | SMEMBERS        | HINCRBY         | LPUSHX           | ZREVRANGE             |
-|                     |                 | SCAN            |                     | SREM            | HCRBYFLOAT    	| RPUSHX           | ZRANGEBYSCORE         |
-|                     |                 |                 |                     |                 | HSETNX          | LREM             | ZREVRANGEBYSCORE      |
-|                     |                 |                 |                     |                 | HMGET           | LSET             | ZREM                  |
+|                     |                 | SCAN            | SETEX               | SREM            | HICRBYFLOAT    	| RPUSHX           | ZRANGEBYSCORE         |
+|                     |                 |                 | INCRBY              |                 | HSETNX          | LREM             | ZREVRANGEBYSCORE      |
+|                     |                 |                 | DECRBY              |                 | HMGET           | LSET             | ZREM                  |
 |                     |                 |                 |                     |                 | HMSET           | LRANGE           | ZREMRANGEBYRANK       |
 |                     |                 |                 |                     |                 | HCLEAR          | LPOPRPUSH        | ZREMRANGEBYSCORE      |
 |                     |                 |                 |                     |                 | HSCAN           | RPOPLPUSH        | ZCLEAR                |
 |                     |                 |                 |                     |                 | HVALS           |                  | ZEXISTS               |
-
+|                     |                 |                 |                     |                 |                 |                  |                       |
 ## Get Started
 ```bash
  go get github.com/diiyw/nodis@v1.5.0

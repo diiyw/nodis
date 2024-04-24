@@ -1,7 +1,8 @@
 package str
 
 import (
-	"encoding/binary"
+	"strconv"
+	"unsafe"
 
 	"github.com/diiyw/nodis/ds"
 )
@@ -30,25 +31,31 @@ func (s *String) Get() []byte {
 }
 
 // Incr increments the value by 1
-func (s *String) Incr() int64 {
-	if len(s.V) != 8 {
-		s.V = make([]byte, 8)
+func (s *String) Incr(step int64) int64 {
+	var v string
+	if len(s.V) == 0 {
+		v = "0"
+	} else {
+		v = unsafe.String(unsafe.SliceData(s.V), len(s.V))
 	}
-	v := binary.LittleEndian.Uint64(s.V)
-	v++
-	binary.LittleEndian.PutUint64(s.V, v)
-	return int64(v)
+	n, _ := strconv.ParseInt(v, 10, 64)
+	n += step
+	s.V = unsafe.Slice(unsafe.StringData(strconv.FormatInt(n, 10)), len(s.V))
+	return n
 }
 
 // Decr decrements the value by 1
-func (s *String) Decr() int64 {
-	if len(s.V) != 8 {
-		s.V = make([]byte, 8)
+func (s *String) Decr(step int64) int64 {
+	var v string
+	if len(s.V) == 0 {
+		v = "0"
+	} else {
+		v = unsafe.String(unsafe.SliceData(s.V), len(s.V))
 	}
-	v := binary.LittleEndian.Uint64(s.V)
-	v--
-	binary.LittleEndian.PutUint64(s.V, v)
-	return int64(v)
+	n, _ := strconv.ParseInt(v, 10, 64)
+	n -= step
+	s.V = unsafe.Slice(unsafe.StringData(strconv.FormatInt(n, 10)), len(s.V))
+	return n
 }
 
 // SetBit set a bit in a key
