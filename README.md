@@ -52,7 +52,7 @@ Simple way to embed in your application.
 |                     |                 |                 |                     |                 |                 |                  |                       |
 ## Get Started
 ```bash
- go get github.com/diiyw/nodis@v1.5.0
+ go get github.com/diiyw/nodis@v1.5.2
 ```
 Or use test version
 ```bash
