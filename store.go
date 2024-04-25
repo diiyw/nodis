@@ -119,6 +119,7 @@ func (s *store) writeKey(key string, newFn func() ds.DataStruct) *metadata {
 				return meta
 			}
 		}
+		meta.markChanged()
 		d, ok := s.values.Get(key)
 		if ok {
 			meta.set(k, d)

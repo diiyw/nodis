@@ -53,8 +53,12 @@ func TestSetBit_BitCount(t *testing.T) {
 func TestSet_Incr(t *testing.T) {
 	s := NewString()
 	s.Set([]byte("100"))
-	if s.Incr(1) != 101 {
+	if v := s.Incr(1); v != 101 {
 		t.Errorf("expected 101, got %d", s.Incr(1))
+	}
+	s.Set([]byte(""))
+	if s.Incr(1) != 1 {
+		t.Errorf("expected 1, got %d", s.Incr(1))
 	}
 }
 

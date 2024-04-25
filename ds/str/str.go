@@ -40,7 +40,8 @@ func (s *String) Incr(step int64) int64 {
 	}
 	n, _ := strconv.ParseInt(v, 10, 64)
 	n += step
-	s.V = unsafe.Slice(unsafe.StringData(strconv.FormatInt(n, 10)), len(s.V))
+	nn := strconv.FormatInt(n, 10)
+	s.V = unsafe.Slice(unsafe.StringData(nn), len(nn))
 	return n
 }
 
@@ -54,7 +55,9 @@ func (s *String) Decr(step int64) int64 {
 	}
 	n, _ := strconv.ParseInt(v, 10, 64)
 	n -= step
-	s.V = unsafe.Slice(unsafe.StringData(strconv.FormatInt(n, 10)), len(s.V))
+	n += step
+	nn := strconv.FormatInt(n, 10)
+	s.V = unsafe.Slice(unsafe.StringData(nn), len(nn))
 	return n
 }
 

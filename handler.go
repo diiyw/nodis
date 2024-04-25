@@ -144,6 +144,10 @@ func getCommand(name string) func(*Nodis, redis.Value, []redis.Value) redis.Valu
 		return lPopRPush
 	case "RPOPLPUSH":
 		return rPopLPush
+	case "BLPOP":
+		return bLPop
+	case "BRPOP":
+		return bRPop
 	case "ZADD":
 		return zAdd
 	case "ZCARD":
@@ -671,7 +675,11 @@ func hGet(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	}
 	key := args[0].Bulk
 	field := args[1].Bulk
-	return redis.BulkValue(string(n.HGet(key, field)))
+	v := string(n.HGet(key, field))
+	if v == "" {
+		return redis.NullValue()
+	}
+	return redis.BulkValue(v)
 }
 
 func hDel(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
@@ -781,7 +789,11 @@ func hMGet(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 	results := n.HMGet(key, fields...)
 	var r = make([]redis.Value, 0, len(results))
 	for _, v := range results {
-		r = append(r, redis.BulkValue(string(v)))
+		if v == nil {
+			r = append(r, redis.NullValue())
+		} else {
+			r = append(r, redis.BulkValue(string(v)))
+		}
 	}
 	return redis.ArrayValue(r...)
 }
@@ -1027,6 +1039,38 @@ func rPopLPush(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
 		return redis.NullValue()
 	}
 	return redis.BulkValue(string(v))
+}
+
+func bLPop(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
+	if len(args) < 2 {
+		return redis.ErrorValue("BLPOP requires at least two arguments")
+	}
+	keys := make([]string, 0, len(args)-1)
+	for i := 0; i < len(args)-1; i++ {
+		keys = append(keys, args[i].Bulk)
+	}
+	timeout, _ := strconv.ParseInt(args[len(args)-1].Bulk, 10, 64)
+	k, v := n.BLPop(time.Duration(timeout)*time.Second, keys...)
+	if k == "" {
+		return redis.NullValue()
+	}
+	return redis.ArrayValue(redis.BulkValue(k), redis.BulkValue(string(v)))
+}
+
+func bRPop(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
+	if len(args) < 2 {
+		return redis.ErrorValue("BRPOP requires at least two arguments")
+	}
+	keys := make([]string, 0, len(args)-1)
+	for i := 0; i < len(args)-1; i++ {
+		keys = append(keys, args[i].Bulk)
+	}
+	timeout, _ := strconv.ParseInt(args[len(args)-1].Bulk, 10, 64)
+	k, v := n.BRPop(time.Duration(timeout)*time.Second, keys...)
+	if k == "" {
+		return redis.NullValue()
+	}
+	return redis.ArrayValue(redis.BulkValue(k), redis.BulkValue(string(v)))
 }
 
 func zAdd(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {

@@ -192,28 +192,40 @@ func (n *Nodis) RPopLPush(source, destination string) []byte {
 	return v[0]
 }
 
-func (n *Nodis) BLPop(key string, timeout time.Duration) []byte {
-	results := n.LPop(key, 1)
-	if results == nil {
-		time.Sleep(timeout)
+func (n *Nodis) BLPop(timeout time.Duration, keys ...string) (string, []byte) {
+	for _, key := range keys {
+		results := n.LPop(key, 1)
+		if results != nil {
+			n.notify(pb.NewOp(pb.OpType_LPop, key))
+			return key, results[0]
+		}
 	}
-	results = n.LPop(key, 1)
-	if results == nil {
-		return nil
+	time.Sleep(timeout)
+	for _, key := range keys {
+		results := n.LPop(key, 1)
+		if results != nil {
+			n.notify(pb.NewOp(pb.OpType_LPop, key))
+			return key, results[0]
+		}
 	}
-	n.notify(pb.NewOp(pb.OpType_LPop, key))
-	return results[0]
+	return "", nil
 }
 
-func (n *Nodis) BRPop(key string, timeout time.Duration) []byte {
-	results := n.RPop(key, 1)
-	if results == nil {
-		time.Sleep(timeout)
+func (n *Nodis) BRPop(timeout time.Duration, keys ...string) (string, []byte) {
+	for _, key := range keys {
+		results := n.RPop(key, 1)
+		if results != nil {
+			n.notify(pb.NewOp(pb.OpType_RPop, key))
+			return key, results[0]
+		}
 	}
-	results = n.RPop(key, 1)
-	if results == nil {
-		return nil
+	time.Sleep(timeout)
+	for _, key := range keys {
+		results := n.RPop(key, 1)
+		if results != nil {
+			n.notify(pb.NewOp(pb.OpType_RPop, key))
+			return key, results[0]
+		}
 	}
-	n.notify(pb.NewOp(pb.OpType_RPop, key))
-	return results[0]
+	return "", nil
 }

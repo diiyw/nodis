@@ -48,8 +48,8 @@ Simple way to embed in your application.
 |                     |                 |                 |                     |                 | HMSET           | LRANGE           | ZREMRANGEBYRANK       |
 |                     |                 |                 |                     |                 | HCLEAR          | LPOPRPUSH        | ZREMRANGEBYSCORE      |
 |                     |                 |                 |                     |                 | HSCAN           | RPOPLPUSH        | ZCLEAR                |
-|                     |                 |                 |                     |                 | HVALS           |                  | ZEXISTS               |
-|                     |                 |                 |                     |                 |                 |                  |                       |
+|                     |                 |                 |                     |                 | HVALS           | BLPOP            | ZEXISTS               |
+|                     |                 |                 |                     |                 |                 | BRPOP            |                       |
 ## Get Started
 ```bash
  go get github.com/diiyw/nodis@latest

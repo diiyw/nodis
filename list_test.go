@@ -82,7 +82,8 @@ func TestList_LIndex(t *testing.T) {
 func TestList_BLPopNoPush(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{Path: "testdata"})
-	if string(n.BLPop("list", time.Second)) != "" {
+	k, _ := n.BLPop(time.Second, "list")
+	if k != "" {
 		t.Error("BLPop failed excepted value got nil")
 	}
 }
@@ -93,7 +94,8 @@ func TestList_BLPop(t *testing.T) {
 	go func() {
 		n.LPush("list", []byte("value"))
 	}()
-	if string(n.BLPop("list", time.Second)) != "value" {
+	_, v := n.BLPop(time.Second, "list")
+	if string(v) != "value" {
 		t.Error("BLPop failed excepted value got nil")
 	}
 }
@@ -101,7 +103,8 @@ func TestList_BLPop(t *testing.T) {
 func TestList_BRPopNoPush(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{Path: "testdata"})
-	if string(n.BRPop("list", time.Second)) != "" {
+	k, _ := n.BRPop(time.Second, "list")
+	if k != "" {
 		t.Error("BRPop failed")
 	}
 }
@@ -112,7 +115,8 @@ func TestList_BRPop(t *testing.T) {
 	go func() {
 		n.RPush("list", []byte("value"))
 	}()
-	if string(n.BRPop("list", time.Second)) != "value" {
+	_, v := n.BRPop(time.Second, "list")
+	if string(v) != "value" {
 		t.Error("BRPop failed")
 	}
 }

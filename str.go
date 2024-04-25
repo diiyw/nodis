@@ -1,8 +1,9 @@
 package nodis
 
 import (
-	"encoding/binary"
+	"strconv"
 	"time"
+	"unsafe"
 
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/str"
@@ -88,8 +89,8 @@ func (n *Nodis) Get(key string) []byte {
 func (n *Nodis) Incr(key string) int64 {
 	meta := n.store.writeKey(key, n.newStr)
 	v := meta.ds.(*str.String).Incr(1)
-	m := make([]byte, 8)
-	binary.LittleEndian.PutUint64(m, uint64(v))
+	vv := strconv.FormatInt(v, 10)
+	m := unsafe.Slice(unsafe.StringData(vv), len(vv))
 	n.notify(pb.NewOp(pb.OpType_Set, key).Value(m))
 	meta.commit()
 	return v
@@ -98,8 +99,8 @@ func (n *Nodis) Incr(key string) int64 {
 func (n *Nodis) IncrBy(key string, increment int64) int64 {
 	meta := n.store.writeKey(key, n.newStr)
 	v := meta.ds.(*str.String).Incr(increment)
-	m := make([]byte, 8)
-	binary.LittleEndian.PutUint64(m, uint64(v))
+	vv := strconv.FormatInt(v, 10)
+	m := unsafe.Slice(unsafe.StringData(vv), len(vv))
 	n.notify(pb.NewOp(pb.OpType_Set, key).Value(m))
 	meta.commit()
 	return v
@@ -109,8 +110,8 @@ func (n *Nodis) IncrBy(key string, increment int64) int64 {
 func (n *Nodis) Decr(key string) int64 {
 	meta := n.store.writeKey(key, n.newStr)
 	v := meta.ds.(*str.String).Decr(1)
-	m := make([]byte, 8)
-	binary.LittleEndian.PutUint64(m, uint64(v))
+	vv := strconv.FormatInt(v, 10)
+	m := unsafe.Slice(unsafe.StringData(vv), len(vv))
 	n.notify(pb.NewOp(pb.OpType_Set, key).Value(m))
 	meta.commit()
 	return v
@@ -119,8 +120,8 @@ func (n *Nodis) Decr(key string) int64 {
 func (n *Nodis) DecrBy(key string, decrement int64) int64 {
 	meta := n.store.writeKey(key, n.newStr)
 	v := meta.ds.(*str.String).Decr(decrement)
-	m := make([]byte, 8)
-	binary.LittleEndian.PutUint64(m, uint64(v))
+	vv := strconv.FormatInt(v, 10)
+	m := unsafe.Slice(unsafe.StringData(vv), len(vv))
 	n.notify(pb.NewOp(pb.OpType_Set, key).Value(m))
 	meta.commit()
 	return v
