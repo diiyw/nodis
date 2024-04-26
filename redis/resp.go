@@ -4,62 +4,129 @@ import (
 	"bufio"
 	"io"
 	"strconv"
+	"unsafe"
 
 	"github.com/diiyw/nodis/utils"
 )
 
 type Resp struct {
 	reader *bufio.Reader
+	buf    []byte
+	r      int
+	l      int
 }
+
+const defaultSize = 4096
 
 func NewResp(rd io.Reader) *Resp {
 	return &Resp{
 		reader: bufio.NewReader(rd),
+		buf:    make([]byte, defaultSize),
 	}
 }
 
-func (r *Resp) readLine() (line []byte, n int, err error) {
+func (r *Resp) grow() {
+	r.buf = append(r.buf, make([]byte, defaultSize)...)
+}
+
+func (r *Resp) readByte() error {
+	b, err := r.reader.ReadByte()
+	if err != nil {
+		return err
+	}
+	r.writeBuff(b)
+	return nil
+}
+
+func (r *Resp) readByteN(n int) error {
+	if r.r+r.l+n > defaultSize {
+		r.grow()
+	}
+	_, err := r.reader.Read(r.buf[r.r : r.r+n])
+	if err != nil {
+		return err
+	}
+	r.l += n
+	return nil
+}
+
+func (r *Resp) writeBuff(b byte) {
+	if r.r+r.l >= defaultSize {
+		r.grow()
+	}
+	r.buf[r.r+r.l] = b
+	r.l++
+}
+
+func (r *Resp) bufFirst() byte {
+	return r.bufIndex(0)
+}
+
+func (r *Resp) bufIndex(i int) byte {
+	if i >= 0 {
+		return r.buf[r.r+i]
+	}
+	return r.buf[r.r+r.l+i]
+}
+
+func (r *Resp) flushString() string {
+	s := unsafe.String(unsafe.SliceData(r.buf[r.r:r.r+r.l]), r.l)
+	r.malloc()
+	return s
+}
+
+func (r *Resp) reset() {
+	r.r = 0
+	r.l = 0
+}
+
+func (r *Resp) malloc() {
+	r.r += r.l
+	r.l = 0
+}
+
+func (r *Resp) readLine() error {
 	for {
-		b, err := r.reader.ReadByte()
+		err := r.readByte()
 		if err != nil {
-			return nil, 0, err
+			return err
 		}
-		n += 1
-		line = append(line, b)
-		if len(line) >= 2 && line[len(line)-2] == '\r' {
+		if r.l > 1 && r.bufIndex(-1) == '\n' {
+			r.l -= 2
 			break
 		}
 	}
-	return line[:len(line)-2], n, nil
+	return nil
 }
 
-func (r *Resp) readInteger() (x int, n int, err error) {
-	line, n, err := r.readLine()
+func (r *Resp) readInteger() (x int, err error) {
+	err = r.readLine()
 	if err != nil {
-		return 0, 0, err
+		return 0, err
 	}
-	i64, err := strconv.ParseInt(string(line), 10, 64)
+	i64, err := strconv.ParseInt(r.flushString(), 10, 64)
 	if err != nil {
-		return 0, n, err
+		return 0, err
 	}
-	return int(i64), n, nil
+	return int(i64), nil
 }
 
 func (r *Resp) Read() (Value, error) {
-	_type, err := r.reader.ReadByte()
-
+	r.malloc()
+	err := r.readByte()
 	if err != nil {
 		return Value{}, err
 	}
 
-	switch _type {
+	switch r.bufFirst() {
 	case ArrayType:
+		r.malloc()
 		return r.readArray()
 	case BulkType:
+		r.malloc()
 		return r.readBulk()
 	default:
-		// read inline
-		return r.readInline(_type)
+		return r.readInline()
 	}
 }
 
@@ -71,7 +138,7 @@ func (r *Resp) readArray() (Value, error) {
 	v.typ = ArrayType
 
 	// read length of array
-	l, _, err := r.readInteger()
+	l, err := r.readInteger()
 	if err != nil {
 		return v, err
 	}
@@ -112,50 +179,46 @@ func (r *Resp) readBulk() (Value, error) {
 
 	v.typ = BulkType
 
-	l, _, err := r.readInteger()
+	l, err := r.readInteger()
 	if err != nil {
 		return v, err
 	}
 
-	bulk := make([]byte, l)
+	r.readByteN(l)
 
-	r.reader.Read(bulk)
-
-	v.Bulk = string(bulk)
+	v.Bulk = r.flushString()
 
 	// Read the trailing CRLF
 	r.readLine()
+	r.malloc()
 
 	return v, nil
 }
 
-func (r *Resp) readUtil(first, end byte) (data []byte, isEnd bool, err error) {
-	if first != 0 {
-		data = append(data, first)
-	}
-	var prev = byte(0)
+func (r *Resp) readUtil(end byte) (isEnd bool, err error) {
 	for {
-		b, err := r.reader.ReadByte()
+		err = r.readByte()
 		if err != nil {
-			return nil, isEnd, err
+			return
 		}
-		if b == '\r' {
+		if r.bufIndex(-1) == '\r' {
+			r.l--
 			continue
 		}
-		if b == '\n' {
+		if r.bufIndex(-1) == '\n' {
 			isEnd = true
+			r.l--
 			break
 		}
-		if b == end && prev != '\\' {
+		if r.bufIndex(-1) == end && r.bufIndex(-2) != '\\' {
+			r.l--
 			break
 		}
-		prev = b
-		data = append(data, b)
 	}
-	return data, isEnd, nil
+	return isEnd, nil
 }
 
-func (r *Resp) readInline(first uint8) (Value, error) {
+func (r *Resp) readInline() (Value, error) {
 	v := Value{
 		typ:   ArrayType,
 		Array: make([]Value, 0),
@@ -164,36 +227,39 @@ func (r *Resp) readInline(first uint8) (Value, error) {
 		Options: make(map[string]bool),
 		Args:    make(map[string]Value),
 	}
-	block, isEnd, err := r.readUtil(first, ' ')
+	isEnd, err := r.readUtil(' ')
 	if err != nil {
 		return v, err
 	}
-	c.Bulk = string(block)
+	c.Bulk = r.flushString()
 	v.Array = append(v.Array, c)
 	if isEnd {
 		return v, nil
 	}
 	var arg string
 	for {
-		first, err := r.reader.ReadByte()
+		err := r.readByte()
 		if err != nil {
 			if err != io.EOF {
 				return v, err
 			}
 			break
 		}
+		first := r.bufFirst()
 		if first == ' ' || first == '\t' {
+			r.malloc()
 			continue
 		}
 		if first == '\'' || first == '"' {
-			block, isEnd, err = r.readUtil(0, first)
+			r.malloc()
+			isEnd, err = r.readUtil(first)
 		} else {
-			block, isEnd, err = r.readUtil(first, ' ')
+			isEnd, err = r.readUtil(' ')
 		}
 		if err != nil {
 			return v, err
 		}
-		strV := string(block)
+		strV := r.flushString()
 		if arg != "" {
 			c.Args[arg] = BulkValue(strV)
 			arg = ""
