@@ -50,5 +50,6 @@ func handleConn(conn net.Conn, handler func(cmd Value, args []Value) Value) {
 		cmd.Args = value.Args
 		result := handler(cmd, value.Array[1:])
 		_ = writer.Write(result)
+		resp.reset()
 	}
 }
