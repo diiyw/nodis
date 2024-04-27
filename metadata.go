@@ -14,7 +14,6 @@ type metadata struct {
 }
 
 func (m *metadata) set(key *Key, d ds.DataStruct) *metadata {
-	m.Lock()
 	m.key = key
 	m.ds = d
 	m.ok = true
@@ -33,6 +32,7 @@ func (m *metadata) markChanged() {
 
 func (m *metadata) commit() {
 	if !m.ok {
+		m.Unlock()
 		return
 	}
 	m.ds = nil

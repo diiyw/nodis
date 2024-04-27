@@ -1,11 +1,12 @@
 package redis
 
 import (
-	"log"
 	"net"
 )
 
-func Serve(addr string, handler func(cmd Value, args []Value) Value) error {
+type HandlerFunc func(w *Writer, cmd *Command)
+
+func Serve(addr string, handler HandlerFunc) error {
 	// Create a new server
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -21,35 +22,23 @@ func Serve(addr string, handler func(cmd Value, args []Value) Value) error {
 	}
 }
 
-func handleConn(conn net.Conn, handler func(cmd Value, args []Value) Value) {
-	writer := NewWriter(conn)
+func handleConn(conn net.Conn, handler HandlerFunc) {
+	reader, writer := NewReader(conn), NewWriter(conn)
 	defer func() {
-		// if r := recover(); r != nil {
-		// 	_ = writer.Write(ErrorValue(r.(error).Error()))
-		// }
+		if r := recover(); r != nil {
+			writer.WriteError(r.(error).Error())
+			writer.Flush()
+		}
 		conn.Close()
 	}()
-	resp := NewResp(conn)
 	for {
-		value, err := resp.Read()
+		err := reader.ReadCommand()
 		if err != nil {
-			return
+			writer.WriteError(err.Error())
+			_ = writer.Flush()
+			break
 		}
-
-		if value.typ != ArrayType {
-			log.Println("Invalid request, expected array")
-			continue
-		}
-
-		if len(value.Array) == 0 {
-			log.Println("Invalid request, expected array length > 0")
-			continue
-		}
-		cmd := value.Array[0]
-		cmd.Options = value.Options
-		cmd.Args = value.Args
-		result := handler(cmd, value.Array[1:])
-		_ = writer.Write(result)
-		resp.reset()
+		handler(writer, reader.cmd)
+		_ = writer.Flush()
 	}
 }

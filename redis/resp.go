@@ -2,6 +2,7 @@ package redis
 
 import (
 	"bufio"
+	"errors"
 	"io"
 	"strconv"
 	"unsafe"
@@ -9,27 +10,31 @@ import (
 	"github.com/diiyw/nodis/utils"
 )
 
-type Resp struct {
+type Reader struct {
 	reader *bufio.Reader
 	buf    []byte
 	r      int
 	l      int
+	cmd    *Command
 }
 
 const defaultSize = 4096
 
-func NewResp(rd io.Reader) *Resp {
-	return &Resp{
+func NewReader(rd io.Reader) *Reader {
+	return &Reader{
 		reader: bufio.NewReader(rd),
 		buf:    make([]byte, defaultSize),
+		cmd: &Command{
+			Args: make([]string, 0),
+		},
 	}
 }
 
-func (r *Resp) grow() {
+func (r *Reader) grow() {
 	r.buf = append(r.buf, make([]byte, defaultSize)...)
 }
 
-func (r *Resp) readByte() error {
+func (r *Reader) readByte() error {
 	b, err := r.reader.ReadByte()
 	if err != nil {
 		return err
@@ -38,7 +43,7 @@ func (r *Resp) readByte() error {
 	return nil
 }
 
-func (r *Resp) readByteN(n int) error {
+func (r *Reader) readByteN(n int) error {
 	if r.r+r.l+n > defaultSize {
 		r.grow()
 	}
@@ -50,7 +55,7 @@ func (r *Resp) readByteN(n int) error {
 	return nil
 }
 
-func (r *Resp) writeBuff(b byte) {
+func (r *Reader) writeBuff(b byte) {
 	if r.r+r.l >= defaultSize {
 		r.grow()
 	}
@@ -58,34 +63,35 @@ func (r *Resp) writeBuff(b byte) {
 	r.l++
 }
 
-func (r *Resp) bufFirst() byte {
+func (r *Reader) bufFirst() byte {
 	return r.bufIndex(0)
 }
 
-func (r *Resp) bufIndex(i int) byte {
+func (r *Reader) bufIndex(i int) byte {
 	if i >= 0 {
 		return r.buf[r.r+i]
 	}
 	return r.buf[r.r+r.l+i]
 }
 
-func (r *Resp) flushString() string {
+func (r *Reader) flushString() string {
 	s := unsafe.String(unsafe.SliceData(r.buf[r.r:r.r+r.l]), r.l)
 	r.malloc()
 	return s
 }
 
-func (r *Resp) reset() {
+func (r *Reader) reset() {
 	r.r = 0
 	r.l = 0
+	r.cmd.Args = make([]string, 0)
 }
 
-func (r *Resp) malloc() {
+func (r *Reader) malloc() {
 	r.r += r.l
 	r.l = 0
 }
 
-func (r *Resp) readLine() error {
+func (r *Reader) readLine() error {
 	for {
 		err := r.readByte()
 		if err != nil {
@@ -99,7 +105,7 @@ func (r *Resp) readLine() error {
 	return nil
 }
 
-func (r *Resp) readInteger() (x int, err error) {
+func (r *Reader) readInteger() (x int, err error) {
 	err = r.readLine()
 	if err != nil {
 		return 0, err
@@ -111,102 +117,147 @@ func (r *Resp) readInteger() (x int, err error) {
 	return int(i64), nil
 }
 
-func (r *Resp) Read() (Value, error) {
-	r.malloc()
+var (
+	ErrInvalidRequestExceptedArray       = errors.New("invalid request, expected array")
+	ErrInvalidRequestExceptedArrayLength = errors.New("invalid request, expected array length")
+	ErrInvalidRequestExceptedBulk        = errors.New("invalid request, expected bulk")
+)
+
+func (r *Reader) ReadCommand() error {
+	r.reset()
+	// Read resp type
 	err := r.readByte()
 	if err != nil {
-		return Value{}, err
+		return err
 	}
-
-	switch r.bufFirst() {
-	case ArrayType:
-		r.malloc()
-		return r.readArray()
-	case BulkType:
-		r.malloc()
-		return r.readBulk()
-	default:
-		return r.readInline()
+	if r.bufFirst() != ArrayType {
+		return r.ReadInlineCommand()
 	}
-}
-
-func (r *Resp) readArray() (Value, error) {
-	v := Value{
-		Options: make(map[string]bool),
-		Args:    make(map[string]Value),
-	}
-	v.typ = ArrayType
-
-	// read length of array
+	r.malloc()
+	// Read length of array
 	l, err := r.readInteger()
 	if err != nil {
-		return v, err
+		return ErrInvalidRequestExceptedArrayLength
 	}
-
-	// foreach line, parse and read the value
-	v.Array = make([]Value, 0)
-	var arg string
+	var v string
 	for i := 0; i < l; i++ {
-		val, err := r.Read()
+		// Read first args, it should be command name
+		v, err = r.readBulk()
 		if err != nil {
-			return v, err
+			return ErrInvalidRequestExceptedArray
 		}
-		if arg != "" {
-			v.Args[arg] = val
-			arg = ""
+		if i == 0 {
+			r.cmd.Name = utils.ToUpper(v)
 			continue
 		}
-		b := utils.ToUpper(val.Bulk)
-		// options are special case
-		if options[b] && i != 0 {
-			v.Options[b] = true
-			continue
-		}
-		// args are special case
-		if args[b] {
-			arg = b
-			continue
-		}
-		// append parsed value to array
-		v.Array = append(v.Array, val)
+		r.cmd.Args = append(r.cmd.Args, v)
+		r.readOptions(v, i-1)
 	}
-
-	return v, nil
+	return nil
 }
 
-func (r *Resp) readBulk() (Value, error) {
-	v := Value{}
+func (r *Reader) readOptions(v string, i int) {
+	switch r.cmd.Name {
+	case "SET":
+		if i > 2 {
+			opt := utils.ToUpper(v)
+			switch opt {
+			case "NX":
+				r.cmd.Options.NX = i
+			case "XX":
+				r.cmd.Options.XX = i
+			case "EX":
+				r.cmd.Options.EX = i + 1
+			case "EXAT":
+				r.cmd.Options.EXAT = i + 1
+			case "PX":
+				r.cmd.Options.PX = i + 1
+			case "PXAT":
+				r.cmd.Options.PXAT = i + 1
+			case "GET":
+				r.cmd.Options.GET = i
+			case "KEEPTTL":
+				r.cmd.Options.KEEPTTL = i
+			}
+		}
+	case "ZADD":
+		if i > 1 {
+			opt := utils.ToUpper(v)
+			switch opt {
+			case "NX":
+				r.cmd.Options.NX = i
+			case "XX":
+				r.cmd.Options.XX = i
+			case "CH":
+				r.cmd.Options.CH = i
+			case "INCR":
+				r.cmd.Options.INCR = i
+			case "GT":
+				r.cmd.Options.GT = i
+			case "LT":
+				r.cmd.Options.LT = i
+			}
+		}
+	case "ZRANGE":
+		if i > 3 {
+			opt := utils.ToUpper(v)
+			switch opt {
+			case "WITHSCORES":
+				r.cmd.Options.WITHSCORES = i
+			case "LIMIT":
+				r.cmd.Options.OFFSET = i + 1
+				r.cmd.Options.COUNT = i + 2
+			case "BYSCORE":
+				r.cmd.Options.BYSCORE = i
+			case "BYLEX":
+				r.cmd.Options.BYLEX = i
+			}
+		}
+	case "CONFIG":
+		if i > 0 {
+			opt := utils.ToUpper(v)
+			switch opt {
+			case "GET":
+				r.cmd.Options.GET = i + 1
+			}
+		}
+	}
+}
 
-	v.typ = BulkType
-
+func (r *Reader) readBulk() (string, error) {
+	err := r.readByte()
+	if err != nil {
+		return "", err
+	}
+	if r.bufFirst() != BulkType {
+		return "", ErrInvalidRequestExceptedBulk
+	}
+	r.malloc()
 	l, err := r.readInteger()
 	if err != nil {
-		return v, err
+		return "", err
 	}
-
 	r.readByteN(l)
-
-	v.Bulk = r.flushString()
-
+	v := r.flushString()
 	// Read the trailing CRLF
 	r.readLine()
 	r.malloc()
-
 	return v, nil
 }
 
-func (r *Resp) readUtil(end byte) (isEnd bool, err error) {
+func (r *Reader) readUtil(end byte) (bool, error) {
+	var lineEnd bool
 	for {
-		err = r.readByte()
+		err := r.readByte()
 		if err != nil {
-			return
+			return lineEnd, err
 		}
 		if r.bufIndex(-1) == '\r' {
 			r.l--
 			continue
 		}
 		if r.bufIndex(-1) == '\n' {
-			isEnd = true
+			lineEnd = true
 			r.l--
 			break
 		}
@@ -215,33 +266,24 @@ func (r *Resp) readUtil(end byte) (isEnd bool, err error) {
 			break
 		}
 	}
-	return isEnd, nil
+	return lineEnd, nil
 }
 
-func (r *Resp) readInline() (Value, error) {
-	v := Value{
-		typ:   ArrayType,
-		Array: make([]Value, 0),
-	}
-	var c = Value{
-		Options: make(map[string]bool),
-		Args:    make(map[string]Value),
-	}
-	isEnd, err := r.readUtil(' ')
+func (r *Reader) ReadInlineCommand() error {
+	lineEnd, err := r.readUtil(' ')
 	if err != nil {
-		return v, err
+		return err
 	}
-	c.Bulk = r.flushString()
-	v.Array = append(v.Array, c)
-	if isEnd {
-		return v, nil
+	r.cmd.Name = utils.ToUpper(r.flushString())
+	if lineEnd {
+		return nil
 	}
-	var arg string
+	var i = 0
 	for {
 		err := r.readByte()
 		if err != nil {
 			if err != io.EOF {
-				return v, err
+				return err
 			}
 			break
 		}
@@ -252,154 +294,117 @@ func (r *Resp) readInline() (Value, error) {
 		}
 		if first == '\'' || first == '"' {
 			r.malloc()
-			isEnd, err = r.readUtil(first)
+			lineEnd, err = r.readUtil(first)
 		} else {
-			isEnd, err = r.readUtil(' ')
+			lineEnd, err = r.readUtil(' ')
 		}
 		if err != nil {
-			return v, err
+			return err
 		}
-		strV := r.flushString()
-		if arg != "" {
-			c.Args[arg] = BulkValue(strV)
-			arg = ""
-			continue
-		}
-		b := utils.ToUpper(strV)
-		// options are special case
-		if options[b] {
-			c.Options[b] = true
-			continue
-		}
-		// args are special case
-		if args[b] {
-			arg = b
-			continue
-		}
-		// append parsed value to array
-		v.Array = append(v.Array, BulkValue(strV))
-		if isEnd {
+		v := r.flushString()
+		r.cmd.Args = append(r.cmd.Args, v)
+		i++
+		r.readOptions(v, i)
+		if lineEnd {
 			break
 		}
 	}
-	return v, nil
+	return nil
 }
 
-// Marshal Value to bytes
-func (v Value) Marshal() []byte {
-	switch v.typ {
-	case ArrayType:
-		return v.marshalArray()
-	case BulkType:
-		return v.marshalBulk()
-	case StringType:
-		return v.marshalString()
-	case NullType:
-		return v.marshallNull()
-	case ErrType:
-		return v.marshallError()
-	case IntegerType:
-		return v.marshallInteger()
-	case MapType:
-		return v.marshallMap()
-	case DoubleType:
-		return v.marshallDouble()
-	default:
-		return []byte{}
-	}
-}
-
-func (v Value) marshalString() []byte {
-	var bytes []byte
-	bytes = append(bytes, StringType)
-	bytes = append(bytes, v.Str...)
-	bytes = append(bytes, '\r', '\n')
-
-	return bytes
-}
-
-func (v Value) marshalBulk() []byte {
-	var bytes []byte
-	bytes = append(bytes, BulkType)
-	bytes = append(bytes, strconv.Itoa(len(v.Bulk))...)
-	bytes = append(bytes, '\r', '\n')
-	bytes = append(bytes, v.Bulk...)
-	bytes = append(bytes, '\r', '\n')
-
-	return bytes
-}
-
-func (v Value) marshalArray() []byte {
-	l := len(v.Array)
-	var bytes []byte
-	bytes = append(bytes, ArrayType)
-	bytes = append(bytes, strconv.Itoa(l)...)
-	bytes = append(bytes, '\r', '\n')
-
-	for i := 0; i < l; i++ {
-		bytes = append(bytes, v.Array[i].Marshal()...)
-	}
-
-	return bytes
-}
-
-func (v Value) marshallError() []byte {
-	var bytes []byte
-	bytes = append(bytes, ErrType)
-	bytes = append(bytes, v.Str...)
-	bytes = append(bytes, '\r', '\n')
-
-	return bytes
-}
-
-func (v Value) marshallNull() []byte {
-	return []byte("$-1\r\n")
-}
-
-func (v Value) marshallInteger() []byte {
-	var bytes []byte
-	bytes = append(bytes, IntegerType)
-	bytes = append(bytes, strconv.FormatInt(v.Integer, 10)...)
-	bytes = append(bytes, '\r', '\n')
-	return bytes
-}
-
-func (v Value) marshallDouble() []byte {
-	var bytes []byte
-	bytes = append(bytes, DoubleType)
-	bytes = append(bytes, strconv.FormatFloat(v.Double, 'f', -1, 64)...)
-	bytes = append(bytes, '\r', '\n')
-	return bytes
-}
-
-func (v Value) marshallMap() []byte {
-	var bytes []byte
-	bytes = append(bytes, MapType)
-	bytes = append(bytes, strconv.Itoa(len(v.Map))...)
-	bytes = append(bytes, '\r', '\n')
-	for k, v := range v.Map {
-		bytes = append(bytes, StringValue(k).Marshal()...)
-		bytes = append(bytes, v.Marshal()...)
-	}
-	return bytes
-}
-
-// Writer
-
+// Writer is a RESP writer
 type Writer struct {
 	writer io.Writer
+	buf    []byte
+	w      int
 }
 
 func NewWriter(w io.Writer) *Writer {
-	return &Writer{writer: w}
+	return &Writer{
+		writer: w,
+		buf:    make([]byte, defaultSize),
+	}
 }
 
-func (w *Writer) Write(v Value) error {
-	var bytes = v.Marshal()
-	_, err := w.writer.Write(bytes)
+func (w *Writer) grow() {
+	w.buf = append(w.buf, make([]byte, defaultSize)...)
+}
+
+func (w *Writer) Flush() error {
+	_, err := w.writer.Write(w.buf[:w.w])
 	if err != nil {
 		return err
 	}
-
+	w.w = 0
 	return nil
+}
+
+func (w *Writer) writeByte(b byte) {
+	if w.w >= defaultSize {
+		w.grow()
+	}
+	w.buf[w.w] = b
+	w.w++
+}
+
+func (w *Writer) writeBytes(b ...byte) {
+	for _, v := range b {
+		w.writeByte(v)
+	}
+}
+
+func (w *Writer) WriteString(str string) {
+	w.writeByte(StringType)
+	w.writeBytes(utils.String2Bytes(str)...)
+	w.writeBytes('\r', '\n')
+}
+
+func (w *Writer) WriteBulk(bulk string) {
+	w.writeByte(BulkType)
+	w.writeBytes(utils.String2Bytes(strconv.Itoa(len(bulk)))...)
+	w.writeBytes('\r', '\n')
+	w.writeBytes(utils.String2Bytes(bulk)...)
+	w.writeBytes('\r', '\n')
+}
+
+func (w *Writer) WriteArray(l int) {
+	w.writeByte(ArrayType)
+	w.writeBytes(utils.String2Bytes(strconv.Itoa(l))...)
+	w.writeBytes('\r', '\n')
+}
+
+func (w *Writer) WriteError(err string) {
+	w.writeByte(ErrType)
+	w.writeBytes(utils.String2Bytes(err)...)
+	w.writeBytes('\r', '\n')
+}
+
+func (w *Writer) WriteNull() {
+	w.writeBytes([]byte("$-1\r\n")...)
+}
+
+func (w *Writer) WriteInteger(v int64) {
+	w.writeByte(IntegerType)
+	w.writeBytes(utils.String2Bytes(strconv.FormatInt(v, 10))...)
+	w.writeBytes('\r', '\n')
+}
+
+func (w *Writer) WriteDouble(v float64) {
+	w.writeByte(DoubleType)
+	w.writeBytes(utils.String2Bytes(strconv.FormatFloat(v, 'f', -1, 64))...)
+	w.writeBytes('\r', '\n')
+}
+
+func (w *Writer) WriteMap(n int) {
+	w.writeByte(MapType)
+	w.writeBytes(utils.String2Bytes(strconv.Itoa(n))...)
+	w.writeBytes('\r', '\n')
+}
+
+func (w *Writer) WriteNullMap() {
+	w.writeBytes([]byte("%-1\r\n")...)
+}
+
+func (w *Writer) WriteOK() {
+	w.writeBytes([]byte("+OK\r\n")...)
 }

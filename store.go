@@ -21,11 +21,12 @@ import (
 	"github.com/diiyw/nodis/ds/zset"
 	"github.com/diiyw/nodis/fs"
 	"github.com/diiyw/nodis/pb"
+	"github.com/diiyw/nodis/utils"
 	"github.com/tidwall/btree"
 )
 
 type store struct {
-	mu           sync.Mutex
+	mu           sync.RWMutex
 	metaPool     []*metadata
 	keys         btree.Map[string, *Key]
 	values       btree.Map[string, ds.DataStruct]
@@ -90,22 +91,15 @@ func newStore(path string, fileSize int64, metaPoolSize int, filesystem fs.Fs) *
 	return s
 }
 
-func fnv32(key string) uint32 {
-	h := uint32(2166136261)
-	for i := 0; i < len(key); i++ {
-		h *= 16777619
-		h ^= uint32(key[i])
-	}
-	return h
-}
-
 func (s *store) spread(hashCode uint32) *metadata {
 	tableSize := uint32(s.metaPoolSize)
 	return s.metaPool[(tableSize-1)&hashCode]
 }
 
 func (s *store) getMetadata(key string) *metadata {
-	return s.spread(fnv32(key))
+	m := s.spread(utils.Fnv32(key))
+	m.Lock()
+	return m
 }
 
 func (s *store) writeKey(key string, newFn func() ds.DataStruct) *metadata {
@@ -145,6 +139,8 @@ func (s *store) writeKey(key string, newFn func() ds.DataStruct) *metadata {
 }
 
 func (s *store) readKey(key string) *metadata {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	meta := s.getMetadata(key)
 	k, ok := s.keys.Get(key)
 	if ok {
@@ -171,7 +167,7 @@ func (s *store) delKey(key string) {
 
 func (s *store) fromStorage(k *Key, meta *metadata) *metadata {
 	// try get from storage
-	v, err := s.getKey(k)
+	v, err := s.getEntryRaw(k)
 	if err == nil && len(v) > 0 {
 		key, value, err := s.parseDs(v)
 		if err != nil {
@@ -192,43 +188,43 @@ func (s *store) parseEntry(data []byte) (*pb.Entry, error) {
 	if c32 != crc32.ChecksumIEEE(data[4:]) {
 		return nil, ErrCorruptedData
 	}
-	var entity pb.Entry
-	if err := proto.Unmarshal(data[4:], &entity); err != nil {
+	var entry pb.Entry
+	if err := proto.Unmarshal(data[4:], &entry); err != nil {
 		return nil, err
 	}
-	return &entity, nil
+	return &entry, nil
 }
 
 // parseDs the data
 func (s *store) parseDs(data []byte) (string, ds.DataStruct, error) {
-	var entity, err = s.parseEntry(data)
+	var entry, err = s.parseEntry(data)
 	if err != nil {
 		return "", nil, err
 	}
 	var dataStruct ds.DataStruct
-	switch ds.DataType(entity.Type) {
+	switch ds.DataType(entry.Type) {
 	case ds.String:
 		v := str.NewString()
-		v.SetValue(entity.GetStringValue().Value)
+		v.SetValue(entry.GetStringValue().Value)
 		dataStruct = v
 	case ds.ZSet:
 		z := zset.NewSortedSet()
-		z.SetValue(entity.GetZSetValue().Values)
+		z.SetValue(entry.GetZSetValue().Values)
 		dataStruct = z
 	case ds.List:
 		l := list.NewDoublyLinkedList()
-		l.SetValue(entity.GetListValue().Values)
+		l.SetValue(entry.GetListValue().Values)
 		dataStruct = l
 	case ds.Hash:
 		h := hash.NewHashMap()
-		h.SetValue(entity.GetHashValue().Values)
+		h.SetValue(entry.GetHashValue().Values)
 		dataStruct = h
 	case ds.Set:
 		v := set.NewSet()
-		v.SetValue(entity.GetSetValue().Values)
+		v.SetValue(entry.GetSetValue().Values)
 		dataStruct = v
 	}
-	return entity.Key, dataStruct, nil
+	return entry.Key, dataStruct, nil
 }
 
 // save flush changed keys to disk
@@ -324,14 +320,14 @@ func (s *store) check() (int64, error) {
 	return offset, nil
 }
 
-func (s *store) putKv(k string, key *Key, value ds.DataStruct) error {
+func (s *store) putKv(name string, key *Key, value ds.DataStruct) error {
 	offset, err := s.check()
 	if err != nil {
 		return err
 	}
 	key.fileId = s.fileId
 	key.offset = offset
-	entry := newEntry(k, value, key.expiration)
+	entry := newEntry(name, value, key.expiration)
 	data, err := entry.Marshal()
 	if err != nil {
 		return err
@@ -367,15 +363,15 @@ func (s *store) putEntry(entry *pb.Entry) error {
 	return nil
 }
 
-func (s *store) putRaw(key string, data []byte, k *Key) error {
+func (s *store) putRaw(name string, key *Key, data []byte) error {
 	offset, err := s.check()
 	if err != nil {
 		return err
 	}
-	k.fileId = s.fileId
-	k.offset = offset
-	k.size = uint32(len(data))
-	s.keys.Set(key, k)
+	key.fileId = s.fileId
+	key.offset = offset
+	key.size = uint32(len(data))
+	s.keys.Set(name, key)
 	_, err = s.aof.Write(data)
 	if err != nil {
 		return err
@@ -383,16 +379,8 @@ func (s *store) putRaw(key string, data []byte, k *Key) error {
 	return nil
 }
 
-// get a value by key
-func (s *store) get(key string) ([]byte, error) {
-	k, ok := s.keys.Get(key)
-	if !ok {
-		return nil, nil
-	}
-	return s.getKey(k)
-}
-
-func (s *store) getKey(key *Key) ([]byte, error) {
+// getEntryRaw get entry raw data
+func (s *store) getEntryRaw(key *Key) ([]byte, error) {
 	if key.fileId == s.fileId {
 		data := make([]byte, key.size)
 		_, err := s.aof.ReadAt(data, key.offset)
@@ -433,16 +421,16 @@ func (s *store) snapshot(path string) {
 	}
 	s.save()
 	ns := newStore(snapshotDir, s.fileSize, 0, s.filesystem)
-	s.keys.Scan(func(key string, k *Key) bool {
-		if _, ok := ns.keys.Get(key); !ok {
+	s.keys.Scan(func(name string, key *Key) bool {
+		if _, ok := ns.keys.Get(name); !ok {
 			return true
 		}
-		data, err := s.get(key)
+		data, err := s.getEntryRaw(key)
 		if err != nil {
 			log.Println("Snapshot get error: ", err)
 			return true
 		}
-		err = ns.putRaw(key, data, k)
+		err = ns.putRaw(name, key, data)
 		if err != nil {
 			log.Println("Snapshot put error: ", err)
 			return true

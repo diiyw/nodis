@@ -12,7 +12,6 @@ import (
 	"github.com/diiyw/nodis/pb"
 	"github.com/diiyw/nodis/redis"
 	nSync "github.com/diiyw/nodis/sync"
-	"github.com/diiyw/nodis/utils"
 	"github.com/diiyw/nodis/watch"
 )
 
@@ -246,11 +245,12 @@ func (n *Nodis) Serve(addr string) error {
 		log.Printf("Nodis closed %v \n", n.Close())
 		os.Exit(0)
 	}()
-	return redis.Serve(addr, func(cmd redis.Value, args []redis.Value) redis.Value {
-		c := getCommand(utils.ToUpper(cmd.Bulk))
+	return redis.Serve(addr, func(w *redis.Writer, cmd *redis.Command) {
+		c := getCommand(cmd.Name)
 		if c == nil {
-			return redis.ErrorValue("Unsupported command '" + cmd.Bulk + "' ")
+			w.WriteError("ERR unknown command: " + cmd.Name)
+			return
 		}
-		return c(n, cmd, args)
+		c(n, w, cmd)
 	})
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/diiyw/nodis/utils"
 )
 
-func getCommand(name string) func(*Nodis, redis.Value, []redis.Value) redis.Value {
+func getCommand(name string) func(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	switch name {
 	case "CLIENT":
 		return client
@@ -22,9 +22,9 @@ func getCommand(name string) func(*Nodis, redis.Value, []redis.Value) redis.Valu
 		return echo
 	case "QUIT":
 		return quit
-	case "FLUSHALL":
-		return flushDB
 	case "FLUSHDB":
+		return flushDB
+	case "FLUSHALL":
 		return flushDB
 	case "SAVE":
 		return save
@@ -182,38 +182,47 @@ func getCommand(name string) func(*Nodis, redis.Value, []redis.Value) redis.Valu
 	return nil
 }
 
-func client(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("CLIENT subcommand must be provided")
+func client(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("CLIENT subcommand must be provided")
+		return
 	}
-	switch utils.ToUpper(args[0].Bulk) {
+	switch utils.ToUpper(cmd.Args[0]) {
 	case "LIST":
-		return redis.ArrayValue()
+		w.WriteArray(0)
 	case "SETNAME":
-		return redis.StringValue("OK")
+		w.WriteString("OK")
 	default:
-		return redis.ErrorValue("CLIENT subcommand must be provided")
+		w.WriteError("CLIENT subcommand must be provided")
 	}
 }
 
-func config(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("CONFIG GET requires at least one argument")
+func config(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("CONFIG GET requires at least two argument")
+		return
 	}
-	if cmd.Options["GET"] {
-		if args[0].Bulk == "databases" {
-			return redis.ArrayValue(redis.BulkValue("databases"), redis.BulkValue("0"))
+	if cmd.Options.GET > 0 {
+		if cmd.Options.GET > len(cmd.Args) {
+			w.WriteError("CONFIG GET requires at least one argument")
+			return
+		}
+		if utils.ToUpper(cmd.Args[cmd.Options.GET]) == "DATABASES" {
+			w.WriteArray(2)
+			w.WriteBulk("databases")
+			w.WriteBulk("0")
+			return
 		}
 	}
-	return redis.NullValue()
+	w.WriteNull()
 }
 
-func info(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
+func info(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	memStats := runtime.MemStats{}
 	runtime.ReadMemStats(&memStats)
 	usedMemory := strconv.FormatUint(memStats.HeapInuse+memStats.StackInuse, 10)
 	pid := strconv.Itoa(os.Getpid())
-	return redis.BulkValue(`# Server
+	w.WriteBulk(`# Server
 redis_version:nodis-1.5.0
 os:` + runtime.GOOS + `
 process_id:` + pid + `
@@ -222,1079 +231,1242 @@ used_memory:` + usedMemory + `
 `)
 }
 
-func flushDB(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
+func ping(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteBulk("PONG")
+		return
+	}
+	w.WriteBulk(cmd.Args[0])
+}
+
+func echo(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteNull()
+		return
+	}
+	w.WriteBulk(cmd.Args[0])
+}
+
+func quit(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	w.WriteOK()
+}
+
+func flushDB(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	n.Clear()
-	return redis.StringValue("OK")
+	w.WriteOK()
 }
 
-func quit(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	return redis.StringValue("OK")
+func del(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("DEL requires at least one argument")
+		return
+	}
+	w.WriteInteger(n.Del(cmd.Args...))
 }
 
-func ping(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.BulkValue("PONG")
+func exists(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("EXISTS requires at least one argument")
+		return
 	}
-	return redis.BulkValue(args[0].Bulk)
+	w.WriteInteger(n.Exists(cmd.Args...))
 }
 
-func echo(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.NullValue()
+func expire(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("EXPIRE requires at least two arguments")
+		return
 	}
-	return redis.BulkValue(args[0].Bulk)
+	if cmd.Options.NX > 0 {
+		seconds, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
+		w.WriteInteger(n.ExpireNX(cmd.Args[0], seconds))
+		return
+	}
+	if cmd.Options.XX > 0 {
+		seconds, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
+		w.WriteInteger(n.ExpireXX(cmd.Args[0], seconds))
+		return
+	}
+	if cmd.Options.LT > 0 {
+		seconds, _ := strconv.ParseInt(cmd.Args[cmd.Options.LT], 10, 64)
+		w.WriteInteger(n.ExpireLT(cmd.Args[0], seconds))
+		return
+	}
+	if cmd.Options.GT > 0 {
+		seconds, _ := strconv.ParseInt(cmd.Args[cmd.Options.GT], 10, 64)
+		w.WriteInteger(n.ExpireGT(cmd.Args[0], seconds))
+		return
+	}
+	seconds, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
+	w.WriteInteger(n.Expire(cmd.Args[0], seconds))
 }
 
-func del(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("DEL requires at least one argument")
+func expireAt(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("EXPIREAT requires at least two arguments")
+		return
 	}
-	keys := make([]string, 0, len(args))
-	for _, arg := range args {
-		keys = append(keys, arg.Bulk)
+	if cmd.Options.NX > 0 {
+		timestamp, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
+		e := time.Unix(timestamp, 0)
+		w.WriteInteger(n.ExpireAtNX(cmd.Args[0], e))
+		return
 	}
-	return redis.IntegerValue(n.Del(keys...))
-}
-
-func exists(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("EXISTS requires at least one argument")
+	if cmd.Options.XX > 0 {
+		timestamp, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
+		e := time.Unix(timestamp, 0)
+		w.WriteInteger(n.ExpireAtXX(cmd.Args[0], e))
+		return
 	}
-	keys := make([]string, 0, len(args))
-	for _, arg := range args {
-		keys = append(keys, arg.Bulk)
+	if cmd.Options.LT > 0 {
+		timestamp, _ := strconv.ParseInt(cmd.Args[cmd.Options.LT], 10, 64)
+		e := time.Unix(timestamp, 0)
+		w.WriteInteger(n.ExpireAtLT(cmd.Args[0], e))
+		return
 	}
-	return redis.IntegerValue(n.Exists(keys...))
-}
-
-func expire(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("EXPIRE requires at least two arguments")
+	if cmd.Options.GT > 0 {
+		timestamp, _ := strconv.ParseInt(cmd.Args[cmd.Options.GT], 10, 64)
+		e := time.Unix(timestamp, 0)
+		w.WriteInteger(n.ExpireAtGT(cmd.Args[0], e))
+		return
 	}
-	key := args[0].Bulk
-	seconds, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
-	if _, ok := cmd.Args["NX"]; ok {
-		return redis.IntegerValue(n.ExpireNX(key, seconds))
-	}
-	if _, ok := cmd.Args["XX"]; ok {
-		return redis.IntegerValue(n.ExpireXX(key, seconds))
-	}
-	if _, ok := cmd.Args["LT"]; ok {
-		return redis.IntegerValue(n.ExpireLT(key, seconds))
-	}
-	if _, ok := cmd.Args["GT"]; ok {
-		return redis.IntegerValue(n.ExpireGT(key, seconds))
-	}
-	return redis.IntegerValue(n.Expire(key, seconds))
-}
-
-func expireAt(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("EXPIREAT requires at least two arguments")
-	}
-	key := args[0].Bulk
-	timestamp, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
+	timestamp, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
 	e := time.Unix(timestamp, 0)
-	if _, ok := cmd.Args["NX"]; ok {
-		return redis.IntegerValue(n.ExpireAtNX(key, e))
-	}
-	if _, ok := cmd.Args["XX"]; ok {
-		return redis.IntegerValue(n.ExpireAtXX(key, e))
-	}
-	if _, ok := cmd.Args["LT"]; ok {
-		return redis.IntegerValue(n.ExpireAtLT(key, e))
-	}
-	if _, ok := cmd.Args["GT"]; ok {
-		return redis.IntegerValue(n.ExpireAtGT(key, e))
-	}
-	return redis.IntegerValue(n.ExpireAt(key, e))
+	w.WriteInteger(n.ExpireAt(cmd.Args[0], e))
 }
 
-func keys(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("KEYS requires at least one argument")
+func keys(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("KEYS requires at least one argument")
+		return
 	}
-	pattern := args[0].Bulk
-	keys := n.Keys(pattern)
-	var k = make([]redis.Value, 0, len(keys))
+	keys := n.Keys(cmd.Args[0])
+	w.WriteArray(len(keys))
 	for _, v := range keys {
-		k = append(k, redis.BulkValue(v))
+		w.WriteBulk(v)
 	}
-	return redis.ArrayValue(k...)
 }
 
-func ttl(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("TTL requires at least one argument")
+func ttl(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("TTL requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
-	return redis.IntegerValue(int64(n.TTL(key).Seconds()))
+	w.WriteInteger(int64(n.TTL(cmd.Args[0]).Seconds()))
 }
 
-func rename(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("RENAME requires at least two arguments")
+func rename(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("RENAME requires at least two arguments")
+		return
 	}
-	oldKey := args[0].Bulk
-	newKey := args[1].Bulk
+	oldKey := cmd.Args[0]
+	newKey := cmd.Args[1]
 	v := n.Rename(oldKey, newKey)
 	if v == nil {
-		return redis.IntegerValue(1)
+		w.WriteInteger(1)
+		return
 	}
-	return redis.ErrorValue(v.Error())
+	w.WriteError(v.Error())
 }
 
-func typ(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("TYPE requires at least one argument")
+func typ(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("TYPE requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
-	return redis.BulkValue(n.Type(key))
+	key := cmd.Args[0]
+	w.WriteBulk(n.Type(key))
 }
 
-func scan(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("SCAN requires at least one argument")
+func scan(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("SCAN requires at least one argument")
+		return
 	}
-	cursor, _ := strconv.ParseInt(args[0].Bulk, 10, 64)
+	cursor, _ := strconv.ParseInt(cmd.Args[0], 10, 64)
 	var match = "*"
 	var count int64
-	if v, ok := cmd.Args["MATCH"]; ok {
-		match = v.Bulk
+	if cmd.Options.MATCH > 0 {
+		match = cmd.Args[cmd.Options.MATCH]
 	}
-	if v, ok := cmd.Args["COUNT"]; ok {
-		count, _ = strconv.ParseInt(v.Bulk, 10, 64)
+	if cmd.Options.COUNT > 0 {
+		count, _ = strconv.ParseInt(cmd.Args[cmd.Options.COUNT], 10, 64)
 	}
 	_, keys := n.Scan(cursor, match, count)
-	var r = make([]redis.Value, 2)
-	r[0] = redis.BulkValue(strconv.FormatInt(cursor, 10))
-	var k = make([]redis.Value, 0, len(keys))
+	w.WriteArray(2)
+	w.WriteBulk(strconv.FormatInt(cursor, 10))
+	w.WriteArray(len(keys))
 	for _, v := range keys {
-		k = append(k, redis.BulkValue(v))
+		w.WriteBulk(v)
 	}
-	r[1] = redis.ArrayValue(k...)
-	return redis.ArrayValue(r...)
 }
 
-func setString(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("SET requires at least two arguments")
+func setString(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("SET requires at least two arguments")
+		return
 	}
-	key := args[0].Bulk
-	value := []byte(args[1].Bulk)
+	key := cmd.Args[0]
+	value := []byte(cmd.Args[1])
 	var get []byte
-	if _, ok := cmd.Args["GET"]; ok {
+	if cmd.Options.GET > 0 {
 		get = n.Get(key)
 	}
-	if _, ok := cmd.Args["NX"]; ok {
+	if cmd.Options.NX > 0 {
 		n.SetNX(key, value)
-	} else if _, ok = cmd.Args["XX"]; ok {
+	} else if cmd.Options.XX > 0 {
 		n.SetXX(key, value)
 	} else {
 		n.Set(key, value)
 	}
-	if _, ok := cmd.Args["EX"]; ok {
-		seconds, _ := strconv.ParseInt(cmd.Args["EX"].Bulk, 10, 64)
+	if cmd.Options.EX > 0 {
+		seconds, _ := strconv.ParseInt(cmd.Args[cmd.Options.EX], 10, 64)
 		n.Expire(key, seconds)
-		return redis.StringValue("OK")
+		w.WriteOK()
+		return
 	}
-	if _, ok := cmd.Args["PX"]; ok {
-		milliseconds, _ := strconv.ParseInt(cmd.Args["PX"].Bulk, 10, 64)
+	if cmd.Options.PX > 0 {
+		milliseconds, _ := strconv.ParseInt(cmd.Args[cmd.Options.PX], 10, 64)
 		n.ExpirePX(key, milliseconds)
-		return redis.StringValue("OK")
+		w.WriteOK()
+		return
 	}
-	if _, ok := cmd.Args["EXAT"]; ok {
-		seconds, _ := strconv.ParseInt(cmd.Args["EX"].Bulk, 10, 64)
+	if cmd.Options.EXAT > 0 {
+		seconds, _ := strconv.ParseInt(cmd.Args[cmd.Options.EXAT], 10, 64)
 		n.ExpireAt(key, time.Unix(seconds, 0))
-		return redis.StringValue("OK")
+		w.WriteOK()
+		return
 	}
-	if _, ok := cmd.Args["PXAT"]; ok {
-		milliseconds, _ := strconv.ParseInt(cmd.Args["PX"].Bulk, 10, 64)
+	if cmd.Options.PXAT > 0 {
+		milliseconds, _ := strconv.ParseInt(cmd.Args[cmd.Options.PXAT], 10, 64)
 		seconds := milliseconds / 1000
 		ns := (milliseconds - seconds*1000) * 1000 * 1000
 		n.ExpireAt(key, time.Unix(seconds, ns))
-		return redis.StringValue("OK")
+		w.WriteOK()
+		return
 	}
 	if get != nil {
-		return redis.BulkValue(string(get))
+		w.WriteBulk(string(get))
+		return
 	}
-	return redis.StringValue("OK")
+	w.WriteOK()
 }
 
-func setex(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 3 {
-		return redis.ErrorValue("SETEX requires at least three arguments")
+func setex(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("SETEX requires at least three arguments")
+		return
 	}
-	key := args[0].Bulk
-	seconds, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
-	value := []byte(args[2].Bulk)
+	key := cmd.Args[0]
+	seconds, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
+	value := []byte(cmd.Args[2])
 	n.SetEX(key, value, seconds)
-	return redis.StringValue("OK")
+	w.WriteOK()
 }
 
-func incr(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("INCR requires at least one argument")
+func incr(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("INCR requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
-	return redis.IntegerValue(n.Incr(key))
+	key := cmd.Args[0]
+	w.WriteInteger(n.Incr(key))
 }
 
-func incrBy(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("INCRBY requires at least two arguments")
+func incrBy(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("INCRBY requires at least two arguments")
+		return
 	}
-	key := args[0].Bulk
-	value, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
-	return redis.IntegerValue(n.IncrBy(key, value))
+	key := cmd.Args[0]
+	value, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
+	w.WriteInteger(n.IncrBy(key, value))
 }
 
-func decr(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("DECR requires at least one argument")
+func decr(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("DECR requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
-	return redis.IntegerValue(n.Decr(key))
+	key := cmd.Args[0]
+	w.WriteInteger(n.Decr(key))
 }
 
-func decrBy(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("INCRBY requires at least two arguments")
+func decrBy(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("INCRBY requires at least two arguments")
+		return
 	}
-	key := args[0].Bulk
-	value, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
-	return redis.IntegerValue(n.DecrBy(key, value))
+	key := cmd.Args[0]
+	value, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
+	w.WriteInteger(n.DecrBy(key, value))
 }
 
-func getString(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("GET requires at least one argument")
+func getString(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("GET requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
-	v := n.Get(key)
+	v := n.Get(cmd.Args[0])
 	if v == nil {
-		return redis.NullValue()
+		w.WriteNull()
+		return
 	}
-	return redis.BulkValue(string(v))
+	w.WriteBulk(string(v))
 }
 
-func setBit(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("SETBIT requires at least two arguments")
+func setBit(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("SETBIT requires at least three arguments")
+		return
 	}
-	key := args[0].Bulk
-	offset, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
-	value, _ := strconv.ParseBool(args[2].Bulk)
+	key := cmd.Args[0]
+	offset, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
+	value, _ := strconv.ParseBool(cmd.Args[2])
 	n.SetBit(key, offset, value)
-	return redis.IntegerValue(1)
+	w.WriteInteger(1)
 }
 
-func getBit(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("GETBIT requires at least two arguments")
+func getBit(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("GETBIT requires at least two arguments")
+		return
 	}
-	key := args[0].Bulk
-	offset, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
-	return redis.IntegerValue(n.GetBit(key, offset))
+	key := cmd.Args[0]
+	offset, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
+	w.WriteInteger(n.GetBit(key, offset))
 }
 
-func bitCount(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("BITCOUNT requires at least one argument")
+func bitCount(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("BITCOUNT requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
+	key := cmd.Args[0]
 	var start, end int64
-	if len(args) > 1 {
-		start, _ = strconv.ParseInt(args[1].Bulk, 10, 64)
+	if len(cmd.Args) > 1 {
+		start, _ = strconv.ParseInt(cmd.Args[1], 10, 64)
 	}
-	if len(args) > 2 {
-		end, _ = strconv.ParseInt(args[2].Bulk, 10, 64)
+	if len(cmd.Args) > 2 {
+		end, _ = strconv.ParseInt(cmd.Args[2], 10, 64)
 	}
-	return redis.IntegerValue(n.BitCount(key, start, end))
+	w.WriteInteger(n.BitCount(key, start, end))
 }
 
-func sAdd(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("SADD requires at least two arguments")
+func sAdd(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("SADD requires at least two arguments")
+		return
 	}
-	key := args[0].Bulk
-	members := make([]string, 0, len(args)-1)
-	for i := 1; i < len(args); i++ {
-		members = append(members, args[i].Bulk)
-	}
-	return redis.IntegerValue(n.SAdd(key, members...))
+	key := cmd.Args[0]
+	w.WriteInteger(n.SAdd(key, cmd.Args[1:]...))
 }
 
-func sScan(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 1 {
-		return redis.ErrorValue("SSCAN requires at least one argument")
+func sScan(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 1 {
+		w.WriteError("SSCAN requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
-	cursor, _ := strconv.ParseInt(args[0].Bulk, 10, 64)
+	key := cmd.Args[0]
+	cursor, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
 	var match = "*"
 	var count int64
-	if v, ok := cmd.Args["MATCH"]; ok {
-		match = v.Bulk
+	if cmd.Options.MATCH > 0 {
+		match = cmd.Args[cmd.Options.MATCH]
 	}
-	if v, ok := cmd.Args["COUNT"]; ok {
-		count, _ = strconv.ParseInt(v.Bulk, 10, 64)
+	if cmd.Options.COUNT > 0 {
+		count, _ = strconv.ParseInt(cmd.Args[cmd.Options.COUNT], 10, 64)
 	}
 	cursor, keys := n.SScan(key, cursor, match, count)
-	var r = make([]redis.Value, 2)
-	r[0] = redis.BulkValue(strconv.FormatInt(cursor, 10))
-	var k = make([]redis.Value, 0, len(keys))
+	w.WriteArray(2)
+	w.WriteBulk(strconv.FormatInt(cursor, 10))
+	w.WriteArray(len(keys))
 	for _, v := range keys {
-		k = append(k, redis.BulkValue(v))
+		w.WriteBulk(v)
 	}
-	r[1] = redis.ArrayValue(k...)
-	return redis.ArrayValue(r...)
 }
 
-func sPop(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("SPOP requires at least one argument")
+func sPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 1 {
+		w.WriteError("SPOP requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
+	var err error
+	key := cmd.Args[0]
 	var count int64 = 1
-	if len(args) > 1 {
-		count, _ = strconv.ParseInt(args[1].Bulk, 10, 64)
+	if cmd.Options.COUNT > 0 {
+		count, err = strconv.ParseInt(cmd.Args[cmd.Options.COUNT], 10, 64)
+		if err != nil {
+			w.WriteError("ERR value is not an integer or out of range")
+			return
+		}
 	}
 	results := n.SPop(key, count)
-	var r = make([]redis.Value, 0, len(results))
+	w.WriteArray(len(results))
 	for _, v := range results {
-		r = append(r, redis.BulkValue(v))
+		w.WriteBulk(v)
 	}
-	return redis.ArrayValue(r...)
 }
 
-func scard(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("SCARD requires at least one argument")
+func scard(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("SCARD requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
-	return redis.IntegerValue(n.SCard(key))
+	key := cmd.Args[0]
+	w.WriteInteger(n.SCard(key))
 }
 
-func sDiff(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("SDIFF requires at least two arguments")
+func sDiff(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("SDIFF requires at least two arguments")
+		return
 	}
-	keys := make([]string, 0, len(args))
-	for _, arg := range args {
-		keys = append(keys, arg.Bulk)
-	}
-	results := n.SDiff(keys...)
-	var r = make([]redis.Value, 0, len(results))
+	results := n.SDiff(cmd.Args...)
+	w.WriteArray(len(results))
 	for _, v := range results {
-		r = append(r, redis.BulkValue(v))
+		w.WriteBulk(v)
 	}
-	return redis.ArrayValue(r...)
 }
 
-func sInter(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("SINTER requires at least two arguments")
+func sInter(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("SINTER requires at least two arguments")
+		return
 	}
-	keys := make([]string, 0, len(args))
-	for _, arg := range args {
-		keys = append(keys, arg.Bulk)
-	}
-	results := n.SInter(keys...)
-	var r = make([]redis.Value, 0, len(results))
+	results := n.SInter(cmd.Args...)
+	w.WriteArray(len(results))
 	for _, v := range results {
-		r = append(r, redis.BulkValue(v))
+		w.WriteBulk(v)
 	}
-	return redis.ArrayValue(r...)
 }
 
-func sIsMember(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("SISMEMBER requires at least two arguments")
+func sIsMember(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("SISMEMBER requires at least two arguments")
+		return
 	}
-	key := args[0].Bulk
-	member := args[1].Bulk
+	key := cmd.Args[0]
+	member := cmd.Args[1]
 	var r int64 = 0
 	is := n.SIsMember(key, member)
 	if is {
 		r = 1
 	}
-	return redis.IntegerValue(r)
+	w.WriteInteger(r)
 }
 
-func sMembers(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("SMEMBERS requires at least one argument")
+func sMembers(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("SMEMBERS requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
+	key := cmd.Args[0]
 	results := n.SMembers(key)
-	var r = make([]redis.Value, 0, len(results))
+	w.WriteArray(len(results))
 	for _, v := range results {
-		r = append(r, redis.BulkValue(v))
+		w.WriteBulk(v)
 	}
-	return redis.ArrayValue(r...)
 }
 
-func sRem(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("SREM requires at least two arguments")
+func sRem(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("SREM requires at least two arguments")
+		return
 	}
-	key := args[0].Bulk
-	members := make([]string, 0, len(args)-1)
-	for i := 1; i < len(args); i++ {
-		members = append(members, args[i].Bulk)
-	}
-	return redis.IntegerValue(n.SRem(key, members...))
+	key := cmd.Args[0]
+	w.WriteInteger(n.SRem(key, cmd.Args[1:]...))
 }
 
-func hSet(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 3 {
-		return redis.ErrorValue("HSET requires at least three arguments")
+func hSet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("HSET requires at least three arguments")
+		return
 	}
-	key := args[0].Bulk
-	field := args[1].Bulk
-	value := args[2].Bulk
+	key := cmd.Args[0]
+	field := cmd.Args[1]
+	value := cmd.Args[2]
 	var i int64 = 1
 	n.HSet(key, field, []byte(value))
-	if len(args) > 3 {
-		var fields = make(map[string][]byte, len(args)-3)
-		for i := 3; i < len(args); i += 2 {
-			if i+1 >= len(args) {
+	if len(cmd.Args) > 3 {
+		var fields = make(map[string][]byte, len(cmd.Args)-3)
+		for i := 3; i < len(cmd.Args); i += 2 {
+			if i+1 >= len(cmd.Args) {
 				break
 			}
-			fields[args[i].Bulk] = []byte(args[i+1].Bulk)
+			fields[cmd.Args[i]] = []byte(cmd.Args[i+1])
 		}
 		i++
 		n.HMSet(key, fields)
 	}
-	return redis.IntegerValue(i)
+	w.WriteInteger(i)
 }
 
-func hGet(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("HGET requires at least two arguments")
+func hGet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("HGET requires at least two arguments")
+		return
 	}
-	key := args[0].Bulk
-	field := args[1].Bulk
+	key := cmd.Args[0]
+	field := cmd.Args[1]
 	v := string(n.HGet(key, field))
 	if v == "" {
-		return redis.NullValue()
+		w.WriteNull()
+		return
 	}
-	return redis.BulkValue(v)
+	w.WriteBulk(v)
 }
 
-func hDel(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("HDEL requires at least two arguments")
+func hDel(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("HDEL requires at least two arguments")
+		return
 	}
-	key := args[0].Bulk
-	fields := make([]string, 0, len(args)-1)
-	for i := 1; i < len(args); i++ {
-		fields = append(fields, args[i].Bulk)
-	}
-	return redis.IntegerValue(n.HDel(key, fields...))
+	key := cmd.Args[0]
+	w.WriteInteger(n.HDel(key, cmd.Args[1:]...))
 }
 
-func hLen(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("HLEN requires at least one argument")
+func hLen(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("HLEN requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
-	return redis.IntegerValue(n.HLen(key))
+	key := cmd.Args[0]
+	w.WriteInteger(n.HLen(key))
 }
 
-func hKeys(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("HKEYS requires at least one argument")
+func hKeys(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("HKEYS requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
+	key := cmd.Args[0]
 	results := n.HKeys(key)
-	var r = make([]redis.Value, 0, len(results))
+	w.WriteArray(len(results))
 	for _, v := range results {
-		r = append(r, redis.BulkValue(v))
+		w.WriteBulk(v)
 	}
-	return redis.ArrayValue(r...)
 }
 
-func hExists(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("HEXISTS requires at least two arguments")
+func hExists(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("HEXISTS requires at least two arguments")
+		return
 	}
-	key := args[0].Bulk
-	field := args[1].Bulk
+	key := cmd.Args[0]
+	field := cmd.Args[1]
 	is := n.HExists(key, field)
 	var r int64 = 0
 	if is {
 		r = 1
 	}
-	return redis.IntegerValue(r)
+	w.WriteInteger(r)
 }
 
-func hGetAll(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("HGETALL requires at least one argument")
+func hGetAll(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("HGETALL requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
+	key := cmd.Args[0]
 	results := n.HGetAll(key)
-	var r = make([]redis.Value, 0)
+	w.WriteArray(len(results) * 2)
 	for k, v := range results {
-		r = append(r, redis.BulkValue(string(k)))
-		r = append(r, redis.BulkValue(string(v)))
+		w.WriteBulk(string(k))
+		w.WriteBulk(string(v))
 	}
-	return redis.ArrayValue(r...)
 }
 
-func hIncrBy(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 3 {
-		return redis.ErrorValue("HINCRBY requires at least three arguments")
+func hIncrBy(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("HINCRBY requires at least three arguments")
+		return
 	}
-	key := args[0].Bulk
-	field := args[1].Bulk
-	value, _ := strconv.ParseInt(args[2].Bulk, 10, 64)
-	return redis.IntegerValue(n.HIncrBy(key, field, value))
+	key := cmd.Args[0]
+	field := cmd.Args[1]
+	value, err := strconv.ParseInt(cmd.Args[2], 10, 64)
+	if err != nil {
+		w.WriteError("ERR value is not an integer or out of range")
+		return
+	}
+	w.WriteInteger(n.HIncrBy(key, field, value))
 }
 
-func hIncrByFloat(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 3 {
-		return redis.ErrorValue("HINCRBYFLOAT requires at least three arguments")
+func hIncrByFloat(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("HINCRBYFLOAT requires at least three arguments")
+		return
 	}
-	key := args[0].Bulk
-	field := args[1].Bulk
-	value, _ := strconv.ParseFloat(args[2].Bulk, 64)
+	key := cmd.Args[0]
+	field := cmd.Args[1]
+	value, err := strconv.ParseFloat(cmd.Args[2], 64)
+	if err != nil {
+		w.WriteError("ERR value is not a valid float")
+		return
+	}
 	f := strconv.FormatFloat(n.HIncrByFloat(key, field, value), 'f', -1, 64)
-	return redis.BulkValue(f)
+	w.WriteBulk(f)
 }
 
-func hSetNX(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 3 {
-		return redis.ErrorValue("HSETNX requires at least three arguments")
+func hSetNX(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("HSETNX requires at least three arguments")
+		return
 	}
-	key := args[0].Bulk
-	field := args[1].Bulk
-	value := args[2].Bulk
+	key := cmd.Args[0]
+	field := cmd.Args[1]
+	value := cmd.Args[2]
 	if n.HSetNX(key, field, []byte(value)) {
-		return redis.IntegerValue(1)
+		w.WriteInteger(1)
 	}
-	return redis.IntegerValue(0)
+	w.WriteInteger(0)
 }
 
-func hMGet(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("HMGET requires at least two arguments")
+func hMGet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("HMGET requires at least two arguments")
+		return
 	}
-	key := args[0].Bulk
-	fields := make([]string, 0, len(args)-1)
-	for i := 1; i < len(args); i++ {
-		fields = append(fields, args[i].Bulk)
-	}
+	key := cmd.Args[0]
+	fields := cmd.Args[1:]
 	results := n.HMGet(key, fields...)
-	var r = make([]redis.Value, 0, len(results))
+	w.WriteArray(len(results))
 	for _, v := range results {
 		if v == nil {
-			r = append(r, redis.NullValue())
+			w.WriteNull()
 		} else {
-			r = append(r, redis.BulkValue(string(v)))
+			w.WriteBulk(string(v))
 		}
 	}
-	return redis.ArrayValue(r...)
 }
 
-func hMSet(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 3 {
-		return redis.ErrorValue("HMSET requires at least three arguments")
+func hMSet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("HMSET requires at least three arguments")
+		return
 	}
-	key := args[0].Bulk
-	fields := make(map[string][]byte, len(args)-1)
-	for i := 1; i < len(args); i += 2 {
-		fields[args[i].Bulk] = []byte(args[i+1].Bulk)
+	key := cmd.Args[0]
+	fields := make(map[string][]byte, len(cmd.Args)-1)
+	for i := 1; i < len(cmd.Args); i += 2 {
+		fields[cmd.Args[i]] = []byte(cmd.Args[i+1])
 	}
 	n.HMSet(key, fields)
-	return redis.StringValue("OK")
+	w.WriteString("OK")
 }
 
-func hClear(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("HCLEAR requires at least one argument")
+func hClear(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("HCLEAR requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
+	key := cmd.Args[0]
 	n.HClear(key)
-	return redis.StringValue("OK")
+	w.WriteString("OK")
 }
 
-func hScan(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("HSCAN requires at least one argument")
+func hScan(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("HSCAN requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
-	cursor, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
+	var err error
+	key := cmd.Args[0]
+	cursor, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
 	var match = "*"
 	var count int64
-	if v, ok := cmd.Args["MATCH"]; ok {
-		match = v.Bulk
+	if cmd.Options.MATCH > 0 {
+		match = cmd.Args[cmd.Options.MATCH]
 	}
-	if v, ok := cmd.Args["COUNT"]; ok {
-		count, _ = strconv.ParseInt(v.Bulk, 10, 64)
+	if cmd.Options.COUNT > 0 {
+		count, err = strconv.ParseInt(cmd.Args[cmd.Options.COUNT], 10, 64)
+		if err != nil {
+			w.WriteError("ERR value is not an integer or out of range")
+			return
+		}
 	}
 	_, results := n.HScan(key, cursor, match, count)
-	var r = make([]redis.Value, 2)
-	r[0] = redis.BulkValue(strconv.FormatInt(cursor, 10))
-	var ret = make([]redis.Value, 0, len(results))
+	w.WriteArray(2)
+	w.WriteBulk(strconv.FormatInt(cursor, 10))
+	w.WriteArray(len(results) * 2)
 	for k, v := range results {
-		ret = append(ret, redis.BulkValue(k), redis.BulkValue(string(v)))
+		w.WriteBulk(k)
+		w.WriteBulk(string(v))
 	}
-	r[1] = redis.ArrayValue(ret...)
-	return redis.ArrayValue(r...)
 }
 
-func hVals(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("HVALS requires at least one argument")
+func hVals(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("HVALS requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
+	key := cmd.Args[0]
 	results := n.HVals(key)
-	var r = make([]redis.Value, 0, len(results))
+	w.WriteArray(len(results))
 	for _, v := range results {
-		r = append(r, redis.BulkValue(string(v)))
+		w.WriteBulk(string(v))
 	}
-	return redis.ArrayValue(r...)
 }
 
-func lPush(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("LPUSH requires at least two arguments")
+func lPush(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("LPUSH requires at least two arguments")
+		return
 	}
-	key := args[0].Bulk
-	values := make([][]byte, 0, len(args)-1)
-	for i := 1; i < len(args); i++ {
-		values = append(values, []byte(args[i].Bulk))
+	key := cmd.Args[0]
+	values := make([][]byte, 0, len(cmd.Args)-1)
+	for i := 1; i < len(cmd.Args); i++ {
+		values = append(values, []byte(cmd.Args[i]))
 	}
-	return redis.IntegerValue(n.LPush(key, values...))
+	w.WriteInteger(n.LPush(key, values...))
 }
 
-func rPush(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("RPUSH requires at least two arguments")
+func rPush(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("RPUSH requires at least two arguments")
+		return
 	}
-	key := args[0].Bulk
-	values := make([][]byte, 0, len(args)-1)
-	for i := 1; i < len(args); i++ {
-		values = append(values, []byte(args[i].Bulk))
+	key := cmd.Args[0]
+	values := make([][]byte, 0, len(cmd.Args)-1)
+	for i := 1; i < len(cmd.Args); i++ {
+		values = append(values, []byte(cmd.Args[i]))
 	}
 
-	return redis.IntegerValue(n.RPush(key, values...))
+	w.WriteInteger(n.RPush(key, values...))
 }
 
-func lPop(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("LPOP requires at least one argument")
+func lPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("LPOP requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
+	var err error
+	key := cmd.Args[0]
 	var count int64 = 1
-	if len(args) > 1 {
-		count, _ = strconv.ParseInt(args[1].Bulk, 10, 64)
+	if len(cmd.Args) > 1 {
+		count, err = strconv.ParseInt(cmd.Args[1], 10, 64)
+		if err != nil {
+			w.WriteError("ERR value is not an integer or out of range")
+			return
+		}
 	}
 	v := n.LPop(key, count)
 	if v == nil {
-		return redis.NullValue()
+		w.WriteNull()
+		return
 	}
 	if count == 1 {
-		return redis.BulkValue(string(v[0]))
+		w.WriteBulk(string(v[0]))
+		return
 	}
-	var r = make([]redis.Value, 0, len(v))
+	w.WriteArray(len(v))
 	for _, vv := range v {
-		r = append(r, redis.BulkValue(string(vv)))
+		w.WriteBulk(string(vv))
 	}
-	return redis.ArrayValue(r...)
 }
 
-func rPop(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("RPOP requires at least one argument")
+func rPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("RPOP requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
+	var err error
+	key := cmd.Args[0]
 	var count int64 = 1
-	if len(args) > 1 {
-		count, _ = strconv.ParseInt(args[1].Bulk, 10, 64)
+	if len(cmd.Args) > 1 {
+		count, err = strconv.ParseInt(cmd.Args[1], 10, 64)
+		if err != nil {
+			w.WriteError("ERR value is not an integer or out of range")
+			return
+		}
 	}
 	v := n.RPop(key, count)
 	if v == nil {
-		return redis.NullValue()
+		w.WriteNull()
+		return
 	}
 	if count == 1 {
-		return redis.BulkValue(string(v[0]))
+		w.WriteBulk(string(v[0]))
+		return
 	}
-	var r = make([]redis.Value, 0, len(v))
+	w.WriteArray(len(v))
 	for _, vv := range v {
-		r = append(r, redis.BulkValue(string(vv)))
+		w.WriteBulk(string(vv))
 	}
-	return redis.ArrayValue(r...)
 }
 
-func llen(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("LLEN requires at least one argument")
+func llen(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("LLEN requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
-	return redis.IntegerValue(n.LLen(key))
+	key := cmd.Args[0]
+	w.WriteInteger(n.LLen(key))
 }
 
-func lIndex(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("LINDEX requires at least two arguments")
+func lIndex(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("LINDEX requires at least two arguments")
+		return
 	}
-	key := args[0].Bulk
-	index, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
+	key := cmd.Args[0]
+	index, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
 	v := n.LIndex(key, index)
 	if v == nil {
-		return redis.NullValue()
+		w.WriteNull()
+		return
 	}
-	return redis.BulkValue(string(v))
+	w.WriteBulk(string(v))
 }
 
-func lInsert(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 4 {
-		return redis.ErrorValue("LINSERT requires at least four arguments")
+func lInsert(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 4 {
+		w.WriteError("LINSERT requires at least four arguments")
+		return
 	}
-	key := args[0].Bulk
-	before := utils.ToUpper(args[1].Bulk) == "BEFORE"
-	pivot := []byte(args[2].Bulk)
-	value := []byte(args[3].Bulk)
-	return redis.IntegerValue(n.LInsert(key, pivot, value, before))
+	key := cmd.Args[0]
+	before := utils.ToUpper(cmd.Args[1]) == "BEFORE"
+	pivot := []byte(cmd.Args[2])
+	value := []byte(cmd.Args[3])
+	w.WriteInteger(n.LInsert(key, pivot, value, before))
 }
 
-func lPushx(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("LPUSHX requires at least two arguments")
+func lPushx(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("LPUSHX requires at least two arguments")
+		return
 	}
-	key := args[0].Bulk
-	value := []byte(args[1].Bulk)
-	return redis.IntegerValue(n.LPushX(key, value))
+	key := cmd.Args[0]
+	value := []byte(cmd.Args[1])
+	w.WriteInteger(n.LPushX(key, value))
 }
 
-func rPushx(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("RPUSHX requires at least two arguments")
+func rPushx(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("RPUSHX requires at least two arguments")
 	}
-	key := args[0].Bulk
-	value := []byte(args[1].Bulk)
-	return redis.IntegerValue(n.RPushX(key, value))
+	key := cmd.Args[0]
+	value := []byte(cmd.Args[1])
+	w.WriteInteger(n.RPushX(key, value))
 }
 
-func lRem(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("LREM requires at least two arguments")
+func lRem(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("LREM requires at least two arguments")
+		return
 	}
-	key := args[0].Bulk
-	count, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
-	value := []byte(args[2].Bulk)
-	return redis.IntegerValue(n.LRem(key, count, value))
+	var err error
+	key := cmd.Args[0]
+	count, err := strconv.ParseInt(cmd.Args[1], 10, 64)
+	if err != nil {
+		w.WriteError("ERR value is not an integer or out of range")
+		return
+	}
+	value := []byte(cmd.Args[2])
+	w.WriteInteger(n.LRem(key, count, value))
 }
 
-func lSet(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 3 {
-		return redis.ErrorValue("LSET requires at least three arguments")
+func lSet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("LSET requires at least three arguments")
+		return
 	}
-	key := args[0].Bulk
-	index, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
-	value := []byte(args[2].Bulk)
+	key := cmd.Args[0]
+	index, err := strconv.ParseInt(cmd.Args[1], 10, 64)
+	if err != nil {
+		w.WriteError("ERR value is not an integer or out of range")
+		return
+	}
+	value := []byte(cmd.Args[2])
 	n.LSet(key, index, value)
-	return redis.StringValue("OK")
+	w.WriteString("OK")
 }
 
-func lRange(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("LRANGE requires at least two arguments")
+func lRange(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("LRANGE requires at least two arguments")
+		return
 	}
-	key := args[0].Bulk
-	start, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
-	end, _ := strconv.ParseInt(args[2].Bulk, 10, 64)
+	key := cmd.Args[0]
+	start, err := strconv.ParseInt(cmd.Args[1], 10, 64)
+	if err != nil {
+		w.WriteError("ERR value is not an integer or out of range")
+		return
+	}
+	end, err := strconv.ParseInt(cmd.Args[2], 10, 64)
+	if err != nil {
+		w.WriteError("ERR value is not an integer or out of range")
+		return
+	}
 	results := n.LRange(key, start, end)
-	var r = make([]redis.Value, 0, len(results))
+	w.WriteArray(len(results))
 	for _, v := range results {
-		r = append(r, redis.BulkValue(string(v)))
+		w.WriteBulk(string(v))
 	}
-	return redis.ArrayValue(r...)
 }
 
-func lPopRPush(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("LPOPRPUSH requires at least two arguments")
+func lPopRPush(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("LPOPRPUSH requires at least two arguments")
+		return
 	}
-	source := args[0].Bulk
-	destination := args[1].Bulk
+	source := cmd.Args[0]
+	destination := cmd.Args[1]
 	v := n.LPopRPush(source, destination)
 	if v == nil {
-		return redis.NullValue()
+		w.WriteNull()
+		return
 	}
-	return redis.BulkValue(string(v))
+	w.WriteBulk(string(v))
 }
 
-func rPopLPush(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("RPOPLPUSH requires at least two arguments")
+func rPopLPush(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("RPOPLPUSH requires at least two arguments")
+		return
 	}
-	source := args[0].Bulk
-	destination := args[1].Bulk
+	source := cmd.Args[0]
+	destination := cmd.Args[1]
 	v := n.RPopLPush(source, destination)
 	if v == nil {
-		return redis.NullValue()
+		w.WriteNull()
+		return
 	}
-	return redis.BulkValue(string(v))
+	w.WriteBulk(string(v))
 }
 
-func bLPop(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("BLPOP requires at least two arguments")
+func bLPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("BLPOP requires at least two arguments")
+		return
 	}
-	keys := make([]string, 0, len(args)-1)
-	for i := 0; i < len(args)-1; i++ {
-		keys = append(keys, args[i].Bulk)
+	keys := make([]string, 0, len(cmd.Args)-1)
+	for i := 0; i < len(cmd.Args)-1; i++ {
+		keys = append(keys, cmd.Args[i])
 	}
-	timeout, _ := strconv.ParseInt(args[len(args)-1].Bulk, 10, 64)
+	timeout, err := strconv.ParseInt(cmd.Args[len(cmd.Args)-1], 10, 64)
+	if err != nil {
+		w.WriteError("ERR timeout value is not an integer or out of range")
+		return
+	}
 	k, v := n.BLPop(time.Duration(timeout)*time.Second, keys...)
 	if k == "" {
-		return redis.NullValue()
+		w.WriteNull()
+		return
 	}
-	return redis.ArrayValue(redis.BulkValue(k), redis.BulkValue(string(v)))
+	w.WriteArray(2)
+	w.WriteBulk(k)
+	w.WriteBulk(string(v))
 }
 
-func bRPop(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("BRPOP requires at least two arguments")
+func bRPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("BRPOP requires at least two arguments")
+		return
 	}
-	keys := make([]string, 0, len(args)-1)
-	for i := 0; i < len(args)-1; i++ {
-		keys = append(keys, args[i].Bulk)
+	keys := make([]string, 0, len(cmd.Args)-1)
+	for i := 0; i < len(cmd.Args)-1; i++ {
+		keys = append(keys, cmd.Args[i])
 	}
-	timeout, _ := strconv.ParseInt(args[len(args)-1].Bulk, 10, 64)
+	timeout, err := strconv.ParseInt(cmd.Args[len(cmd.Args)-1], 10, 64)
+	if err != nil {
+		w.WriteError("ERR timeout value is not an integer or out of range")
+		return
+	}
 	k, v := n.BRPop(time.Duration(timeout)*time.Second, keys...)
 	if k == "" {
-		return redis.NullValue()
+		w.WriteNull()
+		return
 	}
-	return redis.ArrayValue(redis.BulkValue(k), redis.BulkValue(string(v)))
+	w.WriteArray(2)
+	w.WriteBulk(k)
+	w.WriteBulk(string(v))
 }
 
-func zAdd(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 3 {
-		return redis.ErrorValue("ZADD requires at least three arguments")
+func zAdd(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("ZADD requires at least three arguments")
+		return
 	}
-	key := args[0].Bulk
-	score, _ := strconv.ParseFloat(args[1].Bulk, 64)
-	member := args[2].Bulk
-	if cmd.Options["INCR"] {
+	key := cmd.Args[0]
+	score, err := strconv.ParseFloat(cmd.Args[1], 64)
+	if err != nil {
+		w.WriteError("ERR score value is not a valid float")
+		return
+	}
+	member := cmd.Args[2]
+	if cmd.Options.INCR > 0 {
 		score = n.ZIncrBy(key, member, score)
-		return redis.BulkValue(strconv.FormatFloat(score, 'f', -1, 64))
+		w.WriteBulk(strconv.FormatFloat(score, 'f', -1, 64))
 	}
-	if cmd.Options["XX"] {
-		return redis.IntegerValue(n.ZAddXX(key, member, score))
+	if cmd.Options.XX > 0 {
+		w.WriteInteger(n.ZAddXX(key, member, score))
 	}
-	if cmd.Options["NX"] {
-		return redis.IntegerValue(n.ZAddNX(key, member, score))
+	if cmd.Options.NX > 0 {
+		w.WriteInteger(n.ZAddNX(key, member, score))
 	}
-	if cmd.Options["LT"] {
-		return redis.IntegerValue(n.ZAddLT(key, member, score))
+	if cmd.Options.LT > 0 {
+		w.WriteInteger(n.ZAddLT(key, member, score))
 	}
-	if cmd.Options["GT"] {
-		return redis.IntegerValue(n.ZAddGT(key, member, score))
+	if cmd.Options.GT > 0 {
+		w.WriteInteger(n.ZAddGT(key, member, score))
 	}
 	n.ZAdd(key, member, score)
-	return redis.IntegerValue(1)
+	w.WriteInteger(1)
 }
 
-func zCard(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("ZCARD requires at least one argument")
+func zCard(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("ZCARD requires at least one argument")
+		return
 	}
-	key := args[0].Bulk
-	return redis.IntegerValue(n.ZCard(key))
+	key := cmd.Args[0]
+	w.WriteInteger(n.ZCard(key))
 }
 
-func zRank(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("ZRANK requires at least two argument")
+func zRank(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("ZRANK requires at least two argument")
+		return
 	}
-	key := args[0].Bulk
-	member := args[1].Bulk
-	if len(args) > 2 {
+	key := cmd.Args[0]
+	member := cmd.Args[1]
+	if cmd.Options.WITHSCORES > 0 {
 		rank, el := n.ZRankWithScore(key, member)
 		if el != nil {
-			return redis.ArrayValue(redis.IntegerValue(rank), redis.BulkValue(el.Member))
+			w.WriteArray(2)
+			w.WriteInteger(rank)
+			w.WriteBulk(el.Member)
+			return
 		}
-		return redis.NullValue()
+		w.WriteNull()
+		return
 	}
-	return redis.IntegerValue(n.ZRank(key, member))
+	w.WriteInteger(n.ZRank(key, member))
 }
 
-func zRevRank(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("ZREVRANK requires at least two argument")
+func zRevRank(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("ZREVRANK requires at least two argument")
+		return
 	}
-	key := args[0].Bulk
-	member := args[1].Bulk
-	if len(args) > 2 {
+	key := cmd.Args[0]
+	member := cmd.Args[1]
+	if cmd.Options.WITHSCORES > 0 {
 		rank, el := n.ZRevRankWithScore(key, member)
 		if el != nil {
-			return redis.ArrayValue(redis.IntegerValue(rank), redis.BulkValue(el.Member))
+			w.WriteArray(2)
+			w.WriteInteger(rank)
+			w.WriteBulk(el.Member)
+			return
 		}
-		return redis.NullValue()
+		w.WriteNull()
+		return
 	}
-	return redis.IntegerValue(n.ZRevRank(key, member))
+	w.WriteInteger(n.ZRevRank(key, member))
 }
 
-func zScore(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("ZSCORE requires at least two argument")
+func zScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("ZSCORE requires at least two argument")
+		return
 	}
-	key := args[0].Bulk
-	member := args[1].Bulk
+	key := cmd.Args[0]
+	member := cmd.Args[1]
 	score := n.ZScore(key, member)
-	return redis.BulkValue(strconv.FormatFloat(score, 'f', -1, 64))
+	w.WriteBulk(strconv.FormatFloat(score, 'f', -1, 64))
 }
 
-func zIncrBy(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 3 {
-		return redis.ErrorValue("ZINCRBY requires at least three arguments")
+func zIncrBy(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("ZINCRBY requires at least three arguments")
+		return
 	}
-	key := args[0].Bulk
-	score, _ := strconv.ParseFloat(args[1].Bulk, 64)
-	member := args[2].Bulk
+	key := cmd.Args[0]
+	score, err := strconv.ParseFloat(cmd.Args[1], 64)
+	if err != nil {
+		w.WriteError("ERR score value is not a valid float")
+		return
+	}
+	member := cmd.Args[2]
 	v := n.ZIncrBy(key, member, score)
-	return redis.BulkValue(strconv.FormatFloat(v, 'f', -1, 64))
+	w.WriteBulk(strconv.FormatFloat(v, 'f', -1, 64))
 }
 
-func zRange(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 3 {
-		return redis.ErrorValue("ZRANGE requires at least three arguments")
+func zRange(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("ZRANGE requires at least three arguments")
+		return
 	}
-	key := args[0].Bulk
-	start, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
-	stop, _ := strconv.ParseInt(args[2].Bulk, 10, 64)
-	if cmd.Options["WITHSCORES"] {
+	key := cmd.Args[0]
+	start, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
+	stop, _ := strconv.ParseInt(cmd.Args[2], 10, 64)
+	if cmd.Options.WITHSCORES > 0 {
 		results := n.ZRangeWithScores(key, start, stop)
-		var r = make([]redis.Value, 0, len(results)*2)
+		w.WriteArray(len(results))
 		for _, v := range results {
-			r = append(r, redis.BulkValue(v.Member), redis.BulkValue(strconv.FormatFloat(v.Score, 'f', -1, 64)))
+			w.WriteArray(2)
+			w.WriteBulk(v.Member)
+			w.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
 		}
-		return redis.ArrayValue(r...)
+		return
 	}
 	results := n.ZRange(key, start, stop)
-	var r = make([]redis.Value, 0, len(results))
+	w.WriteArray(len(results))
 	for _, v := range results {
-		r = append(r, redis.BulkValue(v))
+		w.WriteBulk(v)
 	}
-	return redis.ArrayValue(r...)
 }
 
-func zRevRange(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 3 {
-		return redis.ErrorValue("ZREVRANGE requires at least three arguments")
+func zRevRange(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("ZREVRANGE requires at least three arguments")
+		return
 	}
-	key := args[0].Bulk
-	start, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
-	stop, _ := strconv.ParseInt(args[2].Bulk, 10, 64)
-	if cmd.Options["WITHSCORES"] {
+	key := cmd.Args[0]
+	start, err := strconv.ParseInt(cmd.Args[1], 10, 64)
+	if err != nil {
+		w.WriteError("ERR start value is not an integer or out of range")
+		return
+	}
+	stop, err := strconv.ParseInt(cmd.Args[2], 10, 64)
+	if err != nil {
+		w.WriteError("ERR stop value is not an integer or out of range")
+		return
+	}
+	if cmd.Options.WITHSCORES > 0 {
 		results := n.ZRevRangeWithScores(key, start, stop)
-		var r = make([]redis.Value, 0, len(results)*2)
+		w.WriteArray(len(results))
 		for _, v := range results {
-			r = append(r, redis.BulkValue(v.Member), redis.BulkValue(strconv.FormatFloat(v.Score, 'f', -1, 64)))
+			w.WriteArray(2)
+			w.WriteBulk(v.Member)
+			w.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
 		}
-		return redis.ArrayValue(r...)
+		return
 	}
 	results := n.ZRevRange(key, start, stop)
-	var r = make([]redis.Value, 0, len(results))
+	w.WriteArray(len(results))
 	for _, v := range results {
-		r = append(r, redis.BulkValue(v))
+		w.WriteBulk(v)
 	}
-	return redis.ArrayValue(r...)
 }
 
-func zRangeByScore(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 3 {
-		return redis.ErrorValue("ZRANGEBYSCORE requires at least three arguments")
+func zRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("ZRANGEBYSCORE requires at least three arguments")
+		return
 	}
-	key := args[0].Bulk
-	min, _ := strconv.ParseFloat(args[1].Bulk, 64)
-	max, _ := strconv.ParseFloat(args[1].Bulk, 64)
+	key := cmd.Args[0]
+	min, err := strconv.ParseFloat(cmd.Args[1], 64)
+	if err != nil {
+		w.WriteError("ERR min value is not a valid float")
+		return
+	}
+	max, err := strconv.ParseFloat(cmd.Args[1], 64)
+	if err != nil {
+		w.WriteError("ERR max value is not a valid float")
+		return
+	}
 	results := n.ZRangeByScore(key, min, max)
-	var r = make([]redis.Value, 0, len(results))
+	w.WriteArray(len(results))
 	for _, v := range results {
-		r = append(r, redis.BulkValue(v))
+		w.WriteBulk(v)
 	}
-	return redis.ArrayValue(r...)
 }
 
-func zRevRangeByScore(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 3 {
-		return redis.ErrorValue("ZREVRANGEBYSCORE requires at least three arguments")
+func zRevRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("ZREVRANGEBYSCORE requires at least three arguments")
+		return
 	}
-	key := args[0].Bulk
-	min, _ := strconv.ParseFloat(args[1].Bulk, 64)
-	max, _ := strconv.ParseFloat(args[1].Bulk, 64)
+	key := cmd.Args[0]
+	min, err := strconv.ParseFloat(cmd.Args[1], 64)
+	if err != nil {
+		w.WriteError("ERR min value is not a valid float")
+		return
+	}
+	max, err := strconv.ParseFloat(cmd.Args[1], 64)
+	if err != nil {
+		w.WriteError("ERR max value is not a valid float")
+		return
+	}
 	results := n.ZRevRangeByScore(key, min, max)
-	var r = make([]redis.Value, 0, len(results))
+	w.WriteArray(len(results))
 	for _, v := range results {
-		r = append(r, redis.BulkValue(v))
+		w.WriteBulk(v)
 	}
-	return redis.ArrayValue(r...)
 }
 
-func zRem(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("ZREM requires at least two arguments")
+func zRem(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("ZREM requires at least two arguments")
 	}
-	key := args[0].Bulk
-	members := make([]string, 0, len(args)-1)
-	for i := 1; i < len(args); i++ {
-		members = append(members, args[i].Bulk)
-	}
-	return redis.IntegerValue(n.ZRem(key, members...))
+	key := cmd.Args[0]
+	w.WriteInteger(n.ZRem(key, cmd.Args[1:]...))
 }
 
-func zRemRangeByRank(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 3 {
-		return redis.ErrorValue("ZREMRANGEBYRANK requires at least three arguments")
+func zRemRangeByRank(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("ZREMRANGEBYRANK requires at least three arguments")
 	}
-	key := args[0].Bulk
-	start, _ := strconv.ParseInt(args[1].Bulk, 10, 64)
-	stop, _ := strconv.ParseInt(args[2].Bulk, 10, 64)
-	return redis.IntegerValue(n.ZRemRangeByRank(key, start, stop))
+	key := cmd.Args[0]
+	start, err := strconv.ParseInt(cmd.Args[1], 10, 64)
+	if err != nil {
+		w.WriteError("ERR start value is not a valid float")
+		return
+	}
+	stop, err := strconv.ParseInt(cmd.Args[2], 10, 64)
+	if err != nil {
+		w.WriteError("ERR stop value is not a valid float")
+		return
+	}
+	w.WriteInteger(n.ZRemRangeByRank(key, start, stop))
 }
 
-func zRemRangeByScore(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 3 {
-		return redis.ErrorValue("ZREMRANGEBYSCORE requires at least three arguments")
+func zRemRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("ZREMRANGEBYSCORE requires at least three arguments")
 	}
-	key := args[0].Bulk
-	min, _ := strconv.ParseFloat(args[1].Bulk, 64)
-	max, _ := strconv.ParseFloat(args[1].Bulk, 64)
-	return redis.IntegerValue(n.ZRemRangeByScore(key, min, max))
+	key := cmd.Args[0]
+	min, err := strconv.ParseFloat(cmd.Args[1], 64)
+	if err != nil {
+		w.WriteError("ERR min value is not a valid float")
+		return
+	}
+	max, err := strconv.ParseFloat(cmd.Args[1], 64)
+	if err != nil {
+		w.WriteError("ERR max value is not a valid float")
+		return
+	}
+	w.WriteInteger(n.ZRemRangeByScore(key, min, max))
 }
 
-func zClear(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) == 0 {
-		return redis.ErrorValue("ZCLEAR requires at least one argument")
+func zClear(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("ZCLEAR requires at least one argument")
 	}
-	key := args[0].Bulk
+	key := cmd.Args[0]
 	n.ZClear(key)
-	return redis.StringValue("OK")
+	w.WriteString("OK")
 }
 
-func zExists(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
-	if len(args) < 2 {
-		return redis.ErrorValue("ZEXISTS requires at least two arguments")
+func zExists(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("ZEXISTS requires at least two arguments")
 	}
-	key := args[0].Bulk
-	member := args[1].Bulk
+	key := cmd.Args[0]
+	member := cmd.Args[1]
 	is := n.ZExists(key, member)
 	var r int64 = 0
 	if is {
 		r = 1
 	}
-	return redis.IntegerValue(r)
+	w.WriteInteger(r)
 }
 
-func save(n *Nodis, cmd redis.Value, args []redis.Value) redis.Value {
+func save(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	n.store.mu.Lock()
 	n.store.save()
 	n.store.mu.Unlock()
-	return redis.StringValue("OK")
+	w.WriteString("OK")
 }

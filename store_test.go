@@ -78,23 +78,27 @@ func TestStoreGet(t *testing.T) {
 	// Create a new Store instance
 	store := newStore(tempDir, 1024, 1000, driver)
 
-	// Generate a random key and value for testing
-	key := "testKey"
+	// Generate a random name and value for testing
+	name := "testKey"
 	value := []byte("testValue")
 	ds := str.NewString()
 	ds.Set(value)
 	// Call the put method
-	err := store.putEntry(newEntry(key, ds, time.Now().Unix()))
+	err := store.putEntry(newEntry(name, ds, time.Now().Unix()))
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
+	key, ok := store.keys.Get(name)
+	if !ok {
+		t.Fatalf("Failed to get value for key: %v", err)
+	}
 	// Call the get method
-	data, err := store.get(key)
+	data, err := store.getEntryRaw(key)
 	if err != nil {
 		t.Fatalf("Failed to get value for key: %v", err)
 	}
 	if data == nil {
-		t.Fatalf("Failed to retrieve index for key: %s", key)
+		t.Fatalf("Failed to retrieve index for key: %s", name)
 	}
 }
 
@@ -128,16 +132,20 @@ func TestStoreMultiPut(t *testing.T) {
 	if store.keys.Len() != 5 {
 		t.Fatalf("Expected index count to be 5, got %d", store.keys.Len())
 	}
-	for key, value := range kv {
-		v, err := store.get(key)
+	for name, value := range kv {
+		key, ok := store.keys.Get(name)
+		if !ok {
+			t.Fatalf("Failed to get value for key: %v", name)
+		}
+		v, err := store.getEntryRaw(key)
 		if err != nil {
 			t.Fatalf("Failed to get value for key: %v", err)
 		}
 		if v == nil {
-			t.Fatalf("Failed to retrieve index for key: %s", key)
+			t.Fatalf("Failed to retrieve index for key: %s", name)
 		}
 
-		if !bytes.Equal(result[key], v) {
+		if !bytes.Equal(result[name], v) {
 			t.Errorf("Expected value to be %v, got %v", value, v)
 		}
 	}
@@ -184,16 +192,20 @@ func TestStoreMultiFilePut(t *testing.T) {
 	}
 
 	for _, m := range kv {
-		for key, value := range m {
-			v, err := store.get(key)
+		for name, value := range m {
+			key, ok := store.keys.Get(name)
+			if !ok {
+				t.Fatalf("Failed to get value for key: %v", name)
+			}
+			v, err := store.getEntryRaw(key)
 			if err != nil {
-				t.Fatalf("Failed to get value for key: %v , err %v ", key, err)
+				t.Fatalf("Failed to get value for key: %v , err %v ", name, err)
 			}
 			if v == nil {
-				t.Fatalf("Failed to retrieve index for key: %s", key)
+				t.Fatalf("Failed to retrieve index for key: %s", name)
 			}
 
-			if !bytes.Equal(result[key], v) {
+			if !bytes.Equal(result[name], v) {
 				t.Errorf("Expected value to be %v, got %v", value, v)
 			}
 		}
@@ -233,13 +245,13 @@ func TestStorePutRaw(t *testing.T) {
 	// Create a new Store instance
 	store := newStore(tempDir, 1024, 1000, driver)
 
-	// Generate a random key and value for testing
-	key := "testKey"
+	// Generate a random name and value for testing
+	name := "testKey"
 	value := []byte("testValue")
 	d := str.NewString()
 	d.Set(value)
 	expiration := time.Now().Unix() + 3600
-	var e = newEntry(key, d, expiration)
+	var e = newEntry(name, d, expiration)
 	data, err := e.Marshal()
 	if err != nil {
 		t.Fatalf("Failed to marshal data: %v", err)
@@ -247,17 +259,17 @@ func TestStorePutRaw(t *testing.T) {
 	k := newKey()
 	k.expiration = expiration
 	// Call the putRaw method
-	err = store.putRaw(key, data, k)
+	err = store.putRaw(name, k, data)
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
 
 	// Retrieve the value from the index
-	idx, _ := store.keys.Get(key)
-	if idx == nil {
-		t.Fatalf("Failed to retrieve index for key: %s", key)
+	key, _ := store.keys.Get(name)
+	if key == nil {
+		t.Fatalf("Failed to retrieve index for key: %s", name)
 	}
-	nd, err := store.get(key)
+	nd, err := store.getEntryRaw(key)
 	if err != nil {
 		t.Fatalf("Failed to get value for key: %v", err)
 	}
