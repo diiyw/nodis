@@ -40,6 +40,8 @@ func getCommand(name string) func(n *Nodis, w *redis.Writer, cmd *redis.Command)
 		return expireAt
 	case "KEYS":
 		return keys
+	case "RANDOMKEY":
+		return randomKey
 	case "TTL":
 		return ttl
 	case "RENAME":
@@ -345,6 +347,15 @@ func ttl(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	w.WriteInteger(int64(n.TTL(cmd.Args[0]).Seconds()))
 }
 
+func randomKey(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	key := n.RandomKey()
+	if key == "" {
+		w.WriteNull()
+		return
+	}
+	w.WriteBulk(key)
+}
+
 func rename(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		w.WriteError("RENAME requires at least two arguments")
@@ -554,15 +565,24 @@ func bitCount(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		w.WriteError("BITCOUNT requires at least one argument")
 		return
 	}
+	var err error
 	key := cmd.Args[0]
 	var start, end int64
 	if len(cmd.Args) > 1 {
-		start, _ = strconv.ParseInt(cmd.Args[1], 10, 64)
+		start, err = strconv.ParseInt(cmd.Args[1], 10, 64)
+		if err != nil {
+			w.WriteError("ERR start value is not an integer or out of range")
+			return
+		}
 	}
 	if len(cmd.Args) > 2 {
-		end, _ = strconv.ParseInt(cmd.Args[2], 10, 64)
+		end, err = strconv.ParseInt(cmd.Args[2], 10, 64)
+		if err != nil {
+			w.WriteError("ERR end value is not an integer or out of range")
+			return
+		}
 	}
-	w.WriteInteger(n.BitCount(key, start, end))
+	w.WriteInteger(n.BitCount(key, start, end, cmd.Options.BIT > 0))
 }
 
 func sAdd(n *Nodis, w *redis.Writer, cmd *redis.Command) {

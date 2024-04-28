@@ -3,6 +3,7 @@ package nodis
 import (
 	"encoding/binary"
 	"errors"
+	"math/rand"
 	"path/filepath"
 	"time"
 
@@ -310,27 +311,51 @@ func (n *Nodis) TTL(key string) time.Duration {
 	s := meta.key.expiration / 1000
 	ns := (meta.key.expiration - s*1000) * 1000 * 1000
 	meta.commit()
-	return time.Until(time.Unix(s, ns))
+	return time.Until(time.Unix(s, ns)).Round(time.Second)
 }
 
 // Rename a key
-func (n *Nodis) Rename(key, key2 string) error {
+func (n *Nodis) Rename(key, dstKey string) error {
 	meta := n.store.writeKey(key, nil)
 	if !meta.isOk() {
 		meta.commit()
-		return errors.New("newKey exists")
+		return errors.New("key not exists")
 	}
 	v, ok := n.store.values.Get(key)
 	if !ok {
 		return errors.New("key does not exist")
 	}
-	tx2 := n.store.writeKey(key2, nil)
+	dstMeta := n.store.writeKey(dstKey, nil)
 	n.store.delKey(key)
-	n.store.values.Set(key2, v)
-	n.store.keys.Set(key2, newKey())
+	n.store.values.Set(dstKey, v)
+	n.store.keys.Set(dstKey, newKey())
 	meta.commit()
-	tx2.commit()
-	n.notify(pb.NewOp(pb.OpType_Rename, key).DstKey(key2))
+	dstMeta.commit()
+	n.notify(pb.NewOp(pb.OpType_Rename, key).DstKey(dstKey))
+	return nil
+}
+
+// RenameNX a key
+func (n *Nodis) RenameNX(key, dstKey string) error {
+	dstMeta := n.store.writeKey(dstKey, nil)
+	if dstMeta.isOk() {
+		dstMeta.commit()
+		return errors.New("newKey exists")
+	}
+	meta := n.store.writeKey(key, nil)
+	if !meta.isOk() {
+		return errors.New("key does not exist")
+	}
+	v, ok := n.store.values.Get(key)
+	if !ok {
+		return errors.New("key does not exist")
+	}
+	n.store.delKey(key)
+	n.store.values.Set(dstKey, v)
+	n.store.keys.Set(dstKey, newKey())
+	meta.commit()
+	dstMeta.commit()
+	n.notify(pb.NewOp(pb.OpType_Rename, key).DstKey(dstKey))
 	return nil
 }
 
@@ -374,4 +399,20 @@ func (n *Nodis) Scan(cursor int64, match string, count int64) (int64, []string) 
 		count = lk
 	}
 	return cursor + count, keys[cursor : cursor+count]
+}
+
+// RandomKey gets a random key
+func (n *Nodis) RandomKey() string {
+	now := time.Now().UnixMilli()
+	var keys []string
+	n.store.keys.Scan(func(key string, k *Key) bool {
+		if !k.expired(now) {
+			keys = append(keys, key)
+		}
+		return true
+	})
+	if len(keys) == 0 {
+		return ""
+	}
+	return keys[rand.Intn(len(keys))]
 }

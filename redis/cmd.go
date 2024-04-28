@@ -25,6 +25,8 @@ type Options struct {
 	BYLEX      int
 	BYSCORE    int
 	LIMIT      int
+	BYTE       int
+	BIT        int
 }
 
 const (

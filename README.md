@@ -43,8 +43,8 @@ Simple way to embed in your application.
 |                     |                 | RENAME          | INCR              	| SISMEMBER       | HGETALL         | LINSERT          | ZRANGE                |
 |                     |                 | TYPE            | DESR                | SMEMBERS        | HINCRBY         | LPUSHX           | ZREVRANGE             |
 |                     |                 | SCAN            | SETEX               | SREM            | HICRBYFLOAT    	| RPUSHX           | ZRANGEBYSCORE         |
-|                     |                 |                 | INCRBY              |                 | HSETNX          | LREM             | ZREVRANGEBYSCORE      |
-|                     |                 |                 | DECRBY              |                 | HMGET           | LSET             | ZREM                  |
+|                     |                 | RANDOMKEY       | INCRBY              |                 | HSETNX          | LREM             | ZREVRANGEBYSCORE      |
+|                     |                 | RENAMEEX        | DECRBY              |                 | HMGET           | LSET             | ZREM                  |
 |                     |                 |                 |                     |                 | HMSET           | LRANGE           | ZREMRANGEBYRANK       |
 |                     |                 |                 |                     |                 | HCLEAR          | LPOPRPUSH        | ZREMRANGEBYSCORE      |
 |                     |                 |                 |                     |                 | HSCAN           | RPOPLPUSH        | ZCLEAR                |

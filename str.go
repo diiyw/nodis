@@ -25,9 +25,7 @@ func (n *Nodis) Set(key string, value []byte) {
 // SetEX set a key with specified expire time, in seconds (a positive integer).
 func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
 	meta := n.store.writeKey(key, n.newStr)
-	if meta.key.expiration == 0 {
-		meta.key.expiration = time.Now().UnixMilli()
-	}
+	meta.key.expiration = time.Now().UnixMilli()
 	meta.key.expiration += seconds * 1000
 	meta.ds.(*str.String).Set(value)
 	n.notify(pb.NewOp(pb.OpType_Set, key).Value(value).Expiration(meta.key.expiration))
@@ -37,9 +35,7 @@ func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
 // SetPX set a key with specified expire time, in milliseconds (a positive integer).
 func (n *Nodis) SetPX(key string, value []byte, milliseconds int64) {
 	meta := n.store.writeKey(key, n.newStr)
-	if meta.key.expiration == 0 {
-		meta.key.expiration = time.Now().UnixMilli()
-	}
+	meta.key.expiration = time.Now().UnixMilli()
 	meta.key.expiration += milliseconds
 	n.notify(pb.NewOp(pb.OpType_Set, key).Value(value).Expiration(meta.key.expiration))
 	meta.ds.(*str.String).Set(value)
@@ -149,13 +145,18 @@ func (n *Nodis) GetBit(key string, offset int64) int64 {
 }
 
 // BitCount returns the number of bits set to 1
-func (n *Nodis) BitCount(key string, start, end int64) int64 {
+func (n *Nodis) BitCount(key string, start, end int64, bit bool) int64 {
 	meta := n.store.writeKey(key, nil)
 	if !meta.isOk() {
 		meta.commit()
 		return 0
 	}
-	v := meta.ds.(*str.String).BitCount(start, end)
+	var v int64
+	if bit {
+		v = meta.ds.(*str.String).BitCountByBit(start, end)
+	} else {
+		v = meta.ds.(*str.String).BitCount(start, end)
+	}
 	meta.commit()
 	return v
 }

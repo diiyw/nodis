@@ -145,6 +145,23 @@ func TestKey_Rename(t *testing.T) {
 	}
 }
 
+func TestKey_RenameNX(t *testing.T) {
+	_ = os.RemoveAll("testdata")
+	n := Open(&Options{
+		Path: "testdata",
+	})
+	n.Set("test", []byte("test1"))
+	n.Set("test2", []byte("test2"))
+	err := n.RenameNX("test", "test2")
+	if err == nil {
+		t.Errorf("RenameNX() = %v, want %v", err, "key exists")
+	}
+	err = n.RenameNX("test", "test3")
+	if err != nil {
+		t.Errorf("RenameNX() = %v, want %v", err, nil)
+	}
+}
+
 func TestKey_Keys(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{

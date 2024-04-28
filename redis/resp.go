@@ -63,7 +63,7 @@ READ:
 		return err
 	}
 	r.l += rn
-	if rn < r.l {
+	if r.l < n {
 		goto READ
 	}
 	return nil
@@ -257,6 +257,16 @@ func (r *Reader) readOptions(v string, i int) {
 		switch opt {
 		case "GET":
 			r.cmd.Options.GET = i + 1
+		}
+	case "BITCOUNT":
+		if i > 2 {
+			opt := utils.ToUpper(v)
+			switch opt {
+			case "BYTE":
+				r.cmd.Options.BYTE = i
+			case "BIT":
+				r.cmd.Options.BIT = i
+			}
 		}
 	}
 }

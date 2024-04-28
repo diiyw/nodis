@@ -55,7 +55,7 @@ func TestStr_BitCount(t *testing.T) {
 	n.SetBit("a", 5, true)
 	n.SetBit("a", 6, true)
 	n.SetBit("a", 7, true)
-	if n.BitCount("a", 0, 0) != 8 {
-		t.Errorf("BitCount failed expected 8 got %d", n.BitCount("a", 0, 0))
+	if n.BitCount("a", 0, 0, true) != 8 {
+		t.Errorf("BitCount failed expected 8 got %d", n.BitCount("a", 0, 0,true))
 	}
 }

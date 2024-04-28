@@ -108,6 +108,38 @@ func (s *String) BitCount(start, end int64) int64 {
 	if start < 0 {
 		start = 0
 	}
+	if start >= int64(len(s.V)) {
+		return 0
+	}
+	bl := int64(len(s.V))
+	if end <= 0 {
+		end += bl + 1
+	}
+	if end > bl {
+		end = bl
+	}
+	if start > end {
+		return 0
+	}
+	if start == end {
+		end++
+	}
+	for _, v := range s.V[start:end] {
+		for i := 0; i < 8; i++ {
+			if v&(1<<uint(i)) != 0 {
+				count++
+			}
+		}
+	}
+	return count
+}
+
+// BitCountByBit counts the number of bits set to 1 by bit
+func (s *String) BitCountByBit(start, end int64) int64 {
+	var count int64 = 0
+	if start < 0 {
+		start = 0
+	}
 	bl := int64(len(s.V)) * 8
 	if end <= 0 {
 		end = bl

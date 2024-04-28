@@ -42,7 +42,7 @@ English | [简体中文](https://github.com/diiyw/nodis/blob/main/README_zh-cn.m
 |                     |                 | RENAME          | INCR              	| SISMEMBER       | HGETALL         | LINSERT          | ZRANGE                |
 |                     |                 | TYPE            | DESR                | SMEMBERS        | HINCRBY         | LPUSHX           | ZREVRANGE             |
 |                     |                 | SCAN            | SETEX               | SREM            | HICRBYFLOAT    	| RPUSHX           | ZRANGEBYSCORE         |
-|                     |                 |                 | INCRBY              |                 | HSETNX          | LREM             | ZREVRANGEBYSCORE      |
+|                     |                 | RANDOMKEY       | INCRBY              |                 | HSETNX          | LREM             | ZREVRANGEBYSCORE      |
 |                     |                 |                 | DECRBY              |                 | HMGET           | LSET             | ZREM                  |
 |                     |                 |                 |                     |                 | HMSET           | LRANGE           | ZREMRANGEBYRANK       |
 |                     |                 |                 |                     |                 | HCLEAR          | LPOPRPUSH        | ZREMRANGEBYSCORE      |
