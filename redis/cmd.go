@@ -22,9 +22,9 @@ type Options struct {
 	PXAT       int
 	MATCH      int
 	COUNT      int
-	OFFSET     int
 	BYLEX      int
 	BYSCORE    int
+	LIMIT      int
 }
 
 const (

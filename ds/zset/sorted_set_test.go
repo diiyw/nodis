@@ -85,7 +85,7 @@ func TestSortedSet_ZRangeByScore(t *testing.T) {
 	ss.ZAdd("member3", 0.5)
 
 	// Test if the range is correct
-	members := ss.ZRangeByScore(0.5, 2.5)
+	members := ss.ZRangeByScore(0.5, 2.5, 0, -1)
 	if len(members) != 3 {
 		t.Errorf("Range error expected 3 got %d", len(members))
 	}
@@ -185,11 +185,11 @@ func TestSortedSet_ZRevRangeByScore(t *testing.T) {
 	ss.ZAdd("member3", 0.5)
 
 	// Test if the range is correct
-	if len(ss.ZRevRangeByScore(1, 2)) != 1 {
-		t.Errorf("Range error expected 1 got %d", len(ss.ZRevRangeByScore(1, 2)))
+	if len(ss.ZRevRangeByScore(1, 2, 0, -1)) != 1 {
+		t.Errorf("Range error expected 1 got %d", len(ss.ZRevRangeByScore(1, 2, 0, -1)))
 	}
-	if len(ss.ZRevRangeByScore(0, 3)) != 3 {
-		t.Errorf("Range error expected 3 got %d", len(ss.ZRevRangeByScore(0, 3)))
+	if len(ss.ZRevRangeByScore(0, 3, 0, -1)) != 3 {
+		t.Errorf("Range error expected 3 got %d", len(ss.ZRevRangeByScore(0, 3, 0, -1)))
 	}
 }
 

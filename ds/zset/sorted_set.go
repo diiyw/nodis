@@ -332,13 +332,13 @@ func (sortedSet *SortedSet) ZExists(member string) bool {
 }
 
 // ZRangeByScore returns members which score or member within the given border
-func (sortedSet *SortedSet) ZRangeByScore(min float64, max float64) []*Item {
-	return sortedSet.zRange(min, max, 0, -1, false)
+func (sortedSet *SortedSet) ZRangeByScore(min float64, max float64, offset, count int64) []*Item {
+	return sortedSet.zRange(min, max, offset, count, false)
 }
 
 // ZRevRangeByScore returns members which score or member within the given border
-func (sortedSet *SortedSet) ZRevRangeByScore(min float64, max float64) []*Item {
-	return sortedSet.zRange(min, max, 0, -1, true)
+func (sortedSet *SortedSet) ZRevRangeByScore(min float64, max float64, offset, count int64) []*Item {
+	return sortedSet.zRange(min, max, offset, count, true)
 }
 
 // ZIncrBy increases the score of the given member

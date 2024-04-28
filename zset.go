@@ -195,13 +195,13 @@ func (n *Nodis) ZRevRangeWithScores(key string, start int64, stop int64) []*zset
 	return v
 }
 
-func (n *Nodis) ZRangeByScore(key string, min float64, max float64) []string {
+func (n *Nodis) ZRangeByScore(key string, min float64, max float64, offset, count int64) []string {
 	meta := n.store.readKey(key)
 	if !meta.isOk() {
 		meta.commit()
 		return nil
 	}
-	els := meta.ds.(*zset.SortedSet).ZRangeByScore(min, max)
+	els := meta.ds.(*zset.SortedSet).ZRangeByScore(min, max, offset, count)
 	meta.commit()
 	members := make([]string, len(els))
 	for i, el := range els {
@@ -210,24 +210,24 @@ func (n *Nodis) ZRangeByScore(key string, min float64, max float64) []string {
 	return members
 }
 
-func (n *Nodis) ZRangeByScoreWithScores(key string, min float64, max float64) []*zset.Item {
+func (n *Nodis) ZRangeByScoreWithScores(key string, min float64, max float64, offset, count int64) []*zset.Item {
 	meta := n.store.readKey(key)
 	if !meta.isOk() {
 		meta.commit()
 		return nil
 	}
-	v := meta.ds.(*zset.SortedSet).ZRangeByScore(min, max)
+	v := meta.ds.(*zset.SortedSet).ZRangeByScore(min, max, offset, count)
 	meta.commit()
 	return v
 }
 
-func (n *Nodis) ZRevRangeByScore(key string, min float64, max float64) []string {
+func (n *Nodis) ZRevRangeByScore(key string, min float64, max float64, offset, count int64) []string {
 	meta := n.store.readKey(key)
 	if !meta.isOk() {
 		meta.commit()
 		return nil
 	}
-	els := meta.ds.(*zset.SortedSet).ZRevRangeByScore(min, max)
+	els := meta.ds.(*zset.SortedSet).ZRevRangeByScore(min, max, offset, count)
 	meta.commit()
 	members := make([]string, len(els))
 	for i, el := range els {
@@ -236,13 +236,13 @@ func (n *Nodis) ZRevRangeByScore(key string, min float64, max float64) []string 
 	return members
 }
 
-func (n *Nodis) ZRevRangeByScoreWithScores(key string, min float64, max float64) []*zset.Item {
+func (n *Nodis) ZRevRangeByScoreWithScores(key string, min float64, max float64, offset, count int64) []*zset.Item {
 	meta := n.store.readKey(key)
 	if !meta.isOk() {
 		meta.commit()
 		return nil
 	}
-	v := meta.ds.(*zset.SortedSet).ZRevRangeByScore(min, max)
+	v := meta.ds.(*zset.SortedSet).ZRevRangeByScore(min, max, offset, count)
 	meta.commit()
 	return v
 }

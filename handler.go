@@ -272,66 +272,56 @@ func exists(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	w.WriteInteger(n.Exists(cmd.Args...))
 }
 
+// EXPIRE key seconds [NX | XX | GT | LT]
 func expire(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		w.WriteError("EXPIRE requires at least two arguments")
 		return
 	}
+	seconds, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
 	if cmd.Options.NX > 0 {
-		seconds, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
 		w.WriteInteger(n.ExpireNX(cmd.Args[0], seconds))
 		return
 	}
 	if cmd.Options.XX > 0 {
-		seconds, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
 		w.WriteInteger(n.ExpireXX(cmd.Args[0], seconds))
 		return
 	}
 	if cmd.Options.LT > 0 {
-		seconds, _ := strconv.ParseInt(cmd.Args[cmd.Options.LT], 10, 64)
 		w.WriteInteger(n.ExpireLT(cmd.Args[0], seconds))
 		return
 	}
 	if cmd.Options.GT > 0 {
-		seconds, _ := strconv.ParseInt(cmd.Args[cmd.Options.GT], 10, 64)
 		w.WriteInteger(n.ExpireGT(cmd.Args[0], seconds))
 		return
 	}
-	seconds, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
 	w.WriteInteger(n.Expire(cmd.Args[0], seconds))
 }
 
+// EXPIREAT key unix-time-seconds [NX | XX | GT | LT]
 func expireAt(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		w.WriteError("EXPIREAT requires at least two arguments")
 		return
 	}
+	timestamp, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
+	e := time.Unix(timestamp, 0)
 	if cmd.Options.NX > 0 {
-		timestamp, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
-		e := time.Unix(timestamp, 0)
 		w.WriteInteger(n.ExpireAtNX(cmd.Args[0], e))
 		return
 	}
 	if cmd.Options.XX > 0 {
-		timestamp, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
-		e := time.Unix(timestamp, 0)
 		w.WriteInteger(n.ExpireAtXX(cmd.Args[0], e))
 		return
 	}
 	if cmd.Options.LT > 0 {
-		timestamp, _ := strconv.ParseInt(cmd.Args[cmd.Options.LT], 10, 64)
-		e := time.Unix(timestamp, 0)
 		w.WriteInteger(n.ExpireAtLT(cmd.Args[0], e))
 		return
 	}
 	if cmd.Options.GT > 0 {
-		timestamp, _ := strconv.ParseInt(cmd.Args[cmd.Options.GT], 10, 64)
-		e := time.Unix(timestamp, 0)
 		w.WriteInteger(n.ExpireAtGT(cmd.Args[0], e))
 		return
 	}
-	timestamp, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
-	e := time.Unix(timestamp, 0)
 	w.WriteInteger(n.ExpireAt(cmd.Args[0], e))
 }
 
@@ -379,29 +369,39 @@ func typ(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	w.WriteBulk(n.Type(key))
 }
 
+// SCAN cursor [MATCH pattern] [COUNT count] [TYPE type]
 func scan(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		w.WriteError("SCAN requires at least one argument")
 		return
 	}
-	cursor, _ := strconv.ParseInt(cmd.Args[0], 10, 64)
+	cursor, err := strconv.ParseInt(cmd.Args[0], 10, 64)
+	if err != nil {
+		w.WriteError("ERR cursor value is not an integer or out of range")
+		return
+	}
 	var match = "*"
 	var count int64
 	if cmd.Options.MATCH > 0 {
 		match = cmd.Args[cmd.Options.MATCH]
 	}
 	if cmd.Options.COUNT > 0 {
-		count, _ = strconv.ParseInt(cmd.Args[cmd.Options.COUNT], 10, 64)
+		count, err = strconv.ParseInt(cmd.Args[cmd.Options.COUNT], 10, 64)
+		if err != nil {
+			w.WriteError("ERR count value is not an integer or out of range")
+			return
+		}
 	}
-	_, keys := n.Scan(cursor, match, count)
+	nextCursor, keys := n.Scan(cursor, match, count)
 	w.WriteArray(2)
-	w.WriteBulk(strconv.FormatInt(cursor, 10))
+	w.WriteBulk(strconv.FormatInt(nextCursor, 10))
 	w.WriteArray(len(keys))
 	for _, v := range keys {
 		w.WriteBulk(v)
 	}
 }
 
+// SET key value [NX | XX] [GET] [EX seconds | PX milliseconds | EXAT unix-time-seconds | PXAT unix-time-milliseconds | KEEPTTL]
 func setString(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		w.WriteError("SET requires at least two arguments")
@@ -522,10 +522,17 @@ func setBit(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		return
 	}
 	key := cmd.Args[0]
-	offset, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
-	value, _ := strconv.ParseBool(cmd.Args[2])
-	n.SetBit(key, offset, value)
-	w.WriteInteger(1)
+	offset, err := strconv.ParseInt(cmd.Args[1], 10, 64)
+	if err != nil || offset < 0 {
+		w.WriteError("ERR offset value is not an integer or out of range")
+		return
+	}
+	value, err := strconv.ParseInt(cmd.Args[2], 10, 64)
+	if err != nil || (value != 0 && value != 1) {
+		w.WriteError("ERR bit value is not a valid integer")
+		return
+	}
+	w.WriteInteger(n.SetBit(key, offset, value == 1))
 }
 
 func getBit(n *Nodis, w *redis.Writer, cmd *redis.Command) {
@@ -534,7 +541,11 @@ func getBit(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		return
 	}
 	key := cmd.Args[0]
-	offset, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
+	offset, err := strconv.ParseInt(cmd.Args[1], 10, 64)
+	if err != nil || offset < 0 {
+		w.WriteError("ERR offset value is not an integer or out of range")
+		return
+	}
 	w.WriteInteger(n.GetBit(key, offset))
 }
 
@@ -563,13 +574,18 @@ func sAdd(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	w.WriteInteger(n.SAdd(key, cmd.Args[1:]...))
 }
 
+// SSCAN key cursor [MATCH pattern] [COUNT count]
 func sScan(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) < 1 {
 		w.WriteError("SSCAN requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
-	cursor, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
+	cursor, err := strconv.ParseInt(cmd.Args[1], 10, 64)
+	if err != nil {
+		w.WriteError("ERR value is not an integer or out of range")
+		return
+	}
 	var match = "*"
 	var count int64
 	if cmd.Options.MATCH > 0 {
@@ -595,8 +611,8 @@ func sPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	var err error
 	key := cmd.Args[0]
 	var count int64 = 1
-	if cmd.Options.COUNT > 0 {
-		count, err = strconv.ParseInt(cmd.Args[cmd.Options.COUNT], 10, 64)
+	if len(cmd.Args) > 1 {
+		count, err = strconv.ParseInt(cmd.Args[1], 10, 64)
 		if err != nil {
 			w.WriteError("ERR value is not an integer or out of range")
 			return
@@ -849,6 +865,9 @@ func hMSet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	key := cmd.Args[0]
 	fields := make(map[string][]byte, len(cmd.Args)-1)
 	for i := 1; i < len(cmd.Args); i += 2 {
+		if i+2 > len(cmd.Args) {
+			break
+		}
 		fields[cmd.Args[i]] = []byte(cmd.Args[i+1])
 	}
 	n.HMSet(key, fields)
@@ -1183,36 +1202,50 @@ func bRPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	w.WriteBulk(string(v))
 }
 
+// ZADD key [NX | XX] [GT | LT] [CH] [INCR] score member [score member   ...]
 func zAdd(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		w.WriteError("ZADD requires at least three arguments")
 		return
 	}
-	key := cmd.Args[0]
-	score, err := strconv.ParseFloat(cmd.Args[1], 64)
-	if err != nil {
-		w.WriteError("ERR score value is not a valid float")
+	itemStart := max(cmd.Options.NX, cmd.Options.XX, cmd.Options.LT, cmd.Options.GT, cmd.Options.CH, cmd.Options.INCR)
+	if itemStart+1 > len(cmd.Args) {
+		w.WriteError("ZADD requires at least one score-member pair")
 		return
 	}
-	member := cmd.Args[2]
-	if cmd.Options.INCR > 0 {
-		score = n.ZIncrBy(key, member, score)
-		w.WriteBulk(strconv.FormatFloat(score, 'f', -1, 64))
+	itemStart++
+	key := cmd.Args[0]
+	var count int64 = 0
+	for i := itemStart; i < len(cmd.Args); i += 2 {
+		if i+2 > len(cmd.Args) {
+			break
+		}
+		score, err := strconv.ParseFloat(cmd.Args[i], 64)
+		if err != nil {
+			w.WriteError("ERR score value is not a valid float")
+			return
+		}
+		member := cmd.Args[i+1]
+		if cmd.Options.INCR > 0 {
+			score = n.ZIncrBy(key, member, score)
+			w.WriteBulk(strconv.FormatFloat(score, 'f', -1, 64))
+		}
+		if cmd.Options.XX > 0 {
+			w.WriteInteger(n.ZAddXX(key, member, score))
+		}
+		if cmd.Options.NX > 0 {
+			w.WriteInteger(n.ZAddNX(key, member, score))
+		}
+		if cmd.Options.LT > 0 {
+			w.WriteInteger(n.ZAddLT(key, member, score))
+		}
+		if cmd.Options.GT > 0 {
+			w.WriteInteger(n.ZAddGT(key, member, score))
+		}
+		n.ZAdd(key, member, score)
+		count++
 	}
-	if cmd.Options.XX > 0 {
-		w.WriteInteger(n.ZAddXX(key, member, score))
-	}
-	if cmd.Options.NX > 0 {
-		w.WriteInteger(n.ZAddNX(key, member, score))
-	}
-	if cmd.Options.LT > 0 {
-		w.WriteInteger(n.ZAddLT(key, member, score))
-	}
-	if cmd.Options.GT > 0 {
-		w.WriteInteger(n.ZAddGT(key, member, score))
-	}
-	n.ZAdd(key, member, score)
-	w.WriteInteger(1)
+	w.WriteInteger(count)
 }
 
 func zCard(n *Nodis, w *redis.Writer, cmd *redis.Command) {
@@ -1224,6 +1257,7 @@ func zCard(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	w.WriteInteger(n.ZCard(key))
 }
 
+// ZRANK key member [WITHSCORE]
 func zRank(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		w.WriteError("ZRANK requires at least two argument")
@@ -1351,6 +1385,7 @@ func zRevRange(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	}
 }
 
+// ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
 func zRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		w.WriteError("ZRANGEBYSCORE requires at least three arguments")
@@ -1362,12 +1397,36 @@ func zRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		w.WriteError("ERR min value is not a valid float")
 		return
 	}
-	max, err := strconv.ParseFloat(cmd.Args[1], 64)
+	max, err := strconv.ParseFloat(cmd.Args[2], 64)
 	if err != nil {
 		w.WriteError("ERR max value is not a valid float")
 		return
 	}
-	results := n.ZRangeByScore(key, min, max)
+	var offset, count int64 = 0, -1
+	if cmd.Options.LIMIT > 0 {
+		offset, err = strconv.ParseInt(cmd.Args[cmd.Options.LIMIT], 10, 64)
+		if err != nil {
+			w.WriteError("ERR offset value is not an integer or out of range")
+			return
+		}
+		count, err = strconv.ParseInt(cmd.Args[cmd.Options.LIMIT+1], 10, 64)
+		if err != nil {
+			w.WriteError("ERR count value is not an integer or out of range")
+			return
+		}
+	}
+	if cmd.Options.WITHSCORES > 0 {
+		results := n.ZRangeByScoreWithScores(key, min, max, offset, count)
+		w.WriteArray(len(results))
+		for _, v := range results {
+			w.WriteArray(2)
+			w.WriteBulk(v.Member)
+			w.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
+		}
+		return
+
+	}
+	results := n.ZRangeByScore(key, min, max, offset, count)
 	w.WriteArray(len(results))
 	for _, v := range results {
 		w.WriteBulk(v)
@@ -1385,12 +1444,35 @@ func zRevRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		w.WriteError("ERR min value is not a valid float")
 		return
 	}
-	max, err := strconv.ParseFloat(cmd.Args[1], 64)
+	max, err := strconv.ParseFloat(cmd.Args[2], 64)
 	if err != nil {
 		w.WriteError("ERR max value is not a valid float")
 		return
 	}
-	results := n.ZRevRangeByScore(key, min, max)
+	var offset, count int64 = 0, -1
+	if cmd.Options.LIMIT > 0 {
+		offset, err = strconv.ParseInt(cmd.Args[cmd.Options.LIMIT], 10, 64)
+		if err != nil {
+			w.WriteError("ERR offset value is not an integer or out of range")
+			return
+		}
+		count, err = strconv.ParseInt(cmd.Args[cmd.Options.LIMIT+1], 10, 64)
+		if err != nil {
+			w.WriteError("ERR count value is not an integer or out of range")
+			return
+		}
+	}
+	if cmd.Options.WITHSCORES > 0 {
+		results := n.ZRevRangeByScoreWithScores(key, min, max, offset, count)
+		w.WriteArray(len(results))
+		for _, v := range results {
+			w.WriteArray(2)
+			w.WriteBulk(v.Member)
+			w.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
+		}
+		return
+	}
+	results := n.ZRevRangeByScore(key, min, max, offset, count)
 	w.WriteArray(len(results))
 	for _, v := range results {
 		w.WriteBulk(v)

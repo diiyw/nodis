@@ -128,7 +128,7 @@ func (n *Nodis) DecrBy(key string, decrement int64) int64 {
 }
 
 // SetBit set a bit in a key
-func (n *Nodis) SetBit(key string, offset int64, value bool) int {
+func (n *Nodis) SetBit(key string, offset int64, value bool) int64 {
 	meta := n.store.writeKey(key, n.newStr)
 	k := meta.ds.(*str.String)
 	v := k.SetBit(offset, value)

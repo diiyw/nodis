@@ -62,7 +62,7 @@ func (s *String) Decr(step int64) int64 {
 }
 
 // SetBit set a bit in a key
-func (s *String) SetBit(offset int64, value bool) int {
+func (s *String) SetBit(offset int64, value bool) int64 {
 	if offset < 0 {
 		return 0
 	}
@@ -71,13 +71,17 @@ func (s *String) SetBit(offset int64, value bool) int {
 		s.V = append(s.V, make([]byte, i-int64(len(s.V))+1)...)
 	}
 	by := s.V[i]
-	bit := byte(1 << uint(offset%8))
+	bit := byte(1 << (7 - uint(offset%8)))
+	old := by & bit
 	if value {
 		s.V[i] = by | bit
 	} else {
 		s.V[i] = by &^ bit
 	}
-	return 1
+	if old != 0 {
+		return 1
+	}
+	return 0
 }
 
 // GetBit get a bit in a key
@@ -87,11 +91,11 @@ func (s *String) GetBit(offset int64) int64 {
 
 func (s *String) getBit(offset int64) int64 {
 	i := offset / 8
-	if offset < 0 || i > int64(len(s.V)) {
+	if offset < 0 || len(s.V) == 0 || i > int64(len(s.V))-1 {
 		return 0
 	}
 	by := s.V[i]
-	bit := byte(1 << uint(offset%8))
+	bit := byte(1 << (7 - uint(offset%8)))
 	if by&bit != 0 {
 		return 1
 	}

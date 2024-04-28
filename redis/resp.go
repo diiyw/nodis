@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"bufio"
 	"errors"
 	"io"
 	"strconv"
@@ -11,7 +10,7 @@ import (
 )
 
 type Reader struct {
-	reader *bufio.Reader
+	reader io.Reader
 	buf    []byte
 	r      int
 	l      int
@@ -22,7 +21,7 @@ const defaultSize = 4096
 
 func NewReader(rd io.Reader) *Reader {
 	return &Reader{
-		reader: bufio.NewReader(rd),
+		reader: rd,
 		buf:    make([]byte, defaultSize),
 		cmd: &Command{
 			Args: make([]string, 0),
@@ -30,52 +29,65 @@ func NewReader(rd io.Reader) *Reader {
 	}
 }
 
-func (r *Reader) grow() {
-	r.buf = append(r.buf, make([]byte, defaultSize)...)
+func (r *Reader) grow(n int) {
+	if r.r+r.l+n <= len(r.buf) {
+		return
+	}
+	c := r.r + r.l + n
+	newBuf := make([]byte, c)
+	copy(newBuf, r.buf)
+	r.buf = newBuf
 }
 
 func (r *Reader) readByte() error {
-	b, err := r.reader.ReadByte()
+	size := r.r + r.l
+	r.grow(defaultSize)
+	n, err := r.reader.Read(r.buf[size : r.r+r.l+1])
 	if err != nil {
 		return err
 	}
-	r.writeBuff(b)
+	if n == 0 {
+		return io.EOF
+	}
+	r.l++
 	return nil
 }
 
 func (r *Reader) readByteN(n int) error {
-	if r.r+r.l+n > defaultSize {
-		r.grow()
-	}
-	_, err := r.reader.Read(r.buf[r.r : r.r+n])
+	r.grow(n)
+READ:
+	start := r.r + r.l
+	end := start + (n - r.l)
+	rn, err := r.reader.Read(r.buf[start:end])
 	if err != nil {
 		return err
 	}
-	r.l += n
+	r.l += rn
+	if rn < r.l {
+		goto READ
+	}
 	return nil
 }
 
-func (r *Reader) writeBuff(b byte) {
-	if r.r+r.l >= defaultSize {
-		r.grow()
-	}
-	r.buf[r.r+r.l] = b
-	r.l++
+func (r *Reader) firstByte() byte {
+	return r.indexByte(0)
 }
 
-func (r *Reader) bufFirst() byte {
-	return r.bufIndex(0)
-}
-
-func (r *Reader) bufIndex(i int) byte {
+func (r *Reader) indexByte(i int) byte {
 	if i >= 0 {
 		return r.buf[r.r+i]
 	}
 	return r.buf[r.r+r.l+i]
 }
 
-func (r *Reader) flushString() string {
+func (r *Reader) flushNoCopyString() string {
 	s := unsafe.String(unsafe.SliceData(r.buf[r.r:r.r+r.l]), r.l)
+	r.malloc()
+	return s
+}
+
+func (r *Reader) flushCopyString() string {
+	s := string(r.buf[r.r : r.r+r.l])
 	r.malloc()
 	return s
 }
@@ -97,7 +109,7 @@ func (r *Reader) readLine() error {
 		if err != nil {
 			return err
 		}
-		if r.l > 1 && r.bufIndex(-1) == '\n' {
+		if r.l > 1 && r.indexByte(-1) == '\n' {
 			r.l -= 2
 			break
 		}
@@ -110,7 +122,7 @@ func (r *Reader) readInteger() (x int, err error) {
 	if err != nil {
 		return 0, err
 	}
-	i64, err := strconv.ParseInt(r.flushString(), 10, 64)
+	i64, err := strconv.ParseInt(r.flushNoCopyString(), 10, 64)
 	if err != nil {
 		return 0, err
 	}
@@ -130,7 +142,7 @@ func (r *Reader) ReadCommand() error {
 	if err != nil {
 		return err
 	}
-	if r.bufFirst() != ArrayType {
+	if r.firstByte() != ArrayType {
 		return r.ReadInlineCommand()
 	}
 	r.malloc()
@@ -158,8 +170,33 @@ func (r *Reader) ReadCommand() error {
 
 func (r *Reader) readOptions(v string, i int) {
 	switch r.cmd.Name {
+	case "EXPIRE", "EXPIREAT":
+		if i > 1 {
+			opt := utils.ToUpper(v)
+			switch opt {
+			case "NX":
+				r.cmd.Options.NX = i
+			case "XX":
+				r.cmd.Options.XX = i
+			case "LT":
+				r.cmd.Options.LT = i
+			case "GT":
+				r.cmd.Options.GT = i
+			}
+		}
+	case "SCAN", "SSCAN", "HSCAN", "ZSCAN":
+		if i > 1 {
+			opt := utils.ToUpper(v)
+			switch opt {
+			case "MATCH":
+				r.cmd.Options.MATCH = i + 1
+			case "COUNT":
+				r.cmd.Options.COUNT = i + 1
+			case "TYPE":
+			}
+		}
 	case "SET":
-		if i > 2 {
+		if i > 1 {
 			opt := utils.ToUpper(v)
 			switch opt {
 			case "NX":
@@ -181,7 +218,7 @@ func (r *Reader) readOptions(v string, i int) {
 			}
 		}
 	case "ZADD":
-		if i > 1 {
+		if i > 0 {
 			opt := utils.ToUpper(v)
 			switch opt {
 			case "NX":
@@ -198,28 +235,28 @@ func (r *Reader) readOptions(v string, i int) {
 				r.cmd.Options.LT = i
 			}
 		}
-	case "ZRANGE":
-		if i > 3 {
-			opt := utils.ToUpper(v)
-			switch opt {
-			case "WITHSCORES":
-				r.cmd.Options.WITHSCORES = i
-			case "LIMIT":
-				r.cmd.Options.OFFSET = i + 1
-				r.cmd.Options.COUNT = i + 2
-			case "BYSCORE":
-				r.cmd.Options.BYSCORE = i
-			case "BYLEX":
-				r.cmd.Options.BYLEX = i
-			}
+	case "ZRANK", "ZREVRANK", "ZRANGE", "ZREVRANGE":
+		if r.cmd.Name == "ZRANK" && i < 1 {
+			return
+		} else if i < 2 {
+			return
+		}
+		opt := utils.ToUpper(v)
+		switch opt {
+		case "WITHSCORES":
+			r.cmd.Options.WITHSCORES = i
+		case "LIMIT":
+			r.cmd.Options.LIMIT = i + 1
+		case "BYSCORE":
+			r.cmd.Options.BYSCORE = i
+		case "BYLEX":
+			r.cmd.Options.BYLEX = i
 		}
 	case "CONFIG":
-		if i > 0 {
-			opt := utils.ToUpper(v)
-			switch opt {
-			case "GET":
-				r.cmd.Options.GET = i + 1
-			}
+		opt := utils.ToUpper(v)
+		switch opt {
+		case "GET":
+			r.cmd.Options.GET = i + 1
 		}
 	}
 }
@@ -229,7 +266,7 @@ func (r *Reader) readBulk() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if r.bufFirst() != BulkType {
+	if r.firstByte() != BulkType {
 		return "", ErrInvalidRequestExceptedBulk
 	}
 	r.malloc()
@@ -238,7 +275,7 @@ func (r *Reader) readBulk() (string, error) {
 		return "", err
 	}
 	r.readByteN(l)
-	v := r.flushString()
+	v := r.flushCopyString()
 	// Read the trailing CRLF
 	r.readLine()
 	r.malloc()
@@ -252,16 +289,16 @@ func (r *Reader) readUtil(end byte) (bool, error) {
 		if err != nil {
 			return lineEnd, err
 		}
-		if r.bufIndex(-1) == '\r' {
+		if r.indexByte(-1) == '\r' {
 			r.l--
 			continue
 		}
-		if r.bufIndex(-1) == '\n' {
+		if r.indexByte(-1) == '\n' {
 			lineEnd = true
 			r.l--
 			break
 		}
-		if r.bufIndex(-1) == end && r.bufIndex(-2) != '\\' {
+		if r.indexByte(-1) == end && r.indexByte(-2) != '\\' {
 			r.l--
 			break
 		}
@@ -274,7 +311,7 @@ func (r *Reader) ReadInlineCommand() error {
 	if err != nil {
 		return err
 	}
-	r.cmd.Name = utils.ToUpper(r.flushString())
+	r.cmd.Name = utils.ToUpper(r.flushNoCopyString())
 	if lineEnd {
 		return nil
 	}
@@ -287,7 +324,7 @@ func (r *Reader) ReadInlineCommand() error {
 			}
 			break
 		}
-		first := r.bufFirst()
+		first := r.firstByte()
 		if first == ' ' || first == '\t' {
 			r.malloc()
 			continue
@@ -301,7 +338,7 @@ func (r *Reader) ReadInlineCommand() error {
 		if err != nil {
 			return err
 		}
-		v := r.flushString()
+		v := r.flushCopyString()
 		r.cmd.Args = append(r.cmd.Args, v)
 		i++
 		r.readOptions(v, i)
@@ -326,8 +363,14 @@ func NewWriter(w io.Writer) *Writer {
 	}
 }
 
-func (w *Writer) grow() {
-	w.buf = append(w.buf, make([]byte, defaultSize)...)
+func (w *Writer) grow(n int) {
+	newBuf := make([]byte, len(w.buf)+n)
+	copy(newBuf, w.buf)
+	w.buf = newBuf
+}
+
+func (w *Writer) Bytes() []byte {
+	return w.buf[:w.w]
 }
 
 func (w *Writer) Flush() error {
@@ -340,15 +383,19 @@ func (w *Writer) Flush() error {
 }
 
 func (w *Writer) writeByte(b byte) {
-	if w.w >= defaultSize {
-		w.grow()
+	if w.w >= len(w.buf) {
+		w.grow(defaultSize)
 	}
 	w.buf[w.w] = b
 	w.w++
 }
 
-func (w *Writer) writeBytes(b ...byte) {
-	for _, v := range b {
+func (w *Writer) writeBytes(bs ...byte) {
+	n := len(bs)
+	if w.w+n >= len(w.buf) {
+		w.grow(n)
+	}
+	for _, v := range bs {
 		w.writeByte(v)
 	}
 }

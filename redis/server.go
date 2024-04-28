@@ -25,10 +25,10 @@ func Serve(addr string, handler HandlerFunc) error {
 func handleConn(conn net.Conn, handler HandlerFunc) {
 	reader, writer := NewReader(conn), NewWriter(conn)
 	defer func() {
-		if r := recover(); r != nil {
-			writer.WriteError(r.(error).Error())
-			writer.Flush()
-		}
+		// if r := recover(); r != nil {
+		// 	writer.WriteError(r.(error).Error())
+		// 	writer.Flush()
+		// }
 		conn.Close()
 	}()
 	for {
