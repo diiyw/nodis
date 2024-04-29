@@ -31,34 +31,57 @@ func (s *String) Get() []byte {
 }
 
 // Incr increments the value by 1
-func (s *String) Incr(step int64) int64 {
+func (s *String) Incr(step int64) (int64, error) {
 	var v string
 	if len(s.V) == 0 {
 		v = "0"
 	} else {
 		v = unsafe.String(unsafe.SliceData(s.V), len(s.V))
 	}
-	n, _ := strconv.ParseInt(v, 10, 64)
+	n, err := strconv.ParseInt(v, 10, 64)
+	if err != nil {
+		return 0, err
+	}
 	n += step
 	nn := strconv.FormatInt(n, 10)
 	s.V = unsafe.Slice(unsafe.StringData(nn), len(nn))
-	return n
+	return n, nil
 }
 
 // Decr decrements the value by 1
-func (s *String) Decr(step int64) int64 {
+func (s *String) Decr(step int64) (int64, error) {
 	var v string
 	if len(s.V) == 0 {
 		v = "0"
 	} else {
 		v = unsafe.String(unsafe.SliceData(s.V), len(s.V))
 	}
-	n, _ := strconv.ParseInt(v, 10, 64)
+	n, err := strconv.ParseInt(v, 10, 64)
+	if err != nil {
+		return 0, err
+	}
 	n -= step
-	n += step
 	nn := strconv.FormatInt(n, 10)
 	s.V = unsafe.Slice(unsafe.StringData(nn), len(nn))
-	return n
+	return n, nil
+}
+
+// IncrByFloat increments the value by a float
+func (s *String) IncrByFloat(step float64) (float64, error) {
+	var v string
+	if len(s.V) == 0 {
+		v = "0"
+	} else {
+		v = unsafe.String(unsafe.SliceData(s.V), len(s.V))
+	}
+	n, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		return 0, err
+	}
+	n += step
+	nn := strconv.FormatFloat(n, 'f', -1, 64)
+	s.V = unsafe.Slice(unsafe.StringData(nn), len(nn))
+	return n, nil
 }
 
 // SetBit set a bit in a key
@@ -153,6 +176,38 @@ func (s *String) BitCountByBit(start, end int64) int64 {
 		}
 	}
 	return count
+}
+
+func (s *String) Append(data []byte) int64 {
+	s.V = append(s.V, data...)
+	return int64(len(s.V))
+}
+
+// GetRange returns the substring of the value
+func (s *String) GetRange(start, end int64) []byte {
+	bl := int64(len(s.V))
+	if start < 0 {
+		start = bl + start
+	}
+	if start >= int64(len(s.V)) {
+		return nil
+	}
+	end += 1
+	if end <= 0 {
+		end += bl
+	}
+	if end > bl {
+		end = bl
+	}
+	if start > end {
+		return nil
+	}
+	return s.V[start:end]
+}
+
+// Strlen returns the length of the value
+func (s *String) Strlen() int64 {
+	return int64(len(s.V))
 }
 
 // GetValue the string to bytes

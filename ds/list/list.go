@@ -163,31 +163,35 @@ func (l *DoublyLinkedList) LIndex(index int64) []byte {
 }
 
 // LInsert inserts the element before or after the pivot element
+// the list length after a successful insert operation.
+// 0 when the key doesn't exist.
+// -1 when the pivot wasn't found.
 func (l *DoublyLinkedList) LInsert(pivot, data []byte, before bool) int64 {
 	currentNode := l.head
 	for currentNode != nil {
-		if bytes.Contains(currentNode.data, pivot) {
+		if bytes.Equal(currentNode.data, pivot) {
 			newNode := &Node{data: data}
 			if before {
-				newNode.next = currentNode
-				newNode.prev = currentNode.prev
 				if currentNode.prev != nil {
 					currentNode.prev.next = newNode
+					newNode.prev = currentNode.prev
 				} else {
 					l.head = newNode
 				}
+				newNode.next = currentNode
 				currentNode.prev = newNode
 			} else {
-				newNode.prev = currentNode
-				newNode.next = currentNode.next
 				if currentNode.next != nil {
 					currentNode.next.prev = newNode
+					newNode.next = currentNode.next
 				} else {
 					l.tail = newNode
 				}
+				newNode.prev = currentNode
 				currentNode.next = newNode
 			}
-			return l.size()
+			l.length++
+			return l.length
 		}
 		currentNode = currentNode.next
 	}

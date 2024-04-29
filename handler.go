@@ -46,24 +46,36 @@ func getCommand(name string) func(n *Nodis, w *redis.Writer, cmd *redis.Command)
 		return ttl
 	case "RENAME":
 		return rename
+	case "RENAMENX":
+		return renameNx
 	case "TYPE":
 		return typ
 	case "SCAN":
 		return scan
 	case "SET":
 		return setString
+	case "APPEND":
+		return appendString
 	case "SETEX":
 		return setex
+	case "SETNX":
+		return setnx
 	case "GET":
 		return getString
+	case "GETRANGE":
+		return getRange
+	case "STRLEN":
+		return strLen
 	case "INCR":
 		return incr
 	case "INCRBY":
 		return incrBy
-	case "DESR":
+	case "DECR":
 		return decr
 	case "DECRBY":
 		return decrBy
+	case "INCRBYFLOAT":
+		return incrByFloat
 	case "SETBIT":
 		return setBit
 	case "GETBIT":
@@ -368,7 +380,22 @@ func rename(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		w.WriteInteger(1)
 		return
 	}
-	w.WriteError(v.Error())
+	w.WriteInteger(0)
+}
+
+func renameNx(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("RENAMENX requires at least two arguments")
+		return
+	}
+	oldKey := cmd.Args[0]
+	newKey := cmd.Args[1]
+	v := n.RenameNX(oldKey, newKey)
+	if v == nil {
+		w.WriteInteger(1)
+		return
+	}
+	w.WriteInteger(0)
 }
 
 func typ(n *Nodis, w *redis.Writer, cmd *redis.Command) {
@@ -377,7 +404,7 @@ func typ(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		return
 	}
 	key := cmd.Args[0]
-	w.WriteBulk(n.Type(key))
+	w.WriteString(n.Type(key))
 }
 
 // SCAN cursor [MATCH pattern] [COUNT count] [TYPE type]
@@ -464,6 +491,16 @@ func setString(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	w.WriteOK()
 }
 
+func appendString(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("APPEND requires at least two arguments")
+		return
+	}
+	key := cmd.Args[0]
+	value := []byte(cmd.Args[1])
+	w.WriteInteger(n.Append(key, value))
+}
+
 func setex(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		w.WriteError("SETEX requires at least three arguments")
@@ -476,13 +513,32 @@ func setex(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	w.WriteOK()
 }
 
+func setnx(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("SETNX requires at least two arguments")
+		return
+	}
+	key := cmd.Args[0]
+	value := []byte(cmd.Args[1])
+	if n.SetNX(key, value) {
+		w.WriteInteger(1)
+		return
+	}
+	w.WriteInteger(0)
+}
+
 func incr(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		w.WriteError("INCR requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
-	w.WriteInteger(n.Incr(key))
+	v, err := n.Incr(key)
+	if err != nil {
+		w.WriteNull()
+		return
+	}
+	w.WriteInteger(v)
 }
 
 func incrBy(n *Nodis, w *redis.Writer, cmd *redis.Command) {
@@ -491,8 +547,17 @@ func incrBy(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		return
 	}
 	key := cmd.Args[0]
-	value, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
-	w.WriteInteger(n.IncrBy(key, value))
+	value, err := strconv.ParseInt(cmd.Args[1], 10, 64)
+	if err != nil {
+		w.WriteError("ERR value is not an integer or out of range")
+		return
+	}
+	v, err := n.IncrBy(key, value)
+	if err != nil {
+		w.WriteNull()
+		return
+	}
+	w.WriteInteger(v)
 }
 
 func decr(n *Nodis, w *redis.Writer, cmd *redis.Command) {
@@ -501,7 +566,12 @@ func decr(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		return
 	}
 	key := cmd.Args[0]
-	w.WriteInteger(n.Decr(key))
+	v, err := n.Decr(key)
+	if err != nil {
+		w.WriteNull()
+		return
+	}
+	w.WriteInteger(v)
 }
 
 func decrBy(n *Nodis, w *redis.Writer, cmd *redis.Command) {
@@ -510,8 +580,36 @@ func decrBy(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		return
 	}
 	key := cmd.Args[0]
-	value, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
-	w.WriteInteger(n.DecrBy(key, value))
+	value, err := strconv.ParseInt(cmd.Args[1], 10, 64)
+	if err != nil {
+		w.WriteError("ERR value is not an integer or out of range")
+		return
+	}
+	v, err := n.DecrBy(key, value)
+	if err != nil {
+		w.WriteNull()
+		return
+	}
+	w.WriteInteger(v)
+}
+
+func incrByFloat(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("INCRBYFLOAT requires at least two arguments")
+		return
+	}
+	key := cmd.Args[0]
+	value, err := strconv.ParseFloat(cmd.Args[1], 64)
+	if err != nil {
+		w.WriteError("ERR value is not a valid float")
+		return
+	}
+	v, err := n.IncrByFloat(key, value)
+	if err != nil {
+		w.WriteNull()
+		return
+	}
+	w.WriteBulk(strconv.FormatFloat(v, 'f', -1, 64))
 }
 
 func getString(n *Nodis, w *redis.Writer, cmd *redis.Command) {
@@ -525,6 +623,35 @@ func getString(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		return
 	}
 	w.WriteBulk(string(v))
+}
+
+func getRange(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("GETRANGE requires at least three arguments")
+		return
+	}
+	key := cmd.Args[0]
+	start, err := strconv.ParseInt(cmd.Args[1], 10, 64)
+	if err != nil {
+		w.WriteError("ERR start value is not an integer or out of range")
+		return
+	}
+	end, err := strconv.ParseInt(cmd.Args[2], 10, 64)
+	if err != nil {
+		w.WriteError("ERR end value is not an integer or out of range")
+		return
+	}
+	v := n.GetRange(key, start, end)
+	w.WriteBulk(string(v))
+}
+
+func strLen(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("STRLEN requires at least one argument")
+		return
+	}
+	key := cmd.Args[0]
+	w.WriteInteger(n.StrLen(key))
 }
 
 func setBit(n *Nodis, w *redis.Writer, cmd *redis.Command) {
@@ -1040,7 +1167,12 @@ func llen(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		return
 	}
 	key := cmd.Args[0]
-	w.WriteInteger(n.LLen(key))
+	v := n.LLen(key)
+	if v == -1 {
+		w.WriteNull()
+		return
+	}
+	w.WriteInteger(v)
 }
 
 func lIndex(n *Nodis, w *redis.Writer, cmd *redis.Command) {

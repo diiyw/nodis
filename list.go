@@ -18,19 +18,19 @@ func (n *Nodis) newList() ds.DataStruct {
 func (n *Nodis) LPush(key string, values ...[]byte) int64 {
 	meta := n.store.writeKey(key, n.newList)
 	meta.ds.(*list.DoublyLinkedList).LPush(values...)
+	v := meta.ds.(*list.DoublyLinkedList).LLen()
 	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_LPush, key).Values(values))
-	return int64(len(values))
+	return v
 }
 
 func (n *Nodis) RPush(key string, values ...[]byte) int64 {
 	meta := n.store.writeKey(key, n.newList)
-	for _, v := range values {
-		meta.ds.(*list.DoublyLinkedList).RPush(v)
-	}
+	meta.ds.(*list.DoublyLinkedList).RPush(values...)
+	v := meta.ds.(*list.DoublyLinkedList).LLen()
 	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_RPush, key).Values(values))
-	return int64(len(values))
+	return v
 }
 
 func (n *Nodis) LPop(key string, count int64) [][]byte {
@@ -69,7 +69,12 @@ func (n *Nodis) LLen(key string) int64 {
 		meta.commit()
 		return 0
 	}
-	v := meta.ds.(*list.DoublyLinkedList).LLen()
+	ds, ok := meta.ds.(*list.DoublyLinkedList)
+	if !ok {
+		meta.commit()
+		return -1
+	}
+	v := ds.LLen()
 	meta.commit()
 	return v
 }
@@ -86,7 +91,11 @@ func (n *Nodis) LIndex(key string, index int64) []byte {
 }
 
 func (n *Nodis) LInsert(key string, pivot, data []byte, before bool) int64 {
-	meta := n.store.writeKey(key, n.newList)
+	meta := n.store.writeKey(key, nil)
+	if !meta.isOk() {
+		meta.commit()
+		return 0
+	}
 	v := meta.ds.(*list.DoublyLinkedList).LInsert(pivot, data, before)
 	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_LInsert, key).Value(data).Pivot(pivot).Before(before))

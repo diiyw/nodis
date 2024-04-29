@@ -53,23 +53,23 @@ func TestSetBit_BitCount(t *testing.T) {
 func TestSet_Incr(t *testing.T) {
 	s := NewString()
 	s.Set([]byte("100"))
-	if v := s.Incr(1); v != 101 {
-		t.Errorf("expected 101, got %d", s.Incr(1))
+	if v, _ := s.Incr(1); v != 101 {
+		t.Errorf("expected 101, got %d", v)
 	}
 	s.Set([]byte(""))
-	if s.Incr(1) != 1 {
-		t.Errorf("expected 1, got %d", s.Incr(1))
+	if v, _ := s.Incr(1); v != 1 {
+		t.Errorf("expected 1, got %d", v)
 	}
 }
 
 func TestSet_Decr(t *testing.T) {
 	s := NewString()
 	s.Set([]byte("100"))
-	if s.Decr(1) != 99 {
-		t.Errorf("expected 99, got %d", s.Decr(1))
+	if v, _ := s.Decr(1); v != 99 {
+		t.Errorf("expected 99, got %d", v)
 	}
 	s.Set([]byte("0"))
-	if s.Decr(1) != -1 {
-		t.Errorf("expected -1, got %d", s.Decr(1))
+	if v, _ := s.Decr(1); v != -1 {
+		t.Errorf("expected -1, got %d", v)
 	}
 }

@@ -45,11 +45,11 @@ Simple way to embed in your application.
 |                     |                 | SCAN            | SETEX               | SREM            | HICRBYFLOAT    	| RPUSHX           | ZRANGEBYSCORE         |
 |                     |                 | RANDOMKEY       | INCRBY              |                 | HSETNX          | LREM             | ZREVRANGEBYSCORE      |
 |                     |                 | RENAMEEX        | DECRBY              |                 | HMGET           | LSET             | ZREM                  |
-|                     |                 |                 |                     |                 | HMSET           | LRANGE           | ZREMRANGEBYRANK       |
-|                     |                 |                 |                     |                 | HCLEAR          | LPOPRPUSH        | ZREMRANGEBYSCORE      |
-|                     |                 |                 |                     |                 | HSCAN           | RPOPLPUSH        | ZCLEAR                |
-|                     |                 |                 |                     |                 | HVALS           | BLPOP            | ZEXISTS               |
-|                     |                 |                 |                     |                 |                 | BRPOP            |                       |
+|                     |                 |                 | SETNX               |                 | HMSET           | LRANGE           | ZREMRANGEBYRANK       |
+|                     |                 |                 | INCRBYFLOAT         |                 | HCLEAR          | LPOPRPUSH        | ZREMRANGEBYSCORE      |
+|                     |                 |                 | APPEND              |                 | HSCAN           | RPOPLPUSH        | ZCLEAR                |
+|                     |                 |                 | GETRANGE            |                 | HVALS           | BLPOP            | ZEXISTS               |
+|                     |                 |                 | STRLEN              |                 |                 | BRPOP            |                       |
 ## Get Started
 ```bash
  go get github.com/diiyw/nodis@latest

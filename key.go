@@ -366,9 +366,9 @@ func (n *Nodis) Type(key string) string {
 		meta.commit()
 		return "none"
 	}
-	v := ds.DataTypeMap[meta.ds.Type()]
+	v := meta.ds.Type()
 	meta.commit()
-	return v
+	return ds.DataTypeMap[v]
 }
 
 // Scan the keys
