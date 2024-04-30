@@ -251,6 +251,17 @@ func (n *Nodis) Serve(addr string) error {
 			w.WriteError("ERR unknown command: " + cmd.Name)
 			return
 		}
-		c(n, w, cmd)
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					w.WriteError("WRONGTYPE Operation against a key holding the wrong kind of value")
+					w.Flush()
+					if len(cmd.Args) > 0 {
+						n.store.unlock(cmd.Args[0])
+					}
+				}
+			}()
+			c(n, w, cmd)
+		}()
 	})
 }

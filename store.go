@@ -505,3 +505,14 @@ func (s *store) clear() error {
 	s.values.Clear()
 	return nil
 }
+
+// Unlock the key
+func (s *store) unlock(key string) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("Unlock error: ", r)
+		}
+	}()
+	m := s.spread(utils.Fnv32(key))
+	m.commit()
+}

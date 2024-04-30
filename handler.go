@@ -150,6 +150,8 @@ func getCommand(name string) func(n *Nodis, w *redis.Writer, cmd *redis.Command)
 		return rPushx
 	case "LREM":
 		return lRem
+	case "LTRIM":
+		return lTrim
 	case "LSET":
 		return lSet
 	case "LRANGE":
@@ -262,6 +264,7 @@ func echo(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 }
 
 func quit(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	w.Close()
 	w.WriteOK()
 }
 
@@ -766,6 +769,14 @@ func sPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		}
 	}
 	results := n.SPop(key, count)
+	if results == nil {
+		w.WriteNull()
+		return
+	}
+	if cmd.Options.COUNT == 0 {
+		w.WriteBulk(results[0])
+		return
+	}
 	w.WriteArray(len(results))
 	for _, v := range results {
 		w.WriteBulk(v)
@@ -1235,6 +1246,26 @@ func lRem(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	}
 	value := []byte(cmd.Args[2])
 	w.WriteInteger(n.LRem(key, count, value))
+}
+
+func lTrim(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("LTRIM requires at least two arguments")
+		return
+	}
+	key := cmd.Args[0]
+	start, err := strconv.ParseInt(cmd.Args[1], 10, 64)
+	if err != nil {
+		w.WriteError("ERR start value is not an integer or out of range")
+		return
+	}
+	end, err := strconv.ParseInt(cmd.Args[2], 10, 64)
+	if err != nil {
+		w.WriteError("ERR end value is not an integer or out of range")
+		return
+	}
+	n.LTrim(key, start, end)
+	w.WriteString("OK")
 }
 
 func lSet(n *Nodis, w *redis.Writer, cmd *redis.Command) {

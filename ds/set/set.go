@@ -22,10 +22,14 @@ func (s *Set) SAdd(member ...string) int64 {
 }
 
 func (s *Set) sAdd(member ...string) int64 {
+	n := 0
 	for _, m := range member {
-		s.data.Set(m, struct{}{})
+		_, updated := s.data.Set(m, struct{}{})
+		if !updated {
+			n++
+		}
 	}
-	return int64(len(member))
+	return int64(n)
 }
 
 // SCard gets the set members count.

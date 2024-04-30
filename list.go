@@ -103,7 +103,11 @@ func (n *Nodis) LInsert(key string, pivot, data []byte, before bool) int64 {
 }
 
 func (n *Nodis) LPushX(key string, data []byte) int64 {
-	meta := n.store.writeKey(key, n.newList)
+	meta := n.store.writeKey(key, nil)
+	if !meta.isOk() {
+		meta.commit()
+		return 0
+	}
 	v := meta.ds.(*list.DoublyLinkedList).LPushX(data)
 	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_LPushX, key).Value(data))
@@ -111,7 +115,11 @@ func (n *Nodis) LPushX(key string, data []byte) int64 {
 }
 
 func (n *Nodis) RPushX(key string, data []byte) int64 {
-	meta := n.store.writeKey(key, n.newList)
+	meta := n.store.writeKey(key, nil)
+	if !meta.isOk() {
+		meta.commit()
+		return 0
+	}
 	v := meta.ds.(*list.DoublyLinkedList).RPushX(data)
 	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_RPushX, key).Value(data))

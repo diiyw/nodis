@@ -204,7 +204,7 @@ func (l *DoublyLinkedList) LPushX(data []byte) int64 {
 		return 0
 	}
 	l.lPush(data)
-	return l.size()
+	return l.length
 }
 
 // RPushX adds an element to the end of the list if the list exists
@@ -213,7 +213,7 @@ func (l *DoublyLinkedList) RPushX(data []byte) int64 {
 		return 0
 	}
 	l.rPush(data)
-	return l.size()
+	return l.length
 }
 
 // LRem removes the first count occurrences of elements equal to value from the list
@@ -259,11 +259,17 @@ func (l *DoublyLinkedList) LSet(index int64, value []byte) bool {
 }
 
 // LTrim trims an existing list so that it will contain only the specified range of elements specified
+// For example: LTRIM foobar 0 2 will modify the list stored at foobar so that only the first three elements of the list will remain.
+// start and end can also be negative numbers indicating offsets from the end of the list, where -1 is the last element of the list, -2 the penultimate element and so on.
+// Out of range indexes will not produce an error: if start is larger than the end of the list, or start > end, the result will be an empty list (which causes key to be removed). If end is larger than the end of the list, Redis will treat it like the last element of the list.
 func (l *DoublyLinkedList) LTrim(start, end int64) {
 	currentNode := l.head
-	var index int64 = 0
+	var currentIndex int64 = 0
+	if end < 0 {
+		end = l.size() + end
+	}
 	for currentNode != nil {
-		if index < start || index > end {
+		if currentIndex < start || currentIndex > end {
 			if currentNode.prev != nil {
 				currentNode.prev.next = currentNode.next
 			} else {
@@ -274,10 +280,10 @@ func (l *DoublyLinkedList) LTrim(start, end int64) {
 			} else {
 				l.tail = currentNode.prev
 			}
+			l.length--
 		}
 		currentNode = currentNode.next
-		index++
-		l.length--
+		currentIndex++
 	}
 }
 

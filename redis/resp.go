@@ -3,6 +3,7 @@ package redis
 import (
 	"errors"
 	"io"
+	"net"
 	"strconv"
 	"unsafe"
 
@@ -184,7 +185,7 @@ func (r *Reader) readOptions(v string, i int) {
 				r.cmd.Options.GT = i
 			}
 		}
-	case "SCAN", "SSCAN", "HSCAN", "ZSCAN":
+	case "SCAN", "SSCAN", "HSCAN", "ZSCAN", "SPOP":
 		if i > 1 {
 			opt := utils.ToUpper(v)
 			switch opt {
@@ -464,4 +465,9 @@ func (w *Writer) WriteNullMap() {
 
 func (w *Writer) WriteOK() {
 	w.writeBytes([]byte("+OK\r\n")...)
+}
+
+// Close closes the writer
+func (w *Writer) Close() error {
+	return w.writer.(net.Conn).Close()
 }
