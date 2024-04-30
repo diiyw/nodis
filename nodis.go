@@ -254,6 +254,7 @@ func (n *Nodis) Serve(addr string) error {
 		func() {
 			defer func() {
 				if r := recover(); r != nil {
+					log.Println("Recovered from ", r)
 					w.WriteError("WRONGTYPE Operation against a key holding the wrong kind of value")
 					w.Flush()
 					if len(cmd.Args) > 0 {

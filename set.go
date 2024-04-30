@@ -87,6 +87,52 @@ func (n *Nodis) SInter(keys ...string) []string {
 	return v
 }
 
+func (n *Nodis) SInterStore(destination string, keys ...string) int64 {
+	if len(keys) == 0 {
+		return 0
+	}
+	members := n.SInter(keys...)
+	n.Del(destination)
+	return n.SAdd(destination, members...)
+}
+
+// SUnion gets the union between sets.
+func (n *Nodis) SUnion(keys ...string) []string {
+	if len(keys) == 0 {
+		return nil
+	}
+	meta := n.store.readKey(keys[0])
+	if !meta.isOk() {
+		meta.commit()
+		return nil
+	}
+	lockedSets := []*metadata{}
+	otherSets := make([]*set.Set, len(keys)-1)
+	for i, s := range keys[1:] {
+		setDs := n.store.readKey(s)
+		if !setDs.isOk() {
+			continue
+		}
+		lockedSets = append(lockedSets, setDs)
+		otherSets[i] = setDs.ds.(*set.Set)
+	}
+	v := meta.ds.(*set.Set).SUnion(otherSets...)
+	for _, s := range lockedSets {
+		s.commit()
+	}
+	meta.commit()
+	return v
+}
+
+func (n *Nodis) SUnionStore(destination string, keys ...string) int64 {
+	if len(keys) == 0 {
+		return 0
+	}
+	members := n.SUnion(keys...)
+	n.Del(destination)
+	return n.SAdd(destination, members...)
+}
+
 // SIsMember returns if member is a member of the set stored at key.
 func (n *Nodis) SIsMember(key, member string) bool {
 	meta := n.store.readKey(key)
@@ -150,4 +196,36 @@ func (n *Nodis) SPop(key string, count int64) []string {
 	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_SRem, key).Members(members))
 	return members
+}
+
+// SMove moves a member from one set to another.
+func (n *Nodis) SMove(source, destination, member string) bool {
+	meta := n.store.writeKey(source, nil)
+	if !meta.isOk() {
+		meta.commit()
+		return false
+	}
+	v := meta.ds.(*set.Set).SRem(member)
+	if v == 0 {
+		meta.commit()
+		return false
+	}
+	meta.commit()
+	meta = n.store.writeKey(destination, n.newSet)
+	v = meta.ds.(*set.Set).SAdd(member)
+	n.notify(pb.NewOp(pb.OpType_SAdd, destination).Members([]string{member}))
+	meta.commit()
+	return v > 0
+}
+
+// SRandMember returns one or more random elements from the set value stored at key.
+func (n *Nodis) SRandMember(key string, count int64) []string {
+	meta := n.store.readKey(key)
+	if !meta.isOk() {
+		meta.commit()
+		return nil
+	}
+	v := meta.ds.(*set.Set).SRandMember(count)
+	meta.commit()
+	return v
 }

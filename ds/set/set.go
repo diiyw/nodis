@@ -1,6 +1,7 @@
 package set
 
 import (
+	"math/rand"
 	"path/filepath"
 
 	"github.com/diiyw/nodis/ds"
@@ -106,8 +107,10 @@ func (s *Set) SIsMember(member string) bool {
 func (s *Set) SRem(member ...string) int64 {
 	var removed int64 = 0
 	for _, m := range member {
-		s.data.Delete(m)
-		removed++
+		_, ok := s.data.Delete(m)
+		if ok {
+			removed++
+		}
 	}
 	return removed
 }
@@ -171,6 +174,52 @@ func (s *Set) SScan(cursor int64, match string, count int64) (int64, []string) {
 	})
 	return cursor, keys
 }
+
+// SRandMember gets a random member from the set.
+func (s *Set) SRandMember(count int64) []string {
+	if count == 0 {
+		return nil
+	}
+	var unique = true
+	if count < 0 {
+		count = -count
+		unique = false
+	}
+	if count > int64(s.data.Len()) {
+		count = int64(s.data.Len())
+	}
+	kl := s.data.Len()
+	members := make([]string, 0, count)
+	if unique {
+		var keys = make(map[string]bool)
+		s.data.Scan(func(key string, value struct{}) bool {
+			keys[key] = true
+			return true
+		})
+		for m := range keys {
+			if count == 0 {
+				break
+			}
+			members = append(members, m)
+			count--
+		}
+	} else {
+		keys := s.data.Keys()
+		for count > 0 {
+			index := rand.Intn(kl)
+			members = append(members, keys[index])
+			count--
+		}
+
+	}
+	return members
+}
+
+// SClear clears the set.
+func (s *Set) SClear() {
+	s.data.Clear()
+}
+
 
 // Type returns the type of the data structure
 func (s *Set) Type() ds.DataType {

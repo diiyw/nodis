@@ -302,11 +302,11 @@ func (n *Nodis) TTL(key string) time.Duration {
 	meta := n.store.readKey(key)
 	if !meta.isOk() {
 		meta.commit()
-		return 0
+		return -2
 	}
 	if meta.key.expiration == 0 {
 		meta.commit()
-		return 0
+		return -1
 	}
 	s := meta.key.expiration / 1000
 	ns := (meta.key.expiration - s*1000) * 1000 * 1000

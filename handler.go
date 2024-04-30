@@ -16,6 +16,8 @@ func getCommand(name string) func(n *Nodis, w *redis.Writer, cmd *redis.Command)
 		return client
 	case "CONFIG":
 		return config
+	case "DBSIZE":
+		return dbSize
 	case "PING":
 		return ping
 	case "ECHO":
@@ -84,6 +86,8 @@ func getCommand(name string) func(n *Nodis, w *redis.Writer, cmd *redis.Command)
 		return bitCount
 	case "SADD":
 		return sAdd
+	case "SMOVE":
+		return sMove
 	case "SSCAN":
 		return sScan
 	case "SCARD":
@@ -94,10 +98,18 @@ func getCommand(name string) func(n *Nodis, w *redis.Writer, cmd *redis.Command)
 		return sDiff
 	case "SINTER":
 		return sInter
+	case "SINTERSTORE":
+		return sInterStore
+	case "SUNION":
+		return sUnion
+	case "SUNIONSTORE":
+		return sUnionStore
 	case "SISMEMBER":
 		return sIsMember
 	case "SMEMBERS":
 		return sMembers
+	case "SRANDMEMBER":
+		return sRandMember
 	case "SREM":
 		return sRem
 	case "HSET":
@@ -233,6 +245,10 @@ func config(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	w.WriteNull()
 }
 
+func dbSize(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	w.WriteInteger(int64(n.store.keys.Len()))
+}
+
 func info(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	memStats := runtime.MemStats{}
 	runtime.ReadMemStats(&memStats)
@@ -359,7 +375,16 @@ func ttl(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		w.WriteError("TTL requires at least one argument")
 		return
 	}
-	w.WriteInteger(int64(n.TTL(cmd.Args[0]).Seconds()))
+	v := n.TTL(cmd.Args[0])
+	if v == -1 {
+		w.WriteInteger(-1)
+		return
+	}
+	if v == -2 {
+		w.WriteInteger(-2)
+		return
+	}
+	w.WriteInteger(int64(v.Seconds()))
 }
 
 func randomKey(n *Nodis, w *redis.Writer, cmd *redis.Command) {
@@ -724,6 +749,21 @@ func sAdd(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	w.WriteInteger(n.SAdd(key, cmd.Args[1:]...))
 }
 
+func sMove(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("SMOVE requires at least three arguments")
+		return
+	}
+	src := cmd.Args[0]
+	dst := cmd.Args[1]
+	member := cmd.Args[2]
+	if n.SMove(src, dst, member) {
+		w.WriteInteger(1)
+		return
+	}
+	w.WriteInteger(0)
+}
+
 // SSCAN key cursor [MATCH pattern] [COUNT count]
 func sScan(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) < 1 {
@@ -773,7 +813,11 @@ func sPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		w.WriteNull()
 		return
 	}
-	if cmd.Options.COUNT == 0 {
+	if len(results) == 0 {
+		w.WriteNull()
+		return
+	}
+	if len(cmd.Args) <= 1 {
 		w.WriteBulk(results[0])
 		return
 	}
@@ -816,6 +860,47 @@ func sInter(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	}
 }
 
+func sInterStore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("SINTERSTORE requires at least three arguments")
+		return
+	}
+	dst := cmd.Args[0]
+	keys := cmd.Args[1:]
+	if n.Exists(keys...) != int64(len(keys)) {
+		w.WriteInteger(0)
+		return
+	}
+	results := n.SInterStore(dst, keys...)
+	w.WriteInteger(results)
+}
+
+func sUnion(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("SUNION requires at least two arguments")
+		return
+	}
+	results := n.SUnion(cmd.Args...)
+	w.WriteArray(len(results))
+	for _, v := range results {
+		w.WriteBulk(v)
+	}
+}
+
+func sUnionStore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("SUNIONSTORE requires at least three arguments")
+		return
+	}
+	dst := cmd.Args[0]
+	keys := cmd.Args[1:]
+	if n.Exists(keys...) != int64(len(keys)) {
+		w.WriteInteger(0)
+		return
+	}
+	results := n.SUnionStore(dst, keys...)
+	w.WriteInteger(results)
+}
 func sIsMember(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		w.WriteError("SISMEMBER requires at least two arguments")
@@ -838,6 +923,36 @@ func sMembers(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	}
 	key := cmd.Args[0]
 	results := n.SMembers(key)
+	w.WriteArray(len(results))
+	for _, v := range results {
+		w.WriteBulk(v)
+	}
+}
+
+func sRandMember(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("SRANDMEMBER requires at least one argument")
+		return
+	}
+	key := cmd.Args[0]
+	var count int64 = 1
+	if len(cmd.Args) > 1 {
+		var err error
+		count, err = strconv.ParseInt(cmd.Args[1], 10, 64)
+		if err != nil {
+			w.WriteError("ERR value is not an integer or out of range")
+			return
+		}
+	}
+	results := n.SRandMember(key, count)
+	if len(results) == 0 {
+		w.WriteNull()
+		return
+	}
+	if count == 1 {
+		w.WriteBulk(results[0])
+		return
+	}
 	w.WriteArray(len(results))
 	for _, v := range results {
 		w.WriteBulk(v)

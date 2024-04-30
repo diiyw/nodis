@@ -38,15 +38,15 @@ Simple way to embed in your application.
 | PING                | FLUSHDB     	| EXISTS          | SET                 | SSCAN           | HGET            | RPUSH            | ZCARD                 |
 | QUIT                | SAVE       		| EXPIRE          | INCR                | SCARD           | HDEL            | LPOP             | ZRANK                 |
 | ECHO                | INFO          	| EXPIREAT        | DECR                | SPOP            | HLEN            | RPOP             | ZREVRANK              |
-|                     |             	| KEYS            | SETBIT              | SDIFF           | HKEYS           | LLEN             | ZSCORE                |
+| DBSIZE              |             	| KEYS            | SETBIT              | SDIFF           | HKEYS           | LLEN             | ZSCORE                |
 |                     |                 | TTL             | GETBIT              | SINTER          | HEXISTS         | LINDEX           | ZINCRBY               |
 |                     |                 | RENAME          | INCR              	| SISMEMBER       | HGETALL         | LINSERT          | ZRANGE                |
 |                     |                 | TYPE            | DESR                | SMEMBERS        | HINCRBY         | LPUSHX           | ZREVRANGE             |
 |                     |                 | SCAN            | SETEX               | SREM            | HICRBYFLOAT    	| RPUSHX           | ZRANGEBYSCORE         |
-|                     |                 | RANDOMKEY       | INCRBY              |                 | HSETNX          | LREM             | ZREVRANGEBYSCORE      |
-|                     |                 | RENAMEEX        | DECRBY              |                 | HMGET           | LSET             | ZREM                  |
-|                     |                 |                 | SETNX               |                 | HMSET           | LRANGE           | ZREMRANGEBYRANK       |
-|                     |                 |                 | INCRBYFLOAT         |                 | HCLEAR          | LPOPRPUSH        | ZREMRANGEBYSCORE      |
+|                     |                 | RANDOMKEY       | INCRBY              | SMOVE           | HSETNX          | LREM             | ZREVRANGEBYSCORE      |
+|                     |                 | RENAMEEX        | DECRBY              | SRANDMEMBER     | HMGET           | LSET             | ZREM                  |
+|                     |                 |                 | SETNX               | SINTERSTORE     | HMSET           | LRANGE           | ZREMRANGEBYRANK       |
+|                     |                 |                 | INCRBYFLOAT         | SUNIONSTORE     | HCLEAR          | LPOPRPUSH        | ZREMRANGEBYSCORE      |
 |                     |                 |                 | APPEND              |                 | HSCAN           | RPOPLPUSH        | ZCLEAR                |
 |                     |                 |                 | GETRANGE            |                 | HVALS           | BLPOP            | ZEXISTS               |
 |                     |                 |                 | STRLEN              |                 |                 | BRPOP            |                       |

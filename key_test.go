@@ -29,7 +29,7 @@ func TestKey_ExpireXX(t *testing.T) {
 	})
 	n.Set("test", []byte("test1"))
 	n.ExpireXX("test", 3)
-	if n.TTL("test") != 0 {
+	if n.TTL("test") != -1 {
 		t.Errorf("TTL() = %v, want %v", 0, n.TTL("test"))
 	}
 	n.SetEX("test2", []byte("test2"), 1)
