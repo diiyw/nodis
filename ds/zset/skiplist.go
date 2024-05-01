@@ -212,7 +212,7 @@ func (skiplist *skiplist) getByRank(rank int64) *node {
 }
 
 func (skiplist *skiplist) hasInRange(min float64, max float64) bool {
-	if min > max || min == max {
+	if min > max {
 		// empty range
 		return false
 	}

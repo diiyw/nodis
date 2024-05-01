@@ -97,6 +97,7 @@ func (r *Reader) reset() {
 	r.r = 0
 	r.l = 0
 	r.cmd.Args = make([]string, 0)
+	r.cmd.Options = Options{}
 }
 
 func (r *Reader) malloc() {
@@ -236,7 +237,7 @@ func (r *Reader) readOptions(v string, i int) {
 				r.cmd.Options.LT = i
 			}
 		}
-	case "ZRANK", "ZREVRANK", "ZRANGE", "ZREVRANGE":
+	case "ZRANK", "ZREVRANK", "ZRANGE", "ZREVRANGE", "ZRANGEBYSCORE", "ZREVRANGEBYSCORE":
 		if r.cmd.Name == "ZRANK" && i < 1 {
 			return
 		} else if i < 2 {
@@ -470,4 +471,8 @@ func (w *Writer) WriteOK() {
 // Close closes the writer
 func (w *Writer) Close() error {
 	return w.writer.(net.Conn).Close()
+}
+
+func (w *Writer) RemoteAddr() string {
+	return w.writer.(net.Conn).RemoteAddr().String()
 }

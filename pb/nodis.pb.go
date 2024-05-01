@@ -56,6 +56,7 @@ const (
 	OpType_ZRemRangeByRank  OpType = 31
 	OpType_ZRemRangeByScore OpType = 32
 	OpType_Rename           OpType = 33
+	OpType_Persist   		OpType = 34
 )
 
 // Enum value maps for OpType.

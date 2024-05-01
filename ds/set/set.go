@@ -220,6 +220,12 @@ func (s *Set) SClear() {
 	s.data.Clear()
 }
 
+// Iter returns an iterator for the set.
+func (s *Set) Iter(fn func(member string) bool) {
+	s.data.Scan(func(member string, _ struct{}) bool {
+		return fn(member)
+	})
+}
 
 // Type returns the type of the data structure
 func (s *Set) Type() ds.DataType {

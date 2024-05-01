@@ -224,3 +224,13 @@ func (n *Nodis) StrLen(key string) int64 {
 	meta.commit()
 	return v
 }
+
+// MSet sets the given keys to their respective values
+func (n *Nodis) MSet(pairs ...string) {
+	if len(pairs)%2 != 0 {
+		return
+	}
+	for i := 0; i < len(pairs); i += 2 {
+		n.Set(pairs[i], unsafe.Slice(unsafe.StringData(pairs[i+1]), len(pairs[i+1])))
+	}
+}

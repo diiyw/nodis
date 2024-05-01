@@ -46,6 +46,8 @@ func getCommand(name string) func(n *Nodis, w *redis.Writer, cmd *redis.Command)
 		return randomKey
 	case "TTL":
 		return ttl
+	case "PERSIST":
+		return Persist
 	case "RENAME":
 		return rename
 	case "RENAMENX":
@@ -56,6 +58,8 @@ func getCommand(name string) func(n *Nodis, w *redis.Writer, cmd *redis.Command)
 		return scan
 	case "SET":
 		return setString
+	case "MSET":
+		return mSet
 	case "APPEND":
 		return appendString
 	case "SETEX":
@@ -64,6 +68,8 @@ func getCommand(name string) func(n *Nodis, w *redis.Writer, cmd *redis.Command)
 		return setnx
 	case "GET":
 		return getString
+	case "MGET":
+		return mGet
 	case "GETRANGE":
 		return getRange
 	case "STRLEN":
@@ -96,6 +102,8 @@ func getCommand(name string) func(n *Nodis, w *redis.Writer, cmd *redis.Command)
 		return sPop
 	case "SDIFF":
 		return sDiff
+	case "SDIFFSTORE":
+		return sDiffStore
 	case "SINTER":
 		return sInter
 	case "SINTERSTORE":
@@ -198,6 +206,8 @@ func getCommand(name string) func(n *Nodis, w *redis.Writer, cmd *redis.Command)
 		return zRevRangeByScore
 	case "ZREM":
 		return zRem
+	case "ZCOUNT":
+		return zCount
 	case "ZREMRANGEBYRANK":
 		return zRemRangeByRank
 	case "ZREMRANGEBYSCORE":
@@ -217,7 +227,7 @@ func client(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	}
 	switch utils.ToUpper(cmd.Args[0]) {
 	case "LIST":
-		w.WriteArray(0)
+		w.WriteString("id=1 addr=" + w.RemoteAddr() + " fd=5 name= age=0 idle=0 flags=N db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=0 obl=0 oll=0 omem=0 events=r cmd=client")
 	case "SETNAME":
 		w.WriteString("OK")
 	default:
@@ -255,7 +265,7 @@ func info(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	usedMemory := strconv.FormatUint(memStats.HeapInuse+memStats.StackInuse, 10)
 	pid := strconv.Itoa(os.Getpid())
 	w.WriteBulk(`# Server
-redis_version:nodis-1.5.0
+redis_version:6.0.0
 os:` + runtime.GOOS + `
 process_id:` + pid + `
 # Memory
@@ -385,6 +395,14 @@ func ttl(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		return
 	}
 	w.WriteInteger(int64(v.Seconds()))
+}
+
+func Persist(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("PERSIST requires at least one argument")
+		return
+	}
+	w.WriteInteger(n.Persist(cmd.Args[0]))
 }
 
 func randomKey(n *Nodis, w *redis.Writer, cmd *redis.Command) {
@@ -519,6 +537,17 @@ func setString(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	w.WriteOK()
 }
 
+func mSet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 || len(cmd.Args)%2 != 0 {
+		w.WriteError("MSET requires at least two arguments")
+		return
+	}
+	for i := 0; i < len(cmd.Args); i += 2 {
+		n.Set(cmd.Args[i], []byte(cmd.Args[i+1]))
+	}
+	w.WriteOK()
+}
+
 func appendString(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		w.WriteError("APPEND requires at least two arguments")
@@ -627,7 +656,7 @@ func incrByFloat(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		return
 	}
 	key := cmd.Args[0]
-	value, err := strconv.ParseFloat(cmd.Args[1], 64)
+	value, err := redis.Float64(cmd.Args[1])
 	if err != nil {
 		w.WriteError("ERR value is not a valid float")
 		return
@@ -651,6 +680,22 @@ func getString(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		return
 	}
 	w.WriteBulk(string(v))
+}
+
+func mGet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) == 0 {
+		w.WriteError("MGET requires at least one argument")
+		return
+	}
+	w.WriteArray(len(cmd.Args))
+	for _, v := range cmd.Args {
+		value := n.Get(v)
+		if value == nil {
+			w.WriteNull()
+			continue
+		}
+		w.WriteBulk(string(value))
+	}
 }
 
 func getRange(n *Nodis, w *redis.Writer, cmd *redis.Command) {
@@ -848,6 +893,21 @@ func sDiff(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	}
 }
 
+func sDiffStore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 2 {
+		w.WriteError("SDIFFSTORE requires at least two arguments")
+		return
+	}
+	dst := cmd.Args[0]
+	keys := cmd.Args[1:]
+	if n.Exists(keys...) != int64(len(keys)) {
+		w.WriteInteger(0)
+		return
+	}
+	results := n.SDiffStore(dst, keys...)
+	w.WriteInteger(results)
+}
+
 func sInter(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		w.WriteError("SINTER requires at least two arguments")
@@ -861,8 +921,8 @@ func sInter(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 }
 
 func sInterStore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
-	if len(cmd.Args) < 3 {
-		w.WriteError("SINTERSTORE requires at least three arguments")
+	if len(cmd.Args) < 2 {
+		w.WriteError("SINTERSTORE requires at least two arguments")
 		return
 	}
 	dst := cmd.Args[0]
@@ -888,13 +948,13 @@ func sUnion(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 }
 
 func sUnionStore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
-	if len(cmd.Args) < 3 {
-		w.WriteError("SUNIONSTORE requires at least three arguments")
+	if len(cmd.Args) < 2 {
+		w.WriteError("SUNIONSTORE requires at least two arguments")
 		return
 	}
 	dst := cmd.Args[0]
 	keys := cmd.Args[1:]
-	if n.Exists(keys...) != int64(len(keys)) {
+	if n.Exists(keys...) == 0 {
 		w.WriteInteger(0)
 		return
 	}
@@ -1089,7 +1149,7 @@ func hIncrByFloat(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	}
 	key := cmd.Args[0]
 	field := cmd.Args[1]
-	value, err := strconv.ParseFloat(cmd.Args[2], 64)
+	value, err := redis.Float64(cmd.Args[2])
 	if err != nil {
 		w.WriteError("ERR value is not a valid float")
 		return
@@ -1527,18 +1587,23 @@ func zAdd(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		if cmd.Options.INCR > 0 {
 			score = n.ZIncrBy(key, member, score)
 			w.WriteBulk(strconv.FormatFloat(score, 'f', -1, 64))
+			return
 		}
 		if cmd.Options.XX > 0 {
 			w.WriteInteger(n.ZAddXX(key, member, score))
+			return
 		}
 		if cmd.Options.NX > 0 {
 			w.WriteInteger(n.ZAddNX(key, member, score))
+			return
 		}
 		if cmd.Options.LT > 0 {
 			w.WriteInteger(n.ZAddLT(key, member, score))
+			return
 		}
 		if cmd.Options.GT > 0 {
 			w.WriteInteger(n.ZAddGT(key, member, score))
+			return
 		}
 		n.ZAdd(key, member, score)
 		count++
@@ -1615,7 +1680,7 @@ func zIncrBy(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		return
 	}
 	key := cmd.Args[0]
-	score, err := strconv.ParseFloat(cmd.Args[1], 64)
+	score, err := redis.Float64(cmd.Args[1])
 	if err != nil {
 		w.WriteError("ERR score value is not a valid float")
 		return
@@ -1631,13 +1696,60 @@ func zRange(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		return
 	}
 	key := cmd.Args[0]
-	start, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
-	stop, _ := strconv.ParseInt(cmd.Args[2], 10, 64)
-	if cmd.Options.WITHSCORES > 0 {
-		results := n.ZRangeWithScores(key, start, stop)
+	if cmd.Options.BYSCORE > 0 {
+		min, err := redis.Float64(cmd.Args[1])
+		if err != nil {
+			w.WriteError("ERR start value is not an integer or out of range")
+			return
+		}
+		max, err := redis.Float64(cmd.Args[2], n.ZMax(key).Score)
+		if err != nil {
+			w.WriteError("ERR stop value is not an integer or out of range")
+			return
+		}
+		var offset, count int64 = 0, -1
+		if cmd.Options.LIMIT > 0 {
+			offset, err = redis.Int64(cmd.Args[cmd.Options.LIMIT])
+			if err != nil {
+				w.WriteError("ERR offset value is not an integer or out of range")
+				return
+			}
+			count, err = redis.Int64(cmd.Args[cmd.Options.LIMIT+1])
+			if err != nil {
+				w.WriteError("ERR count value is not an integer or out of range")
+				return
+			}
+		}
+		if cmd.Options.WITHSCORES > 0 {
+			results := n.ZRangeByScoreWithScores(key, min, max, offset, count)
+			w.WriteArray(len(results) * 2)
+			for _, v := range results {
+				w.WriteBulk(v.Member)
+				w.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
+			}
+			return
+		}
+		results := n.ZRangeByScore(key, min, max, offset, count)
 		w.WriteArray(len(results))
 		for _, v := range results {
-			w.WriteArray(2)
+			w.WriteBulk(v)
+		}
+		return
+	}
+	start, err := strconv.ParseInt(cmd.Args[1], 10, 64)
+	if err != nil {
+		w.WriteError("ERR start value is not an integer or out of range")
+		return
+	}
+	stop, err := strconv.ParseInt(cmd.Args[2], 10, 64)
+	if err != nil {
+		w.WriteError("ERR stop value is not an integer or out of range")
+		return
+	}
+	if cmd.Options.WITHSCORES > 0 {
+		results := n.ZRangeWithScores(key, start, stop)
+		w.WriteArray(len(results) * 2)
+		for _, v := range results {
 			w.WriteBulk(v.Member)
 			w.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
 		}
@@ -1668,9 +1780,8 @@ func zRevRange(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	}
 	if cmd.Options.WITHSCORES > 0 {
 		results := n.ZRevRangeWithScores(key, start, stop)
-		w.WriteArray(len(results))
+		w.WriteArray(len(results) * 2)
 		for _, v := range results {
-			w.WriteArray(2)
 			w.WriteBulk(v.Member)
 			w.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
 		}
@@ -1690,24 +1801,24 @@ func zRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		return
 	}
 	key := cmd.Args[0]
-	min, err := strconv.ParseFloat(cmd.Args[1], 64)
+	min, err := redis.Float64(cmd.Args[1])
 	if err != nil {
 		w.WriteError("ERR min value is not a valid float")
 		return
 	}
-	max, err := strconv.ParseFloat(cmd.Args[2], 64)
+	max, err := redis.Float64(cmd.Args[2], n.ZMax(key).Score)
 	if err != nil {
 		w.WriteError("ERR max value is not a valid float")
 		return
 	}
 	var offset, count int64 = 0, -1
 	if cmd.Options.LIMIT > 0 {
-		offset, err = strconv.ParseInt(cmd.Args[cmd.Options.LIMIT], 10, 64)
+		offset, err = redis.Int64(cmd.Args[cmd.Options.LIMIT])
 		if err != nil {
 			w.WriteError("ERR offset value is not an integer or out of range")
 			return
 		}
-		count, err = strconv.ParseInt(cmd.Args[cmd.Options.LIMIT+1], 10, 64)
+		count, err = redis.Int64(cmd.Args[cmd.Options.LIMIT+1])
 		if err != nil {
 			w.WriteError("ERR count value is not an integer or out of range")
 			return
@@ -1715,9 +1826,8 @@ func zRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	}
 	if cmd.Options.WITHSCORES > 0 {
 		results := n.ZRangeByScoreWithScores(key, min, max, offset, count)
-		w.WriteArray(len(results))
+		w.WriteArray(len(results) * 2)
 		for _, v := range results {
-			w.WriteArray(2)
 			w.WriteBulk(v.Member)
 			w.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
 		}
@@ -1737,24 +1847,24 @@ func zRevRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		return
 	}
 	key := cmd.Args[0]
-	min, err := strconv.ParseFloat(cmd.Args[1], 64)
+	min, err := redis.Float64(cmd.Args[2])
 	if err != nil {
 		w.WriteError("ERR min value is not a valid float")
 		return
 	}
-	max, err := strconv.ParseFloat(cmd.Args[2], 64)
+	max, err := redis.Float64(cmd.Args[1], n.ZMax(key).Score)
 	if err != nil {
 		w.WriteError("ERR max value is not a valid float")
 		return
 	}
 	var offset, count int64 = 0, -1
 	if cmd.Options.LIMIT > 0 {
-		offset, err = strconv.ParseInt(cmd.Args[cmd.Options.LIMIT], 10, 64)
+		offset, err = redis.Int64(cmd.Args[cmd.Options.LIMIT])
 		if err != nil {
 			w.WriteError("ERR offset value is not an integer or out of range")
 			return
 		}
-		count, err = strconv.ParseInt(cmd.Args[cmd.Options.LIMIT+1], 10, 64)
+		count, err = redis.Int64(cmd.Args[cmd.Options.LIMIT+1])
 		if err != nil {
 			w.WriteError("ERR count value is not an integer or out of range")
 			return
@@ -1762,9 +1872,8 @@ func zRevRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	}
 	if cmd.Options.WITHSCORES > 0 {
 		results := n.ZRevRangeByScoreWithScores(key, min, max, offset, count)
-		w.WriteArray(len(results))
+		w.WriteArray(len(results) * 2)
 		for _, v := range results {
-			w.WriteArray(2)
 			w.WriteBulk(v.Member)
 			w.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
 		}
@@ -1775,6 +1884,25 @@ func zRevRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	for _, v := range results {
 		w.WriteBulk(v)
 	}
+}
+
+func zCount(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("ZCOUNT requires at least three arguments")
+		return
+	}
+	key := cmd.Args[0]
+	min, err := redis.Float64(cmd.Args[1])
+	if err != nil {
+		w.WriteError("ERR min value is not a valid float")
+		return
+	}
+	max, err := redis.Float64(cmd.Args[2], n.ZMax(key).Score)
+	if err != nil {
+		w.WriteError("ERR max value is not a valid float")
+		return
+	}
+	w.WriteInteger(n.ZCount(key, min, max))
 }
 
 func zRem(n *Nodis, w *redis.Writer, cmd *redis.Command) {
@@ -1808,12 +1936,12 @@ func zRemRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		w.WriteError("ZREMRANGEBYSCORE requires at least three arguments")
 	}
 	key := cmd.Args[0]
-	min, err := strconv.ParseFloat(cmd.Args[1], 64)
+	min, err := redis.Float64(cmd.Args[1])
 	if err != nil {
 		w.WriteError("ERR min value is not a valid float")
 		return
 	}
-	max, err := strconv.ParseFloat(cmd.Args[1], 64)
+	max, err := redis.Float64(cmd.Args[1], n.ZMax(key).Score)
 	if err != nil {
 		w.WriteError("ERR max value is not a valid float")
 		return

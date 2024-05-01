@@ -59,31 +59,39 @@ func (n *Nodis) SDiff(keys ...string) []string {
 	return v
 }
 
+// SDiffStore stores the difference between sets.
+func (n *Nodis) SDiffStore(destination string, keys ...string) int64 {
+	if len(keys) == 0 {
+		return 0
+	}
+	members := n.SDiff(keys...)
+	n.Del(destination)
+	return n.SAdd(destination, members...)
+}
+
 // SInter gets the intersection between sets.
 func (n *Nodis) SInter(keys ...string) []string {
 	if len(keys) == 0 {
 		return nil
 	}
-	meta := n.store.readKey(keys[0])
-	if !meta.isOk() {
-		meta.commit()
-		return nil
+	if len(keys) == 1 {
+		return n.SMembers(keys[0])
 	}
-	lockedSets := []*metadata{}
-	otherSets := make([]*set.Set, len(keys)-1)
-	for i, s := range keys[1:] {
+	lockedSets := make([]*metadata, 0, len(keys))
+	otherSets := make([]*set.Set, 0, len(keys))
+	for _, s := range keys {
 		setDs := n.store.readKey(s)
 		if !setDs.isOk() {
+			setDs.commit()
 			continue
 		}
 		lockedSets = append(lockedSets, setDs)
-		otherSets[i] = setDs.ds.(*set.Set)
+		otherSets = append(otherSets, setDs.ds.(*set.Set))
 	}
-	v := meta.ds.(*set.Set).SInter(otherSets...)
+	v := lockedSets[0].ds.(*set.Set).SInter(otherSets[1:]...)
 	for _, s := range lockedSets {
 		s.commit()
 	}
-	meta.commit()
 	return v
 }
 
@@ -101,26 +109,24 @@ func (n *Nodis) SUnion(keys ...string) []string {
 	if len(keys) == 0 {
 		return nil
 	}
-	meta := n.store.readKey(keys[0])
-	if !meta.isOk() {
-		meta.commit()
-		return nil
+	if len(keys) == 1 {
+		return n.SMembers(keys[0])
 	}
-	lockedSets := []*metadata{}
-	otherSets := make([]*set.Set, len(keys)-1)
-	for i, s := range keys[1:] {
+	lockedSets := make([]*metadata, 0, len(keys))
+	otherSets := make([]*set.Set, 0, len(keys))
+	for _, s := range keys {
 		setDs := n.store.readKey(s)
 		if !setDs.isOk() {
+			setDs.commit()
 			continue
 		}
 		lockedSets = append(lockedSets, setDs)
-		otherSets[i] = setDs.ds.(*set.Set)
+		otherSets = append(otherSets, setDs.ds.(*set.Set))
 	}
-	v := meta.ds.(*set.Set).SUnion(otherSets...)
+	v := lockedSets[0].ds.(*set.Set).SUnion(otherSets[1:]...)
 	for _, s := range lockedSets {
 		s.commit()
 	}
-	meta.commit()
 	return v
 }
 

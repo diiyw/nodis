@@ -17,12 +17,13 @@ func (n *Nodis) ZAdd(key string, member string, score float64) {
 	n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
 }
 
+// ZAddXX Only update elements that already exist. Don't add new elements.
 func (n *Nodis) ZAddXX(key string, member string, score float64) int64 {
 	meta := n.store.writeKey(key, n.newZSet)
 	if meta.ds.(*zset.SortedSet).ZAddXX(member, score) {
 		n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
 		meta.commit()
-		return 1
+		return 0
 	}
 	meta.commit()
 	return 0
@@ -253,12 +254,7 @@ func (n *Nodis) ZRem(key string, members ...string) int64 {
 		meta.commit()
 		return 0
 	}
-	var removed int64 = 0
-	for _, member := range members {
-		if meta.ds.(*zset.SortedSet).ZRem(member) {
-			removed++
-		}
-	}
+	var removed int64 = meta.ds.(*zset.SortedSet).ZRem(members...)
 	meta.key.changed = removed > 0
 	meta.commit()
 	if removed > 0 {
@@ -310,4 +306,28 @@ func (n *Nodis) ZExists(key string, member string) bool {
 
 func (n *Nodis) ZClear(key string) {
 	n.Del(key)
+}
+
+// zCount returns the number of elements in the sorted set at key with a score between min and max.
+func (n *Nodis) ZCount(key string, min, max float64) int64 {
+	meta := n.store.readKey(key)
+	if !meta.isOk() {
+		meta.commit()
+		return 0
+	}
+	v := meta.ds.(*zset.SortedSet).ZCount(min, max)
+	meta.commit()
+	return v
+}
+
+// ZMax returns the member with the highest score in the sorted set at key.
+func (n *Nodis) ZMax(key string) *zset.Item {
+	meta := n.store.readKey(key)
+	if !meta.isOk() {
+		meta.commit()
+		return nil
+	}
+	v := meta.ds.(*zset.SortedSet).ZMax()
+	meta.commit()
+	return v
 }

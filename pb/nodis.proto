@@ -37,6 +37,7 @@ enum OpType  {
   ZRemRangeByRank = 31;
   ZRemRangeByScore = 32;
   Rename = 33;
+  Persist = 34;
 }
 
 message Operation {

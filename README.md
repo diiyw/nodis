@@ -45,7 +45,7 @@ Simple way to embed in your application.
 |                     |                 | SCAN            | SETEX               | SREM            | HICRBYFLOAT    	| RPUSHX           | ZRANGEBYSCORE         |
 |                     |                 | RANDOMKEY       | INCRBY              | SMOVE           | HSETNX          | LREM             | ZREVRANGEBYSCORE      |
 |                     |                 | RENAMEEX        | DECRBY              | SRANDMEMBER     | HMGET           | LSET             | ZREM                  |
-|                     |                 |                 | SETNX               | SINTERSTORE     | HMSET           | LRANGE           | ZREMRANGEBYRANK       |
+|                     |                 |  PERSIST        | SETNX               | SINTERSTORE     | HMSET           | LRANGE           | ZREMRANGEBYRANK       |
 |                     |                 |                 | INCRBYFLOAT         | SUNIONSTORE     | HCLEAR          | LPOPRPUSH        | ZREMRANGEBYSCORE      |
 |                     |                 |                 | APPEND              |                 | HSCAN           | RPOPLPUSH        | ZCLEAR                |
 |                     |                 |                 | GETRANGE            |                 | HVALS           | BLPOP            | ZEXISTS               |

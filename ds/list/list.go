@@ -117,6 +117,12 @@ func (l *DoublyLinkedList) LRange(start, end int64) [][]byte {
 	var result [][]byte
 	currentNode := l.head
 	var index int64 = 0
+	if start != 0 && start >= end {
+		return result
+	}
+	if start < 0 {
+		start = l.size() + start
+	}
 	if end < 0 {
 		end = l.size() + end
 	}

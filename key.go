@@ -416,3 +416,20 @@ func (n *Nodis) RandomKey() string {
 	}
 	return keys[rand.Intn(len(keys))]
 }
+
+// Persist the key
+func (n *Nodis) Persist(key string) int64 {
+	meta := n.store.writeKey(key, nil)
+	if !meta.isOk() {
+		meta.commit()
+		return 0
+	}
+	if meta.key.expiration == 0 {
+		meta.commit()
+		return 0
+	}
+	meta.key.expiration = 0
+	n.notify(pb.NewOp(pb.OpType_Persist, key))
+	meta.commit()
+	return 1
+}

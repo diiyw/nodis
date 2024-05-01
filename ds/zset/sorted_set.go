@@ -93,14 +93,17 @@ func (sortedSet *SortedSet) ZCard() int64 {
 }
 
 // ZRem removes the given member from set
-func (sortedSet *SortedSet) ZRem(member string) bool {
-	v, ok := sortedSet.dict.Get(member)
-	if ok {
-		sortedSet.skiplist.remove(member, v.Score)
-		sortedSet.dict.Delete(member)
-		return true
+func (sortedSet *SortedSet) ZRem(members ...string) int64 {
+	var count int64
+	for _, member := range members {
+		v, ok := sortedSet.dict.Get(member)
+		if ok {
+			sortedSet.skiplist.remove(member, v.Score)
+			sortedSet.dict.Delete(member)
+			count++
+		}
 	}
-	return false
+	return count
 }
 
 // getRank returns the rank of the given member, sort by ascending order, rank starts from 0
@@ -115,7 +118,7 @@ func (sortedSet *SortedSet) getRank(member string, desc bool) (rank int64) {
 	} else {
 		r--
 	}
-	return r + 1
+	return r
 }
 
 // ZRank returns the rank of the given member, sort by ascending order, rank starts from 0
@@ -158,20 +161,25 @@ func (sortedSet *SortedSet) ZScore(member string) float64 {
 // forEachByRank visits each member which rank within [start, stop), sort by ascending order, rank starts from 1
 func (sortedSet *SortedSet) forEachByRank(start int64, stop int64, desc bool, consumer func(item *Item) bool) {
 	size := sortedSet.ZCard()
-	if start < 0 || start > size {
+	if start > size {
 		return
+	}
+	if start == 0 {
+		start = 1
+	}
+	if stop < 0 {
+		stop = size + stop + 1
 	}
 	if stop < start {
 		return
+	}
+	if start < 0 {
+		start = size + start
 	}
 	// stop max is size
 	if stop > size {
 		stop = size
 	}
-	if start == 0 {
-		start = 1
-	}
-
 	// find start node
 	var node *node
 	if desc {
@@ -201,8 +209,7 @@ func (sortedSet *SortedSet) forEachByRank(start int64, stop int64, desc bool, co
 
 // rangeByRank returns members which rank within [start, stop), sort by ascending order, rank starts from 0
 func (sortedSet *SortedSet) rangeByRank(start int64, stop int64, desc bool) []*Item {
-	sliceSize := int(stop - start + 1)
-	slice := make([]*Item, 0, sliceSize)
+	slice := make([]*Item, 0)
 	sortedSet.forEachByRank(start, stop, desc, func(item *Item) bool {
 		slice = append(slice, item)
 		return true
@@ -225,18 +232,9 @@ func (sortedSet *SortedSet) rangeCount(min float64, max float64) int64 {
 	var i int64 = 0
 	// ascending order
 	sortedSet.forEachByRank(0, sortedSet.ZCard(), false, func(element *Item) bool {
-		gtMin := min < element.Score // greater than min
-		if !gtMin {
-			// has not into range, continue foreach
-			return true
+		if element.Score >= min && element.Score <= max {
+			i++
 		}
-		ltMax := max > element.Score // less than max
-		if !ltMax {
-			// break through score border, break foreach
-			return false
-		}
-		// gtMin && ltMax
-		i++
 		return true
 	})
 	return i
@@ -344,11 +342,16 @@ func (sortedSet *SortedSet) ZRevRangeByScore(min float64, max float64, offset, c
 // ZIncrBy increases the score of the given member
 func (sortedSet *SortedSet) ZIncrBy(member string, score float64) float64 {
 	element, ok := sortedSet.dict.Get(member)
-	if !ok {
-		return 0
+	if ok {
+		score += element.Score
 	}
-	sortedSet.zAdd(member, element.Score+score)
-	return element.Score + score
+	sortedSet.zAdd(member, score)
+	return score
+}
+
+// GetMax returns the member with the highest score
+func (sortedSet *SortedSet) ZMax() *Item {
+	return &sortedSet.skiplist.tail.Item
 }
 
 func (sortedSet *SortedSet) GetValue() []*pb.KeyScore {
