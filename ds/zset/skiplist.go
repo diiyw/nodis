@@ -219,12 +219,12 @@ func (skiplist *skiplist) hasInRange(min float64, max float64) bool {
 
 	// min > tail
 	n := skiplist.tail
-	if n == nil || min >= n.Item.Score {
+	if n == nil || min > n.Item.Score {
 		return false
 	}
 	// max < head
 	n = skiplist.header.level[0].forward
-	if n == nil || max <= n.Item.Score {
+	if n == nil || max < n.Item.Score {
 		return false
 	}
 	return true
@@ -244,7 +244,7 @@ func (skiplist *skiplist) getFirstInRange(min float64, max float64) *node {
 	}
 	/* This is an inner range, so the next node cannot be NULL. */
 	n = n.level[0].forward
-	if max <= n.Item.Score {
+	if max < n.Item.Score {
 		return nil
 	}
 	return n
