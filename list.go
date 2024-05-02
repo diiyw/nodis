@@ -126,7 +126,7 @@ func (n *Nodis) RPushX(key string, data []byte) int64 {
 	return v
 }
 
-func (n *Nodis) LRem(key string, count int64, data []byte) int64 {
+func (n *Nodis) LRem(key string, data []byte, count int64) int64 {
 	meta := n.store.writeKey(key, nil)
 	if !meta.isOk() {
 		meta.commit()

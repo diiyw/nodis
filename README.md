@@ -45,11 +45,11 @@ Simple way to embed in your application.
 |                     |                 | SCAN            | SETEX               | SREM            | HICRBYFLOAT    	| RPUSHX           | ZRANGEBYSCORE         |
 |                     |                 | RANDOMKEY       | INCRBY              | SMOVE           | HSETNX          | LREM             | ZREVRANGEBYSCORE      |
 |                     |                 | RENAMEEX        | DECRBY              | SRANDMEMBER     | HMGET           | LSET             | ZREM                  |
-|                     |                 |  PERSIST        | SETNX               | SINTERSTORE     | HMSET           | LRANGE           | ZREMRANGEBYRANK       |
+|                     |                 | PERSIST         | SETNX               | SINTERSTORE     | HMSET           | LRANGE           | ZREMRANGEBYRANK       |
 |                     |                 |                 | INCRBYFLOAT         | SUNIONSTORE     | HCLEAR          | LPOPRPUSH        | ZREMRANGEBYSCORE      |
 |                     |                 |                 | APPEND              |                 | HSCAN           | RPOPLPUSH        | ZCLEAR                |
 |                     |                 |                 | GETRANGE            |                 | HVALS           | BLPOP            | ZEXISTS               |
-|                     |                 |                 | STRLEN              |                 |                 | BRPOP            |                       |
+|                     |                 |                 | STRLEN              |                 |                 | BRPOP            | ZUNIONSTORE           |
 ## Get Started
 ```bash
  go get github.com/diiyw/nodis@latest

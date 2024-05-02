@@ -145,7 +145,7 @@ func TestList_LRem(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{Path: "testdata"})
 	n.LPush("list", []byte("value"))
-	n.LRem("list", 0, []byte("value"))
+	n.LRem("list", []byte("value"), 0)
 	if n.LLen("list") != 0 {
 		t.Error("LRem failed")
 	}

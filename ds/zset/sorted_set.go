@@ -6,6 +6,11 @@ import (
 	"github.com/tidwall/btree"
 )
 
+const (
+	MinOpen = 1
+	MaxOpen = 2
+)
+
 // SortedSet is a set which keys sorted by bound score
 type SortedSet struct {
 	dict     btree.Map[string, *Item]
@@ -25,28 +30,26 @@ func (sortedSet *SortedSet) Type() ds.DataType {
 }
 
 // ZAdd puts member into set,  and returns whether it has inserted new node
-func (sortedSet *SortedSet) ZAdd(member string, score float64) bool {
+func (sortedSet *SortedSet) ZAdd(member string, score float64) int64 {
 	return sortedSet.zAdd(member, score)
 }
 
 // ZAddXX Only update elements that already exist. Don't add new elements.
-func (sortedSet *SortedSet) ZAddXX(member string, score float64) bool {
+func (sortedSet *SortedSet) ZAddXX(member string, score float64) int64 {
 	_, ok := sortedSet.dict.Get(member)
 	if ok {
-		sortedSet.zAdd(member, score)
-		return true
+		return sortedSet.zAdd(member, score)
 	}
-	return false
+	return 0
 }
 
 // ZAddNX Only add new elements. Don't update already existing elements.
-func (sortedSet *SortedSet) ZAddNX(member string, score float64) bool {
+func (sortedSet *SortedSet) ZAddNX(member string, score float64) int64 {
 	_, ok := sortedSet.dict.Get(member)
 	if !ok {
-		sortedSet.zAdd(member, score)
-		return true
+		return sortedSet.zAdd(member, score)
 	}
-	return false
+	return 0
 }
 
 // ZAddLT add member if score less than the current score
@@ -70,7 +73,7 @@ func (sortedSet *SortedSet) ZAddGT(member string, score float64) bool {
 }
 
 // zAdd puts member into set,  and returns whether it has inserted new node
-func (sortedSet *SortedSet) zAdd(member string, score float64) bool {
+func (sortedSet *SortedSet) zAdd(member string, score float64) int64 {
 	element, ok := sortedSet.dict.Get(member)
 	sortedSet.dict.Set(member, &Item{
 		Member: member,
@@ -81,10 +84,10 @@ func (sortedSet *SortedSet) zAdd(member string, score float64) bool {
 			sortedSet.skiplist.remove(member, element.Score)
 			sortedSet.skiplist.insert(member, score)
 		}
-		return false
+		return 0
 	}
 	sortedSet.skiplist.insert(member, score)
-	return true
+	return 1
 }
 
 // ZCard returns number of members in set
@@ -228,11 +231,19 @@ func (sortedSet *SortedSet) ZRevRange(start int64, stop int64) []*Item {
 }
 
 // rangeCount returns the number of  members which score or member within the given border
-func (sortedSet *SortedSet) rangeCount(min float64, max float64) int64 {
+func (sortedSet *SortedSet) rangeCount(min float64, max float64, mode int) int64 {
 	var i int64 = 0
 	// ascending order
 	sortedSet.forEachByRank(0, sortedSet.ZCard(), false, func(element *Item) bool {
-		if element.Score >= min && element.Score <= max {
+		matchMin := element.Score >= min
+		if mode&MinOpen == MinOpen {
+			matchMin = element.Score > min
+		}
+		matchMax := element.Score <= max
+		if mode&MaxOpen == MaxOpen {
+			matchMax = element.Score < max
+		}
+		if matchMin && matchMax {
 			i++
 		}
 		return true
@@ -241,8 +252,8 @@ func (sortedSet *SortedSet) rangeCount(min float64, max float64) int64 {
 }
 
 // ZCount returns the number of  members which score or member within the given border
-func (sortedSet *SortedSet) ZCount(min float64, max float64) int64 {
-	return sortedSet.rangeCount(min, max)
+func (sortedSet *SortedSet) ZCount(min float64, max float64, mode int) int64 {
+	return sortedSet.rangeCount(min, max, mode)
 }
 
 // forEach visits members which score or member within the given border
@@ -287,12 +298,18 @@ func (sortedSet *SortedSet) forEach(min float64, max float64, offset int64, limi
 
 // zRange returns members which score or member within the given border
 // param limit: <0 means no limit
-func (sortedSet *SortedSet) zRange(min float64, max float64, offset int64, limit int64, desc bool) []*Item {
+func (sortedSet *SortedSet) zRange(min float64, max float64, offset int64, limit int64, desc bool, mode int) []*Item {
 	if limit == 0 || offset < 0 {
 		return make([]*Item, 0)
 	}
 	slice := make([]*Item, 0)
 	sortedSet.forEach(min, max, offset, limit, desc, func(element *Item) bool {
+		if mode&MinOpen == MinOpen && element.Score == min {
+			return true
+		}
+		if mode&MaxOpen == MaxOpen && element.Score == max {
+			return true
+		}
 		slice = append(slice, element)
 		return true
 	})
@@ -330,13 +347,13 @@ func (sortedSet *SortedSet) ZExists(member string) bool {
 }
 
 // ZRangeByScore returns members which score or member within the given border
-func (sortedSet *SortedSet) ZRangeByScore(min float64, max float64, offset, count int64) []*Item {
-	return sortedSet.zRange(min, max, offset, count, false)
+func (sortedSet *SortedSet) ZRangeByScore(min float64, max float64, offset, count int64, mode int) []*Item {
+	return sortedSet.zRange(min, max, offset, count, false, mode)
 }
 
 // ZRevRangeByScore returns members which score or member within the given border
-func (sortedSet *SortedSet) ZRevRangeByScore(min float64, max float64, offset, count int64) []*Item {
-	return sortedSet.zRange(min, max, offset, count, true)
+func (sortedSet *SortedSet) ZRevRangeByScore(min float64, max float64, offset, count int64, mode int) []*Item {
+	return sortedSet.zRange(min, max, offset, count, true, mode)
 }
 
 // ZIncrBy increases the score of the given member
@@ -349,9 +366,14 @@ func (sortedSet *SortedSet) ZIncrBy(member string, score float64) float64 {
 	return score
 }
 
-// GetMax returns the member with the highest score
+// ZMax returns the member with the highest score
 func (sortedSet *SortedSet) ZMax() *Item {
 	return &sortedSet.skiplist.tail.Item
+}
+
+// ZMin returns the member with the lowest score
+func (sortedSet *SortedSet) ZMin() *Item {
+	return &sortedSet.skiplist.header.level[0].forward.Item
 }
 
 func (sortedSet *SortedSet) GetValue() []*pb.KeyScore {

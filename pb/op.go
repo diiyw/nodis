@@ -104,6 +104,24 @@ func (o *Op) Max(max float64) *Op {
 	return o
 }
 
+// Keys set the keys
+func (o *Op) Keys(keys []string) *Op {
+	o.Operation.Keys = keys
+	return o
+}
+
+// Weights set the weights
+func (o *Op) Weights(weights []float64) *Op {
+	o.Operation.Weights = weights
+	return o
+}
+
+// Aggregate set the aggregate
+func (o *Op) Aggregate(aggregate string) *Op {
+	o.Operation.Aggregate = aggregate
+	return o
+}
+
 // Field set the field
 func (o *Op) Field(field string) *Op {
 	o.Operation.Field = field

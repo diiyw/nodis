@@ -178,7 +178,7 @@ func (n *Nodis) patch(op *pb.Op) error {
 	case pb.OpType_LPushX:
 		n.LPushX(op.Key, op.Operation.Value)
 	case pb.OpType_LRem:
-		n.LRem(op.Key, op.Operation.Count, op.Operation.Value)
+		n.LRem(op.Key, op.Operation.Value, op.Operation.Count)
 	case pb.OpType_LSet:
 		n.LSet(op.Key, op.Operation.Index, op.Operation.Value)
 	case pb.OpType_LTrim:

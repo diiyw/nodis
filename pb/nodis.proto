@@ -38,6 +38,7 @@ enum OpType  {
   ZRemRangeByScore = 32;
   Rename = 33;
   Persist = 34;
+  ZUnionStore = 35;
 }
 
 message Operation {
@@ -62,6 +63,9 @@ message Operation {
   int64 IncrInt = 19;
   bool  Before = 20;
   repeated string Fields = 21;
+  repeated string keys = 22;
+  repeated double weights = 23;
+  string aggregate = 24;
 }
 
 message KeyScore {

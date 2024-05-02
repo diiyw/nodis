@@ -66,7 +66,7 @@ func TestZSet_ZRangeByScore(t *testing.T) {
 	n.ZAdd("zset", "a", 1)
 	n.ZAdd("zset", "b", 2)
 	n.ZAdd("zset", "c", 3)
-	range1 := n.ZRangeByScore("zset", 1, 2, 0, -1)
+	range1 := n.ZRangeByScore("zset", 1, 2, 0, -1, 0)
 	if len(range1) != 2 {
 		t.Errorf("ZRangeByScore() = %v, want %v", len(range1), 2)
 	}
@@ -131,7 +131,7 @@ func TestZSet_ZRevRangeByScore(t *testing.T) {
 	n.ZAdd("zset", "a", 1)
 	n.ZAdd("zset", "b", 2)
 	n.ZAdd("zset", "c", 3)
-	range1 := n.ZRevRangeByScore("zset", 1, 2, 0, -1)
+	range1 := n.ZRevRangeByScore("zset", 1, 2, 0, -1, 0)
 	if len(range1) != 2 {
 		t.Errorf("ZRevRangeByScore() = %v, want %v", len(range1), 2)
 	}
@@ -330,7 +330,7 @@ func TestZSet_ZRangeByScoreWithScores(t *testing.T) {
 	n.ZAdd("zset", "a", 1)
 	n.ZAdd("zset", "b", 2)
 	n.ZAdd("zset", "c", 3)
-	range1 := n.ZRangeByScoreWithScores("zset", 1, 2, 0, -1)
+	range1 := n.ZRangeByScoreWithScores("zset", 1, 2, 0, -1, 0)
 	if len(range1) != 2 {
 		t.Errorf("ZRangeByScoreWithScores() = %v, want %v", len(range1), 2)
 	}
@@ -352,7 +352,7 @@ func TestZSet_ZRevRangeByScoreWithScores(t *testing.T) {
 	n.ZAdd("zset", "a", 1)
 	n.ZAdd("zset", "b", 2)
 	n.ZAdd("zset", "c", 3)
-	range1 := n.ZRevRangeByScoreWithScores("zset", 1, 2, 0, -1)
+	range1 := n.ZRevRangeByScoreWithScores("zset", 1, 2, 0, -1, 0)
 	if len(range1) != 2 {
 		t.Errorf("ZRevRangeByScoreWithScores() = %v, want %v", len(range1), 2)
 	}

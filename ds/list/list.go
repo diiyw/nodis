@@ -223,14 +223,28 @@ func (l *DoublyLinkedList) RPushX(data []byte) int64 {
 }
 
 // LRem removes the first count occurrences of elements equal to value from the list
+// Removes the first count occurrences of elements equal to element from the list stored at key. The count argument influences the operation in the following ways:
+// count > 0: Remove elements equal to element moving from head to tail.
+// count < 0: Remove elements equal to element moving from tail to head.
+// count = 0: Remove all elements equal to element.
 func (l *DoublyLinkedList) LRem(count int64, value []byte) int64 {
+	var removed int64
+	if count > 0 {
+		removed = l.lRem(count, value)
+	} else if count < 0 {
+		removed = l.lRevRem(-count, value)
+	} else {
+		removed = l.lRemAll(value)
+	}
+	return removed
+}
+
+// lRemAll removes all elements equal to value from the list
+func (l *DoublyLinkedList) lRemAll(value []byte) int64 {
+	var removed int64
 	currentNode := l.head
-	var removed int64 = 0
 	for currentNode != nil {
 		if bytes.Equal(currentNode.data, value) {
-			if count > 0 && removed == count {
-				break
-			}
 			if currentNode.prev != nil {
 				currentNode.prev.next = currentNode.next
 			} else {
@@ -241,10 +255,60 @@ func (l *DoublyLinkedList) LRem(count int64, value []byte) int64 {
 			} else {
 				l.tail = currentNode.prev
 			}
-			removed++
 			l.length--
+			removed++
 		}
 		currentNode = currentNode.next
+	}
+	return removed
+}
+
+func (l *DoublyLinkedList) lRem(count int64, value []byte) int64 {
+	var removed int64
+	currentNode := l.head
+	for currentNode != nil {
+		if bytes.Equal(currentNode.data, value) {
+			if count == 0 || removed < count {
+				if currentNode.prev != nil {
+					currentNode.prev.next = currentNode.next
+				} else {
+					l.head = currentNode.next
+				}
+				if currentNode.next != nil {
+					currentNode.next.prev = currentNode.prev
+				} else {
+					l.tail = currentNode.prev
+				}
+				l.length--
+				removed++
+			}
+		}
+		currentNode = currentNode.next
+	}
+	return removed
+}
+
+func (l *DoublyLinkedList) lRevRem(count int64, value []byte) int64 {
+	var removed int64
+	currentNode := l.tail
+	for currentNode != nil {
+		if bytes.Equal(currentNode.data, value) {
+			if count == 0 || removed < count {
+				if currentNode.next != nil {
+					currentNode.next.prev = currentNode.prev
+				} else {
+					l.tail = currentNode.prev
+				}
+				if currentNode.prev != nil {
+					currentNode.prev.next = currentNode.next
+				} else {
+					l.head = currentNode.next
+				}
+				l.length--
+				removed++
+			}
+		}
+		currentNode = currentNode.prev
 	}
 	return removed
 }

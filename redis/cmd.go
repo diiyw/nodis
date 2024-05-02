@@ -27,6 +27,10 @@ type Options struct {
 	LIMIT      int
 	BYTE       int
 	BIT        int
+	NUMKEYS    int
+	WEIGHTS    int
+	AGGREGATE  int
+	REV        int
 }
 
 const (
