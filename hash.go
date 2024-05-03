@@ -13,11 +13,12 @@ func (n *Nodis) newHash() ds.DataStruct {
 	return hash.NewHashMap()
 }
 
-func (n *Nodis) HSet(key string, field string, value []byte) {
+func (n *Nodis) HSet(key string, field string, value []byte) int64 {
 	meta := n.store.writeKey(key, n.newHash)
-	meta.ds.(*hash.HashMap).HSet(field, value)
+	v := meta.ds.(*hash.HashMap).HSet(field, value)
 	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
+	return v
 }
 
 func (n *Nodis) HGet(key string, field string) []byte {
@@ -35,13 +36,13 @@ func (n *Nodis) HDel(key string, fields ...string) int64 {
 		meta.commit()
 		return 0
 	}
-	meta.ds.(*hash.HashMap).HDel(fields...)
+	v := meta.ds.(*hash.HashMap).HDel(fields...)
 	if meta.ds.(*hash.HashMap).HLen() == 0 {
 		n.store.delKey(key)
 	}
 	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_HDel, key).Fields(fields...))
-	return int64(len(fields))
+	return v
 }
 
 func (n *Nodis) HLen(key string) int64 {
@@ -88,48 +89,56 @@ func (n *Nodis) HGetAll(key string) map[string][]byte {
 	return v
 }
 
-func (n *Nodis) HIncrBy(key string, field string, value int64) int64 {
+func (n *Nodis) HIncrBy(key string, field string, value int64) (int64, error) {
 	meta := n.store.writeKey(key, n.newHash)
-	v := meta.ds.(*hash.HashMap).HIncrBy(field, value)
+	v, err := meta.ds.(*hash.HashMap).HIncrBy(field, value)
 	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_HIncrBy, key).Fields(field).IncrInt(value))
-	return v
+	return v, err
 }
 
-func (n *Nodis) HIncrByFloat(key string, field string, value float64) float64 {
+func (n *Nodis) HIncrByFloat(key string, field string, value float64) (float64, error) {
 	meta := n.store.writeKey(key, n.newHash)
-	v := meta.ds.(*hash.HashMap).HIncrByFloat(field, value)
+	v, err := meta.ds.(*hash.HashMap).HIncrByFloat(field, value)
 	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_HIncrByFloat, key).Fields(field).IncrFloat(value))
-	return v
+	return v, err
 }
 
-func (n *Nodis) HSetNX(key string, field string, value []byte) bool {
+// HSetNX Sets field in the hash stored at key to value, only if field does not yet exist.
+// If key does not exist, a new key holding a hash is created.
+// If field already exists, this operation has no effect.
+func (n *Nodis) HSetNX(key string, field string, value []byte) int64 {
 	meta := n.store.writeKey(key, nil)
 	if meta.isOk() && meta.ds.(*hash.HashMap).HExists(field) {
 		meta.commit()
-		return false
+		return 0
 	}
-	h := n.newHash()
-	n.store.values.Set(key, h)
-	k := newKey()
-	k.lastUse = time.Now().Unix()
-	n.store.keys.Set(key, k)
-	h.(*hash.HashMap).HSet(field, value)
+	if !meta.isOk() {
+		meta.ds = n.newHash()
+		meta.ok = true
+		n.store.values.Set(key, meta.ds)
+		k := newKey()
+		k.lastUse = time.Now().Unix()
+		n.store.keys.Set(key, k)
+	}
+	v := meta.ds.(*hash.HashMap).HSet(field, value)
 	meta.commit()
-	return true
+	return v
 }
 
-func (n *Nodis) HMSet(key string, fields map[string][]byte) {
+func (n *Nodis) HMSet(key string, fields map[string][]byte) int64 {
 	meta := n.store.writeKey(key, n.newHash)
 	var ops = make([]*pb.Op, 0, len(fields))
+	var v int64 = 0
 	for field, value := range fields {
-		meta.ds.(*hash.HashMap).HSet(field, value)
+		v += meta.ds.(*hash.HashMap).HSet(field, value)
 		ops = append(ops, pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
 	}
 	n.notify(ops...)
 	meta.ds.(*hash.HashMap).HMSet(fields)
 	meta.commit()
+	return v
 }
 
 func (n *Nodis) HMGet(key string, fields ...string) [][]byte {

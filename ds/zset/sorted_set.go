@@ -1,6 +1,8 @@
 package zset
 
 import (
+	"path/filepath"
+
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/pb"
 	"github.com/tidwall/btree"
@@ -161,7 +163,7 @@ func (sortedSet *SortedSet) ZScore(member string) float64 {
 	return element.Score
 }
 
-// forEachByRank visits each member which rank within [start, stop), sort by ascending order, rank starts from 1
+// forEachByRank visits each member which rank within [start, stop], sort by ascending order, rank starts from 0
 func (sortedSet *SortedSet) forEachByRank(start int64, stop int64, desc bool, consumer func(item *Item) bool) {
 	size := sortedSet.ZCard()
 	if start > size {
@@ -210,7 +212,7 @@ func (sortedSet *SortedSet) forEachByRank(start int64, stop int64, desc bool, co
 	}
 }
 
-// rangeByRank returns members which rank within [start, stop), sort by ascending order, rank starts from 0
+// rangeByRank returns members which rank within [start, stop], sort by ascending order, rank starts from 0
 func (sortedSet *SortedSet) rangeByRank(start int64, stop int64, desc bool) []*Item {
 	slice := make([]*Item, 0)
 	sortedSet.forEachByRank(start, stop, desc, func(item *Item) bool {
@@ -220,12 +222,12 @@ func (sortedSet *SortedSet) rangeByRank(start int64, stop int64, desc bool) []*I
 	return slice
 }
 
-// ZRange returns members which rank within [start, stop), sort by ascending order, rank starts from 0
+// ZRange returns members which rank within [start, stop], sort by ascending order, rank starts from 0
 func (sortedSet *SortedSet) ZRange(start int64, stop int64) []*Item {
 	return sortedSet.rangeByRank(start, stop, false)
 }
 
-// ZRevRange returns members which rank within [start, stop), sort by descending order, rank starts from 0
+// ZRevRange returns members which rank within [start, stop], sort by descending order, rank starts from 0
 func (sortedSet *SortedSet) ZRevRange(start int64, stop int64) []*Item {
 	return sortedSet.rangeByRank(start, stop, true)
 }
@@ -330,10 +332,19 @@ func (sortedSet *SortedSet) ZRemRangeByScore(min float64, max float64) int64 {
 	return sortedSet.removeRange(min, max)
 }
 
-// ZRemRangeByRank removes member ranking within [start, stop)
+// ZRemRangeByRank removes member ranking within [start, stop]
 // sort by ascending order and rank starts from 0
 func (sortedSet *SortedSet) ZRemRangeByRank(start int64, stop int64) int64 {
-	removed := sortedSet.skiplist.removeRangeByRank(start+1, stop+1)
+	if stop < 0 {
+		stop = sortedSet.ZCard() + stop
+	}
+	if start < 0 {
+		start = sortedSet.ZCard() + start
+	}
+	if start >= stop || start < 0 {
+		return 0
+	}
+	removed := sortedSet.skiplist.removeRangeByRank(start, stop)
 	for _, element := range removed {
 		sortedSet.dict.Delete(element.Member)
 	}
@@ -374,6 +385,24 @@ func (sortedSet *SortedSet) ZMax() *Item {
 // ZMin returns the member with the lowest score
 func (sortedSet *SortedSet) ZMin() *Item {
 	return &sortedSet.skiplist.header.level[0].forward.Item
+}
+
+// ZScan returns members which score or member within the given border
+func (sortedSet *SortedSet) ZScan(cursor int64, match string, count int64) (int64, []*Item) {
+	var items = make([]*Item, 0)
+	if count == 0 {
+		count = sortedSet.ZCard()
+	}
+	if match == "" {
+		match = "*"
+	}
+	sortedSet.forEachByRank(cursor, cursor+count, false, func(element *Item) bool {
+		if matched, _ := filepath.Match(match, element.Member); matched {
+			items = append(items, element)
+		}
+		return true
+	})
+	return cursor + int64(len(items)), nil
 }
 
 func (sortedSet *SortedSet) GetValue() []*pb.KeyScore {

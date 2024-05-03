@@ -39,6 +39,7 @@ enum OpType  {
   Rename = 33;
   Persist = 34;
   ZUnionStore = 35;
+  ZInterStore = 36;
 }
 
 message Operation {

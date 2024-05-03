@@ -73,7 +73,7 @@ func TestHash_HSetNX(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{Path: "testdata"})
 	n.HSetNX("hash", "field", []byte("value"))
-	if n.HSetNX("hash", "field", []byte("value")) {
+	if v := n.HSetNX("hash", "field", []byte("value")); v == 1 {
 		t.Error("HSetNX failed")
 	}
 }
@@ -100,7 +100,7 @@ func TestHash_HIncrBy(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{Path: "testdata"})
 	n.HSet("hash", "field", []byte("1"))
-	if n.HIncrBy("hash", "field", 1) != 2 {
+	if v, err := n.HIncrBy("hash", "field", 1); v != 2 || err != nil {
 		t.Error("HIncrBy failed")
 	}
 }
@@ -109,7 +109,7 @@ func TestHash_HIncrByFloat(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{Path: "testdata"})
 	n.HSet("hash", "field", []byte("1"))
-	if n.HIncrByFloat("hash", "field", 1.1) != 2.1 {
+	if v, err := n.HIncrByFloat("hash", "field", 1.1); v != 2.1 || err != nil {
 		t.Error("HIncrByFloat failed")
 	}
 }

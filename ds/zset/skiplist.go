@@ -302,7 +302,7 @@ func (skiplist *skiplist) removeRange(min float64, max float64, limit int) (remo
 	return removed
 }
 
-// 1-based rank, including start, exclude stop
+// removeRangeByRank removes nodes in range [start, stop]
 func (skiplist *skiplist) removeRangeByRank(start int64, stop int64) (removed []*Item) {
 	var i int64 = 0 // rank of iterator
 	update := make([]*node, maxLevel)
@@ -318,11 +318,10 @@ func (skiplist *skiplist) removeRangeByRank(start int64, stop int64) (removed []
 		update[level] = node
 	}
 
-	i++
 	node = node.level[0].forward // first node in range
 
 	// remove nodes in range
-	for node != nil && i < stop {
+	for node != nil && i <= stop {
 		next := node.level[0].forward
 		removedElement := node.Item
 		removed = append(removed, &removedElement)

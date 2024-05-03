@@ -9,9 +9,6 @@ func FormatFloat64(s string, inf float64) (float64, error) {
 	} else {
 		f = s
 	}
-	if f == "-inf" || f == "+inf" {
-		return inf, nil
-	}
 	return strconv.ParseFloat(f, 64)
 }
 
@@ -21,9 +18,6 @@ func FormatInt64(s string, inf int64) (int64, error) {
 		i = s[1:]
 	} else {
 		i = s
-	}
-	if i == "-inf" || i == "+inf" {
-		return inf, nil
 	}
 	return strconv.ParseInt(i, 10, 64)
 }

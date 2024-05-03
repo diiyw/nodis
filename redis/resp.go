@@ -256,7 +256,7 @@ func (r *Reader) readOptions(v string, i int) {
 		case "REV":
 			r.cmd.Options.REV = i
 		}
-	case "ZUNIONSTORE":
+	case "ZUNIONSTORE", "ZINTERSTORE":
 		if i > 2 {
 			opt := utils.ToUpper(v)
 			switch opt {

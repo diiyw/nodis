@@ -1,6 +1,7 @@
 package hash
 
 import (
+	"errors"
 	"path/filepath"
 	"strconv"
 	"unsafe"
@@ -25,8 +26,12 @@ func (s *HashMap) Type() ds.DataType {
 }
 
 // HSet sets the value of a hash
-func (s *HashMap) HSet(key string, value []byte) {
-	s.data.Set(key, value)
+func (s *HashMap) HSet(key string, value []byte) int64 {
+	_, replaced := s.data.Set(key, value)
+	if replaced {
+		return 0
+	}
+	return 1
 }
 
 // HGet gets the value of a hash
@@ -39,10 +44,15 @@ func (s *HashMap) HGet(key string) []byte {
 }
 
 // HDel deletes the value of a hash
-func (s *HashMap) HDel(key ...string) {
+func (s *HashMap) HDel(key ...string) int64 {
+	var v int64 = 0
 	for _, k := range key {
-		s.data.Delete(k)
+		_, deleted := s.data.Delete(k)
+		if deleted {
+			v++
+		}
 	}
+	return v
 }
 
 // HLen gets the length of a hash
@@ -72,29 +82,35 @@ func (s *HashMap) HGetAll() map[string][]byte {
 }
 
 // HIncrBy increments the value of a hash
-func (s *HashMap) HIncrBy(key string, value int64) int64 {
+func (s *HashMap) HIncrBy(key string, value int64) (int64, error) {
 	v, ok := s.data.Get(key)
 	if !ok {
 		s.data.Set(key, []byte(strconv.FormatInt(value, 10)))
-		return 0
+		return value, nil
 	}
-	vi, _ := strconv.ParseInt(*(*string)(unsafe.Pointer(&v)), 10, 64)
+	vi, err := strconv.ParseInt(*(*string)(unsafe.Pointer(&v)), 10, 64)
+	if err != nil {
+		return 0, errors.New("ERR hash value is not an integer")
+	}
 	i := vi + value
 	s.data.Set(key, []byte(strconv.FormatInt(i, 10)))
-	return i
+	return i, nil
 }
 
 // HIncByFloat increments the value of a hash
-func (s *HashMap) HIncrByFloat(key string, value float64) float64 {
+func (s *HashMap) HIncrByFloat(key string, value float64) (float64, error) {
 	v, ok := s.data.Get(key)
 	if !ok {
 		s.data.Set(key, []byte(strconv.FormatFloat(value, 'f', -1, 64)))
-		return 0
+		return value, nil
 	}
-	vf, _ := strconv.ParseFloat(*(*string)(unsafe.Pointer(&v)), 64)
+	vf, err := strconv.ParseFloat(*(*string)(unsafe.Pointer(&v)), 64)
+	if err != nil {
+		return 0, errors.New("ERR hash value is not an integer")
+	}
 	f := vf + value
 	s.data.Set(key, []byte(strconv.FormatFloat(f, 'f', -1, 64)))
-	return f
+	return f, nil
 }
 
 // HMSet sets the values of a hash

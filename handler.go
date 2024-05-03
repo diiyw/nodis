@@ -217,6 +217,8 @@ func getCommand(name string) func(n *Nodis, w *redis.Writer, cmd *redis.Command)
 		return zClear
 	case "ZUNIONSTORE":
 		return zUnionStore
+	case "ZINTERSTORE":
+		return zInterStore
 	case "ZEXISTS":
 		return zExists
 	}
@@ -1039,8 +1041,7 @@ func hSet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	key := cmd.Args[0]
 	field := cmd.Args[1]
 	value := cmd.Args[2]
-	var i int64 = 1
-	n.HSet(key, field, []byte(value))
+	var i int64 = n.HSet(key, field, []byte(value))
 	if len(cmd.Args) > 3 {
 		var fields = make(map[string][]byte, len(cmd.Args)-3)
 		for i := 3; i < len(cmd.Args); i += 2 {
@@ -1049,8 +1050,7 @@ func hSet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 			}
 			fields[cmd.Args[i]] = []byte(cmd.Args[i+1])
 		}
-		i++
-		n.HMSet(key, fields)
+		i += n.HMSet(key, fields)
 	}
 	w.WriteInteger(i)
 }
@@ -1142,7 +1142,12 @@ func hIncrBy(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		w.WriteError("ERR value is not an integer or out of range")
 		return
 	}
-	w.WriteInteger(n.HIncrBy(key, field, value))
+	v, err := n.HIncrBy(key, field, value)
+	if err != nil {
+		w.WriteError(err.Error())
+		return
+	}
+	w.WriteInteger(v)
 }
 
 func hIncrByFloat(n *Nodis, w *redis.Writer, cmd *redis.Command) {
@@ -1157,7 +1162,12 @@ func hIncrByFloat(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		w.WriteError("ERR value is not a valid float")
 		return
 	}
-	f := strconv.FormatFloat(n.HIncrByFloat(key, field, value), 'f', -1, 64)
+	v, err := n.HIncrByFloat(key, field, value)
+	if err != nil {
+		w.WriteError(err.Error())
+		return
+	}
+	f := strconv.FormatFloat(v, 'f', -1, 64)
 	w.WriteBulk(f)
 }
 
@@ -1169,10 +1179,7 @@ func hSetNX(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	key := cmd.Args[0]
 	field := cmd.Args[1]
 	value := cmd.Args[2]
-	if n.HSetNX(key, field, []byte(value)) {
-		w.WriteInteger(1)
-	}
-	w.WriteInteger(0)
+	w.WriteInteger(n.HSetNX(key, field, []byte(value)))
 }
 
 func hMGet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
@@ -2054,7 +2061,42 @@ func zUnionStore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if cmd.Options.AGGREGATE > 0 {
 		aggregate = cmd.Args[cmd.Options.AGGREGATE]
 	}
-	n.ZUnionStore(destination, keys, weights, aggregate)
+	n.ZUnionStore(destination, keys, weights, utils.ToUpper(aggregate))
+	w.WriteInteger(n.ZCard(destination))
+}
+
+func zInterStore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+	if len(cmd.Args) < 3 {
+		w.WriteError("ZINTERSTORE requires at least three arguments")
+		return
+	}
+	destination := cmd.Args[0]
+	numKeys, err := strconv.ParseInt(cmd.Args[1], 10, 64)
+	if err != nil {
+		w.WriteError("ERR numkeys value is not a valid integer")
+		return
+	}
+	keys := cmd.Args[2 : 2+numKeys]
+	var weights []float64
+	var aggregate string
+	if cmd.Options.WEIGHTS > 0 {
+		if len(cmd.Args) < cmd.Options.WEIGHTS+int(numKeys) {
+			w.WriteError("ERR syntax error")
+			return
+		}
+		weights = make([]float64, numKeys)
+		for i := 0; i < len(weights); i++ {
+			weights[i], err = redis.FormatFloat64(cmd.Args[i+cmd.Options.WEIGHTS], 1)
+			if err != nil {
+				w.WriteError("ERR weight value is not a valid float")
+				return
+			}
+		}
+	}
+	if cmd.Options.AGGREGATE > 0 {
+		aggregate = cmd.Args[cmd.Options.AGGREGATE]
+	}
+	n.ZInterStore(destination, keys, weights, utils.ToUpper(aggregate))
 	w.WriteInteger(n.ZCard(destination))
 }
 

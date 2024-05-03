@@ -339,13 +339,7 @@ func (n *Nodis) ZMin(key string) *zset.Item {
 	return v
 }
 
-// ZUnionStore computes the union of numkeys sorted sets given by the specified keys, and stores the result in destination.
-func (n *Nodis) ZUnionStore(destination string, keys []string, weights []float64, aggregate string) int64 {
-	meta := n.store.writeKey(destination, n.newZSet)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
+func (n *Nodis) ZUnion(keys []string, weights []float64, aggregate string) []*zset.Item {
 	lockedKeys := make([]*metadata, 0, len(keys))
 	for _, key := range keys {
 		ds := n.store.readKey(key)
@@ -356,19 +350,22 @@ func (n *Nodis) ZUnionStore(destination string, keys []string, weights []float64
 		lockedKeys = append(lockedKeys, ds)
 	}
 	if len(lockedKeys) == 0 {
-		meta.commit()
-		return 0
+		return nil
 	}
 	var items = make(map[string]float64)
 	for i, m := range lockedKeys {
+		var weight float64 = 1
+		if i < len(weights) {
+			weight = weights[i]
+		}
 		zs := m.ds.(*zset.SortedSet).ZRange(0, -1)
 		for _, z := range zs {
-			var weight float64 = 1
-			if i < len(weights) {
-				weight = weights[i]
-			}
 			if aggregate == "SUM" || aggregate == "" {
-				items[z.Member] = items[z.Member]*weight + weight*z.Score
+				if _, ok := items[z.Member]; !ok {
+					items[z.Member] = z.Score * weight
+				} else {
+					items[z.Member] = items[z.Member]*weight + weight*z.Score
+				}
 			}
 			if aggregate == "MIN" {
 				if _, ok := items[z.Member]; !ok || z.Score < items[z.Member] {
@@ -383,10 +380,113 @@ func (n *Nodis) ZUnionStore(destination string, keys []string, weights []float64
 		}
 		m.commit()
 	}
+	var result []*zset.Item
 	for member, score := range items {
-		meta.ds.(*zset.SortedSet).ZAdd(member, score)
+		result = append(result, &zset.Item{Member: member, Score: score})
+	}
+	return result
+}
+
+// ZUnionStore computes the union of numkeys sorted sets given by the specified keys, and stores the result in destination.
+func (n *Nodis) ZUnionStore(destination string, keys []string, weights []float64, aggregate string) int64 {
+	meta := n.store.writeKey(destination, n.newZSet)
+	if !meta.isOk() {
+		meta.commit()
+		return 0
+	}
+	items := n.ZUnion(keys, weights, aggregate)
+	if len(items) == 0 {
+		meta.commit()
+		return 0
+	}
+	for _, item := range items {
+		meta.ds.(*zset.SortedSet).ZAdd(item.Member, item.Score)
 	}
 	meta.commit()
 	n.notify(pb.NewOp(pb.OpType_ZUnionStore, destination).Keys(keys).Weights(weights).Aggregate(aggregate))
+	return int64(len(items))
+}
+
+func (n *Nodis) ZInter(keys []string, weights []float64, aggregate string) []*zset.Item {
+	lockedKeys := make([]*metadata, 0, len(keys))
+	for _, key := range keys {
+		other := n.store.readKey(key)
+		lockedKeys = append(lockedKeys, other)
+		if !other.isOk() || other.ds.(*zset.SortedSet).ZCard() == 0 {
+			for _, m := range lockedKeys {
+				m.commit()
+			}
+			return nil
+		}
+	}
+	if len(lockedKeys) == 0 {
+		return nil
+	}
+	var items = make(map[string]float64)
+	for i, m := range lockedKeys {
+		var weight float64 = 1
+		if i < len(weights) {
+			weight = weights[i]
+		}
+		zs := m.ds.(*zset.SortedSet).ZRange(0, -1)
+		for _, z := range zs {
+			var found = true
+			for j, otherZ := range lockedKeys {
+				if i == j {
+					continue
+				}
+				if !otherZ.ds.(*zset.SortedSet).ZExists(z.Member) {
+					found = false
+					break
+				}
+			}
+			if found {
+				if aggregate == "SUM" || aggregate == "" {
+					if _, ok := items[z.Member]; !ok {
+						items[z.Member] = z.Score * weight
+					} else {
+						items[z.Member] = items[z.Member]*weight + weight*z.Score
+					}
+				}
+				if aggregate == "MIN" {
+					if _, ok := items[z.Member]; !ok || z.Score < items[z.Member] {
+						items[z.Member] = z.Score * weight
+					}
+				}
+				if aggregate == "MAX" {
+					if _, ok := items[z.Member]; !ok || z.Score > items[z.Member] {
+						items[z.Member] = z.Score * weight
+					}
+				}
+			}
+		}
+	}
+	for _, m := range lockedKeys {
+		m.commit()
+	}
+	var result []*zset.Item
+	for member, score := range items {
+		result = append(result, &zset.Item{Member: member, Score: score})
+	}
+	return result
+}
+
+// ZInterStore computes the intersection of numkeys sorted sets given by the specified keys, and stores the result in destination.
+func (n *Nodis) ZInterStore(destination string, keys []string, weights []float64, aggregate string) int64 {
+	items := n.ZInter(keys, weights, aggregate)
+	meta := n.store.writeKey(destination, n.newZSet)
+	if !meta.isOk() {
+		meta.commit()
+		return 0
+	}
+	if len(items) == 0 {
+		meta.commit()
+		return 0
+	}
+	for _, item := range items {
+		meta.ds.(*zset.SortedSet).ZAdd(item.Member, item.Score)
+	}
+	meta.commit()
+	n.notify(pb.NewOp(pb.OpType_ZInterStore, destination).Keys(keys).Weights(weights).Aggregate(aggregate))
 	return int64(len(items))
 }

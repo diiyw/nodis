@@ -50,6 +50,7 @@ Simple way to embed in your application.
 |                     |                 |                 | APPEND              |                 | HSCAN           | RPOPLPUSH        | ZCLEAR                |
 |                     |                 |                 | GETRANGE            |                 | HVALS           | BLPOP            | ZEXISTS               |
 |                     |                 |                 | STRLEN              |                 |                 | BRPOP            | ZUNIONSTORE           |
+|                     |                 |                 | STRLEN              |                 |                 | BRPOP            | ZINTERSTORE		   |
 ## Get Started
 ```bash
  go get github.com/diiyw/nodis@latest
