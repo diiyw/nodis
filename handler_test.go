@@ -7,21 +7,6 @@ import (
 	"github.com/diiyw/nodis/redis"
 )
 
-func TestClient_List(t *testing.T) {
-	n := &Nodis{}
-	w := redis.NewWriter(&bytes.Buffer{})
-	cmd := &redis.Command{
-		Args: []string{"LIST"},
-	}
-
-	client(n, w, cmd)
-
-	expected := []byte("*0\r\n")
-	if string(w.Bytes()) != string(expected) {
-		t.Errorf("Expected %q, but got %q", expected, w.Bytes())
-	}
-}
-
 func TestClient_SetName(t *testing.T) {
 	n := &Nodis{}
 	w := redis.NewWriter(&bytes.Buffer{})

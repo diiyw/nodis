@@ -486,5 +486,8 @@ func (w *Writer) Close() error {
 }
 
 func (w *Writer) RemoteAddr() string {
-	return w.writer.(net.Conn).RemoteAddr().String()
+	if c, ok := w.writer.(net.Conn); ok {
+		return c.RemoteAddr().String()
+	}
+	return ""
 }

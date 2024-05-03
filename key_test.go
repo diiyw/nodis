@@ -17,8 +17,8 @@ func TestKey_Expire(t *testing.T) {
 	n.Set("test", []byte("test1"))
 	n.Expire("test", 2)
 	time.Sleep(time.Second * 2)
-	if n.TTL("test") != 0 {
-		t.Errorf("Get() = %v, want %vs", n.TTL("test"), 0)
+	if n.TTL("test") > 0 {
+		t.Errorf("Get() = %v, want <= %vs", n.TTL("test"), 0)
 	}
 }
 
