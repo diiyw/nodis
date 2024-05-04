@@ -4,7 +4,14 @@ import (
 	"net"
 )
 
-type HandlerFunc func(w *Writer, cmd *Command)
+type HandlerFunc func(c *Conn, cmd *Command)
+
+type Conn struct {
+	*Reader
+	*Writer
+	Network  net.Conn
+	Commands []*Command
+}
 
 func Serve(addr string, handler HandlerFunc) error {
 	// Create a new server
@@ -23,15 +30,20 @@ func Serve(addr string, handler HandlerFunc) error {
 }
 
 func handleConn(conn net.Conn, handler HandlerFunc) {
-	reader, writer := NewReader(conn), NewWriter(conn)
+	c := &Conn{
+		Reader:   NewReader(conn),
+		Writer:   NewWriter(conn),
+		Network:  conn,
+		Commands: make([]*Command, 0),
+	}
 	for {
-		err := reader.ReadCommand()
+		err := c.Reader.ReadCommand()
 		if err != nil {
-			writer.WriteError(err.Error())
-			_ = writer.Flush()
+			c.WriteError(err.Error())
+			_ = c.Flush()
 			break
 		}
-		handler(writer, reader.cmd)
-		_ = writer.Flush()
+		handler(c, c.cmd)
+		_ = c.Flush()
 	}
 }

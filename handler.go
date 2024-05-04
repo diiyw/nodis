@@ -11,7 +11,7 @@ import (
 	"github.com/diiyw/nodis/utils"
 )
 
-func getCommand(name string) func(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func getCommand(name string) func(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	switch name {
 	case "CLIENT":
 		return client
@@ -225,51 +225,51 @@ func getCommand(name string) func(n *Nodis, w *redis.Writer, cmd *redis.Command)
 	return nil
 }
 
-func client(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func client(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("CLIENT subcommand must be provided")
+		conn.WriteError("CLIENT subcommand must be provided")
 		return
 	}
 	switch utils.ToUpper(cmd.Args[0]) {
 	case "LIST":
-		w.WriteString("id=1 addr=" + w.RemoteAddr() + " fd=5 name= age=0 idle=0 flags=N db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=0 obl=0 oll=0 omem=0 events=r cmd=client")
+		conn.WriteString("id=1 addr=" + conn.Network.RemoteAddr().String() + " fd=5 name= age=0 idle=0 flags=N db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=0 obl=0 oll=0 omem=0 events=r cmd=client")
 	case "SETNAME":
-		w.WriteString("OK")
+		conn.WriteString("OK")
 	default:
-		w.WriteError("CLIENT subcommand must be provided")
+		conn.WriteError("CLIENT subcommand must be provided")
 	}
 }
 
-func config(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func config(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("CONFIG GET requires at least two argument")
+		conn.WriteError("CONFIG GET requires at least two argument")
 		return
 	}
 	if cmd.Options.GET > 0 {
 		if cmd.Options.GET > len(cmd.Args) {
-			w.WriteError("CONFIG GET requires at least one argument")
+			conn.WriteError("CONFIG GET requires at least one argument")
 			return
 		}
 		if utils.ToUpper(cmd.Args[cmd.Options.GET]) == "DATABASES" {
-			w.WriteArray(2)
-			w.WriteBulk("databases")
-			w.WriteBulk("0")
+			conn.WriteArray(2)
+			conn.WriteBulk("databases")
+			conn.WriteBulk("0")
 			return
 		}
 	}
-	w.WriteNull()
+	conn.WriteNull()
 }
 
-func dbSize(n *Nodis, w *redis.Writer, cmd *redis.Command) {
-	w.WriteInteger(int64(n.store.keys.Len()))
+func dbSize(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+	conn.WriteInteger(int64(n.store.keys.Len()))
 }
 
-func info(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func info(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	memStats := runtime.MemStats{}
 	runtime.ReadMemStats(&memStats)
 	usedMemory := strconv.FormatUint(memStats.HeapInuse+memStats.StackInuse, 10)
 	pid := strconv.Itoa(os.Getpid())
-	w.WriteBulk(`# Server
+	conn.WriteBulk(`# Server
 redis_version:1.6.0
 os:` + runtime.GOOS + `
 process_id:` + pid + `
@@ -278,195 +278,195 @@ used_memory:` + usedMemory + `
 `)
 }
 
-func ping(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func ping(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteBulk("PONG")
+		conn.WriteBulk("PONG")
 		return
 	}
-	w.WriteBulk(cmd.Args[0])
+	conn.WriteBulk(cmd.Args[0])
 }
 
-func echo(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func echo(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
-	w.WriteBulk(cmd.Args[0])
+	conn.WriteBulk(cmd.Args[0])
 }
 
-func quit(n *Nodis, w *redis.Writer, cmd *redis.Command) {
-	w.Close()
-	w.WriteOK()
+func quit(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+	conn.WriteOK()
+	conn.Network.Close()
 }
 
-func flushDB(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func flushDB(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	n.Clear()
-	w.WriteOK()
+	conn.WriteOK()
 }
 
-func del(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func del(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("DEL requires at least one argument")
+		conn.WriteError("DEL requires at least one argument")
 		return
 	}
-	w.WriteInteger(n.Del(cmd.Args...))
+	conn.WriteInteger(n.Del(cmd.Args...))
 }
 
-func exists(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func exists(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("EXISTS requires at least one argument")
+		conn.WriteError("EXISTS requires at least one argument")
 		return
 	}
-	w.WriteInteger(n.Exists(cmd.Args...))
+	conn.WriteInteger(n.Exists(cmd.Args...))
 }
 
 // EXPIRE key seconds [NX | XX | GT | LT]
-func expire(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func expire(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("EXPIRE requires at least two arguments")
+		conn.WriteError("EXPIRE requires at least two arguments")
 		return
 	}
 	seconds, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
 	if cmd.Options.NX > 0 {
-		w.WriteInteger(n.ExpireNX(cmd.Args[0], seconds))
+		conn.WriteInteger(n.ExpireNX(cmd.Args[0], seconds))
 		return
 	}
 	if cmd.Options.XX > 0 {
-		w.WriteInteger(n.ExpireXX(cmd.Args[0], seconds))
+		conn.WriteInteger(n.ExpireXX(cmd.Args[0], seconds))
 		return
 	}
 	if cmd.Options.LT > 0 {
-		w.WriteInteger(n.ExpireLT(cmd.Args[0], seconds))
+		conn.WriteInteger(n.ExpireLT(cmd.Args[0], seconds))
 		return
 	}
 	if cmd.Options.GT > 0 {
-		w.WriteInteger(n.ExpireGT(cmd.Args[0], seconds))
+		conn.WriteInteger(n.ExpireGT(cmd.Args[0], seconds))
 		return
 	}
-	w.WriteInteger(n.Expire(cmd.Args[0], seconds))
+	conn.WriteInteger(n.Expire(cmd.Args[0], seconds))
 }
 
 // EXPIREAT key unix-time-seconds [NX | XX | GT | LT]
-func expireAt(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func expireAt(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("EXPIREAT requires at least two arguments")
+		conn.WriteError("EXPIREAT requires at least two arguments")
 		return
 	}
 	timestamp, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
 	e := time.Unix(timestamp, 0)
 	if cmd.Options.NX > 0 {
-		w.WriteInteger(n.ExpireAtNX(cmd.Args[0], e))
+		conn.WriteInteger(n.ExpireAtNX(cmd.Args[0], e))
 		return
 	}
 	if cmd.Options.XX > 0 {
-		w.WriteInteger(n.ExpireAtXX(cmd.Args[0], e))
+		conn.WriteInteger(n.ExpireAtXX(cmd.Args[0], e))
 		return
 	}
 	if cmd.Options.LT > 0 {
-		w.WriteInteger(n.ExpireAtLT(cmd.Args[0], e))
+		conn.WriteInteger(n.ExpireAtLT(cmd.Args[0], e))
 		return
 	}
 	if cmd.Options.GT > 0 {
-		w.WriteInteger(n.ExpireAtGT(cmd.Args[0], e))
+		conn.WriteInteger(n.ExpireAtGT(cmd.Args[0], e))
 		return
 	}
-	w.WriteInteger(n.ExpireAt(cmd.Args[0], e))
+	conn.WriteInteger(n.ExpireAt(cmd.Args[0], e))
 }
 
-func keys(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func keys(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("KEYS requires at least one argument")
+		conn.WriteError("KEYS requires at least one argument")
 		return
 	}
 	keys := n.Keys(cmd.Args[0])
-	w.WriteArray(len(keys))
+	conn.WriteArray(len(keys))
 	for _, v := range keys {
-		w.WriteBulk(v)
+		conn.WriteBulk(v)
 	}
 }
 
-func ttl(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func ttl(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("TTL requires at least one argument")
+		conn.WriteError("TTL requires at least one argument")
 		return
 	}
 	v := n.TTL(cmd.Args[0])
 	if v == -1 {
-		w.WriteInteger(-1)
+		conn.WriteInteger(-1)
 		return
 	}
 	if v == -2 {
-		w.WriteInteger(-2)
+		conn.WriteInteger(-2)
 		return
 	}
-	w.WriteInteger(int64(v.Seconds()))
+	conn.WriteInteger(int64(v.Seconds()))
 }
 
-func Persist(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func Persist(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("PERSIST requires at least one argument")
+		conn.WriteError("PERSIST requires at least one argument")
 		return
 	}
-	w.WriteInteger(n.Persist(cmd.Args[0]))
+	conn.WriteInteger(n.Persist(cmd.Args[0]))
 }
 
-func randomKey(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func randomKey(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	key := n.RandomKey()
 	if key == "" {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
-	w.WriteBulk(key)
+	conn.WriteBulk(key)
 }
 
-func rename(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func rename(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("RENAME requires at least two arguments")
+		conn.WriteError("RENAME requires at least two arguments")
 		return
 	}
 	oldKey := cmd.Args[0]
 	newKey := cmd.Args[1]
 	v := n.Rename(oldKey, newKey)
 	if v == nil {
-		w.WriteInteger(1)
+		conn.WriteInteger(1)
 		return
 	}
-	w.WriteInteger(0)
+	conn.WriteInteger(0)
 }
 
-func renameNx(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func renameNx(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("RENAMENX requires at least two arguments")
+		conn.WriteError("RENAMENX requires at least two arguments")
 		return
 	}
 	oldKey := cmd.Args[0]
 	newKey := cmd.Args[1]
 	v := n.RenameNX(oldKey, newKey)
 	if v == nil {
-		w.WriteInteger(1)
+		conn.WriteInteger(1)
 		return
 	}
-	w.WriteInteger(0)
+	conn.WriteInteger(0)
 }
 
-func typ(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func typ(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("TYPE requires at least one argument")
+		conn.WriteError("TYPE requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
-	w.WriteString(n.Type(key))
+	conn.WriteString(n.Type(key))
 }
 
 // SCAN cursor [MATCH pattern] [COUNT count] [TYPE type]
-func scan(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func scan(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("SCAN requires at least one argument")
+		conn.WriteError("SCAN requires at least one argument")
 		return
 	}
 	cursor, err := strconv.ParseInt(cmd.Args[0], 10, 64)
 	if err != nil {
-		w.WriteError("ERR cursor value is not an integer or out of range")
+		conn.WriteError("ERR cursor value is not an integer or out of range")
 		return
 	}
 	var match = "*"
@@ -477,23 +477,23 @@ func scan(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if cmd.Options.COUNT > 0 {
 		count, err = strconv.ParseInt(cmd.Args[cmd.Options.COUNT], 10, 64)
 		if err != nil {
-			w.WriteError("ERR count value is not an integer or out of range")
+			conn.WriteError("ERR count value is not an integer or out of range")
 			return
 		}
 	}
 	nextCursor, keys := n.Scan(cursor, match, count)
-	w.WriteArray(2)
-	w.WriteBulk(strconv.FormatInt(nextCursor, 10))
-	w.WriteArray(len(keys))
+	conn.WriteArray(2)
+	conn.WriteBulk(strconv.FormatInt(nextCursor, 10))
+	conn.WriteArray(len(keys))
 	for _, v := range keys {
-		w.WriteBulk(v)
+		conn.WriteBulk(v)
 	}
 }
 
 // SET key value [NX | XX] [GET] [EX seconds | PX milliseconds | EXAT unix-time-seconds | PXAT unix-time-milliseconds | KEEPTTL]
-func setString(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func setString(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("SET requires at least two arguments")
+		conn.WriteError("SET requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
@@ -512,19 +512,19 @@ func setString(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if cmd.Options.EX > 0 {
 		seconds, _ := strconv.ParseInt(cmd.Args[cmd.Options.EX], 10, 64)
 		n.Expire(key, seconds)
-		w.WriteOK()
+		conn.WriteOK()
 		return
 	}
 	if cmd.Options.PX > 0 {
 		milliseconds, _ := strconv.ParseInt(cmd.Args[cmd.Options.PX], 10, 64)
 		n.ExpirePX(key, milliseconds)
-		w.WriteOK()
+		conn.WriteOK()
 		return
 	}
 	if cmd.Options.EXAT > 0 {
 		seconds, _ := strconv.ParseInt(cmd.Args[cmd.Options.EXAT], 10, 64)
 		n.ExpireAt(key, time.Unix(seconds, 0))
-		w.WriteOK()
+		conn.WriteOK()
 		return
 	}
 	if cmd.Options.PXAT > 0 {
@@ -532,242 +532,242 @@ func setString(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		seconds := milliseconds / 1000
 		ns := (milliseconds - seconds*1000) * 1000 * 1000
 		n.ExpireAt(key, time.Unix(seconds, ns))
-		w.WriteOK()
+		conn.WriteOK()
 		return
 	}
 	if get != nil {
-		w.WriteBulk(string(get))
+		conn.WriteBulk(string(get))
 		return
 	}
-	w.WriteOK()
+	conn.WriteOK()
 }
 
-func mSet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func mSet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 || len(cmd.Args)%2 != 0 {
-		w.WriteError("MSET requires at least two arguments")
+		conn.WriteError("MSET requires at least two arguments")
 		return
 	}
 	for i := 0; i < len(cmd.Args); i += 2 {
 		n.Set(cmd.Args[i], []byte(cmd.Args[i+1]))
 	}
-	w.WriteOK()
+	conn.WriteOK()
 }
 
-func appendString(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func appendString(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("APPEND requires at least two arguments")
+		conn.WriteError("APPEND requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
 	value := []byte(cmd.Args[1])
-	w.WriteInteger(n.Append(key, value))
+	conn.WriteInteger(n.Append(key, value))
 }
 
-func setex(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func setex(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("SETEX requires at least three arguments")
+		conn.WriteError("SETEX requires at least three arguments")
 		return
 	}
 	key := cmd.Args[0]
 	seconds, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
 	value := []byte(cmd.Args[2])
 	n.SetEX(key, value, seconds)
-	w.WriteOK()
+	conn.WriteOK()
 }
 
-func setnx(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func setnx(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("SETNX requires at least two arguments")
+		conn.WriteError("SETNX requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
 	value := []byte(cmd.Args[1])
 	if n.SetNX(key, value) {
-		w.WriteInteger(1)
+		conn.WriteInteger(1)
 		return
 	}
-	w.WriteInteger(0)
+	conn.WriteInteger(0)
 }
 
-func incr(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func incr(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("INCR requires at least one argument")
+		conn.WriteError("INCR requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
 	v, err := n.Incr(key)
 	if err != nil {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
-	w.WriteInteger(v)
+	conn.WriteInteger(v)
 }
 
-func incrBy(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func incrBy(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("INCRBY requires at least two arguments")
+		conn.WriteError("INCRBY requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
 	value, err := strconv.ParseInt(cmd.Args[1], 10, 64)
 	if err != nil {
-		w.WriteError("ERR value is not an integer or out of range")
+		conn.WriteError("ERR value is not an integer or out of range")
 		return
 	}
 	v, err := n.IncrBy(key, value)
 	if err != nil {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
-	w.WriteInteger(v)
+	conn.WriteInteger(v)
 }
 
-func decr(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func decr(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("DECR requires at least one argument")
+		conn.WriteError("DECR requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
 	v, err := n.Decr(key)
 	if err != nil {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
-	w.WriteInteger(v)
+	conn.WriteInteger(v)
 }
 
-func decrBy(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func decrBy(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("INCRBY requires at least two arguments")
+		conn.WriteError("INCRBY requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
 	value, err := strconv.ParseInt(cmd.Args[1], 10, 64)
 	if err != nil {
-		w.WriteError("ERR value is not an integer or out of range")
+		conn.WriteError("ERR value is not an integer or out of range")
 		return
 	}
 	v, err := n.DecrBy(key, value)
 	if err != nil {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
-	w.WriteInteger(v)
+	conn.WriteInteger(v)
 }
 
-func incrByFloat(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func incrByFloat(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("INCRBYFLOAT requires at least two arguments")
+		conn.WriteError("INCRBYFLOAT requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
 	value, err := redis.FormatFloat64(cmd.Args[1], 0)
 	if err != nil {
-		w.WriteError("ERR value is not a valid float")
+		conn.WriteError("ERR value is not a valid float")
 		return
 	}
 	v, err := n.IncrByFloat(key, value)
 	if err != nil {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
-	w.WriteBulk(strconv.FormatFloat(v, 'f', -1, 64))
+	conn.WriteBulk(strconv.FormatFloat(v, 'f', -1, 64))
 }
 
-func getString(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func getString(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("GET requires at least one argument")
+		conn.WriteError("GET requires at least one argument")
 		return
 	}
 	v := n.Get(cmd.Args[0])
 	if v == nil {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
-	w.WriteBulk(string(v))
+	conn.WriteBulk(string(v))
 }
 
-func mGet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func mGet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("MGET requires at least one argument")
+		conn.WriteError("MGET requires at least one argument")
 		return
 	}
-	w.WriteArray(len(cmd.Args))
+	conn.WriteArray(len(cmd.Args))
 	for _, v := range cmd.Args {
 		value := n.Get(v)
 		if value == nil {
-			w.WriteNull()
+			conn.WriteNull()
 			continue
 		}
-		w.WriteBulk(string(value))
+		conn.WriteBulk(string(value))
 	}
 }
 
-func getRange(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func getRange(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("GETRANGE requires at least three arguments")
+		conn.WriteError("GETRANGE requires at least three arguments")
 		return
 	}
 	key := cmd.Args[0]
 	start, err := strconv.ParseInt(cmd.Args[1], 10, 64)
 	if err != nil {
-		w.WriteError("ERR start value is not an integer or out of range")
+		conn.WriteError("ERR start value is not an integer or out of range")
 		return
 	}
 	end, err := strconv.ParseInt(cmd.Args[2], 10, 64)
 	if err != nil {
-		w.WriteError("ERR end value is not an integer or out of range")
+		conn.WriteError("ERR end value is not an integer or out of range")
 		return
 	}
 	v := n.GetRange(key, start, end)
-	w.WriteBulk(string(v))
+	conn.WriteBulk(string(v))
 }
 
-func strLen(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func strLen(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("STRLEN requires at least one argument")
+		conn.WriteError("STRLEN requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
-	w.WriteInteger(n.StrLen(key))
+	conn.WriteInteger(n.StrLen(key))
 }
 
-func setBit(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func setBit(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("SETBIT requires at least three arguments")
+		conn.WriteError("SETBIT requires at least three arguments")
 		return
 	}
 	key := cmd.Args[0]
 	offset, err := strconv.ParseInt(cmd.Args[1], 10, 64)
 	if err != nil || offset < 0 {
-		w.WriteError("ERR offset value is not an integer or out of range")
+		conn.WriteError("ERR offset value is not an integer or out of range")
 		return
 	}
 	value, err := strconv.ParseInt(cmd.Args[2], 10, 64)
 	if err != nil || (value != 0 && value != 1) {
-		w.WriteError("ERR bit value is not a valid integer")
+		conn.WriteError("ERR bit value is not a valid integer")
 		return
 	}
-	w.WriteInteger(n.SetBit(key, offset, value == 1))
+	conn.WriteInteger(n.SetBit(key, offset, value == 1))
 }
 
-func getBit(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func getBit(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("GETBIT requires at least two arguments")
+		conn.WriteError("GETBIT requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
 	offset, err := strconv.ParseInt(cmd.Args[1], 10, 64)
 	if err != nil || offset < 0 {
-		w.WriteError("ERR offset value is not an integer or out of range")
+		conn.WriteError("ERR offset value is not an integer or out of range")
 		return
 	}
-	w.WriteInteger(n.GetBit(key, offset))
+	conn.WriteInteger(n.GetBit(key, offset))
 }
 
-func bitCount(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func bitCount(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("BITCOUNT requires at least one argument")
+		conn.WriteError("BITCOUNT requires at least one argument")
 		return
 	}
 	var err error
@@ -776,54 +776,54 @@ func bitCount(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) > 1 {
 		start, err = strconv.ParseInt(cmd.Args[1], 10, 64)
 		if err != nil {
-			w.WriteError("ERR start value is not an integer or out of range")
+			conn.WriteError("ERR start value is not an integer or out of range")
 			return
 		}
 	}
 	if len(cmd.Args) > 2 {
 		end, err = strconv.ParseInt(cmd.Args[2], 10, 64)
 		if err != nil {
-			w.WriteError("ERR end value is not an integer or out of range")
+			conn.WriteError("ERR end value is not an integer or out of range")
 			return
 		}
 	}
-	w.WriteInteger(n.BitCount(key, start, end, cmd.Options.BIT > 0))
+	conn.WriteInteger(n.BitCount(key, start, end, cmd.Options.BIT > 0))
 }
 
-func sAdd(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func sAdd(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("SADD requires at least two arguments")
+		conn.WriteError("SADD requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
-	w.WriteInteger(n.SAdd(key, cmd.Args[1:]...))
+	conn.WriteInteger(n.SAdd(key, cmd.Args[1:]...))
 }
 
-func sMove(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func sMove(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("SMOVE requires at least three arguments")
+		conn.WriteError("SMOVE requires at least three arguments")
 		return
 	}
 	src := cmd.Args[0]
 	dst := cmd.Args[1]
 	member := cmd.Args[2]
 	if n.SMove(src, dst, member) {
-		w.WriteInteger(1)
+		conn.WriteInteger(1)
 		return
 	}
-	w.WriteInteger(0)
+	conn.WriteInteger(0)
 }
 
 // SSCAN key cursor [MATCH pattern] [COUNT count]
-func sScan(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func sScan(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 1 {
-		w.WriteError("SSCAN requires at least one argument")
+		conn.WriteError("SSCAN requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
 	cursor, err := strconv.ParseInt(cmd.Args[1], 10, 64)
 	if err != nil {
-		w.WriteError("ERR value is not an integer or out of range")
+		conn.WriteError("ERR value is not an integer or out of range")
 		return
 	}
 	var match = "*"
@@ -835,17 +835,17 @@ func sScan(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		count, _ = strconv.ParseInt(cmd.Args[cmd.Options.COUNT], 10, 64)
 	}
 	cursor, keys := n.SScan(key, cursor, match, count)
-	w.WriteArray(2)
-	w.WriteBulk(strconv.FormatInt(cursor, 10))
-	w.WriteArray(len(keys))
+	conn.WriteArray(2)
+	conn.WriteBulk(strconv.FormatInt(cursor, 10))
+	conn.WriteArray(len(keys))
 	for _, v := range keys {
-		w.WriteBulk(v)
+		conn.WriteBulk(v)
 	}
 }
 
-func sPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func sPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 1 {
-		w.WriteError("SPOP requires at least one argument")
+		conn.WriteError("SPOP requires at least one argument")
 		return
 	}
 	var err error
@@ -854,121 +854,121 @@ func sPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) > 1 {
 		count, err = strconv.ParseInt(cmd.Args[1], 10, 64)
 		if err != nil {
-			w.WriteError("ERR value is not an integer or out of range")
+			conn.WriteError("ERR value is not an integer or out of range")
 			return
 		}
 	}
 	results := n.SPop(key, count)
 	if results == nil {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
 	if len(results) == 0 {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
 	if len(cmd.Args) <= 1 {
-		w.WriteBulk(results[0])
+		conn.WriteBulk(results[0])
 		return
 	}
-	w.WriteArray(len(results))
+	conn.WriteArray(len(results))
 	for _, v := range results {
-		w.WriteBulk(v)
+		conn.WriteBulk(v)
 	}
 }
 
-func scard(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func scard(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("SCARD requires at least one argument")
+		conn.WriteError("SCARD requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
-	w.WriteInteger(n.SCard(key))
+	conn.WriteInteger(n.SCard(key))
 }
 
-func sDiff(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func sDiff(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("SDIFF requires at least two arguments")
+		conn.WriteError("SDIFF requires at least two arguments")
 		return
 	}
 	results := n.SDiff(cmd.Args...)
-	w.WriteArray(len(results))
+	conn.WriteArray(len(results))
 	for _, v := range results {
-		w.WriteBulk(v)
+		conn.WriteBulk(v)
 	}
 }
 
-func sDiffStore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func sDiffStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("SDIFFSTORE requires at least two arguments")
+		conn.WriteError("SDIFFSTORE requires at least two arguments")
 		return
 	}
 	dst := cmd.Args[0]
 	keys := cmd.Args[1:]
 	if n.Exists(keys...) != int64(len(keys)) {
-		w.WriteInteger(0)
+		conn.WriteInteger(0)
 		return
 	}
 	results := n.SDiffStore(dst, keys...)
-	w.WriteInteger(results)
+	conn.WriteInteger(results)
 }
 
-func sInter(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func sInter(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("SINTER requires at least two arguments")
+		conn.WriteError("SINTER requires at least two arguments")
 		return
 	}
 	results := n.SInter(cmd.Args...)
-	w.WriteArray(len(results))
+	conn.WriteArray(len(results))
 	for _, v := range results {
-		w.WriteBulk(v)
+		conn.WriteBulk(v)
 	}
 }
 
-func sInterStore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func sInterStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("SINTERSTORE requires at least two arguments")
+		conn.WriteError("SINTERSTORE requires at least two arguments")
 		return
 	}
 	dst := cmd.Args[0]
 	keys := cmd.Args[1:]
 	if n.Exists(keys...) != int64(len(keys)) {
-		w.WriteInteger(0)
+		conn.WriteInteger(0)
 		return
 	}
 	results := n.SInterStore(dst, keys...)
-	w.WriteInteger(results)
+	conn.WriteInteger(results)
 }
 
-func sUnion(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func sUnion(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("SUNION requires at least two arguments")
+		conn.WriteError("SUNION requires at least two arguments")
 		return
 	}
 	results := n.SUnion(cmd.Args...)
-	w.WriteArray(len(results))
+	conn.WriteArray(len(results))
 	for _, v := range results {
-		w.WriteBulk(v)
+		conn.WriteBulk(v)
 	}
 }
 
-func sUnionStore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func sUnionStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("SUNIONSTORE requires at least two arguments")
+		conn.WriteError("SUNIONSTORE requires at least two arguments")
 		return
 	}
 	dst := cmd.Args[0]
 	keys := cmd.Args[1:]
 	if n.Exists(keys...) == 0 {
-		w.WriteInteger(0)
+		conn.WriteInteger(0)
 		return
 	}
 	results := n.SUnionStore(dst, keys...)
-	w.WriteInteger(results)
+	conn.WriteInteger(results)
 }
-func sIsMember(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func sIsMember(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("SISMEMBER requires at least two arguments")
+		conn.WriteError("SISMEMBER requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
@@ -978,25 +978,25 @@ func sIsMember(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if is {
 		r = 1
 	}
-	w.WriteInteger(r)
+	conn.WriteInteger(r)
 }
 
-func sMembers(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func sMembers(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("SMEMBERS requires at least one argument")
+		conn.WriteError("SMEMBERS requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
 	results := n.SMembers(key)
-	w.WriteArray(len(results))
+	conn.WriteArray(len(results))
 	for _, v := range results {
-		w.WriteBulk(v)
+		conn.WriteBulk(v)
 	}
 }
 
-func sRandMember(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func sRandMember(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("SRANDMEMBER requires at least one argument")
+		conn.WriteError("SRANDMEMBER requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
@@ -1005,37 +1005,37 @@ func sRandMember(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		var err error
 		count, err = strconv.ParseInt(cmd.Args[1], 10, 64)
 		if err != nil {
-			w.WriteError("ERR value is not an integer or out of range")
+			conn.WriteError("ERR value is not an integer or out of range")
 			return
 		}
 	}
 	results := n.SRandMember(key, count)
 	if len(results) == 0 {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
 	if count == 1 {
-		w.WriteBulk(results[0])
+		conn.WriteBulk(results[0])
 		return
 	}
-	w.WriteArray(len(results))
+	conn.WriteArray(len(results))
 	for _, v := range results {
-		w.WriteBulk(v)
+		conn.WriteBulk(v)
 	}
 }
 
-func sRem(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func sRem(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("SREM requires at least two arguments")
+		conn.WriteError("SREM requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
-	w.WriteInteger(n.SRem(key, cmd.Args[1:]...))
+	conn.WriteInteger(n.SRem(key, cmd.Args[1:]...))
 }
 
-func hSet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func hSet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("HSET requires at least three arguments")
+		conn.WriteError("HSET requires at least three arguments")
 		return
 	}
 	key := cmd.Args[0]
@@ -1052,58 +1052,58 @@ func hSet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		}
 		i += n.HMSet(key, fields)
 	}
-	w.WriteInteger(i)
+	conn.WriteInteger(i)
 }
 
-func hGet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func hGet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("HGET requires at least two arguments")
+		conn.WriteError("HGET requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
 	field := cmd.Args[1]
 	v := string(n.HGet(key, field))
 	if v == "" {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
-	w.WriteBulk(v)
+	conn.WriteBulk(v)
 }
 
-func hDel(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func hDel(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("HDEL requires at least two arguments")
+		conn.WriteError("HDEL requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
-	w.WriteInteger(n.HDel(key, cmd.Args[1:]...))
+	conn.WriteInteger(n.HDel(key, cmd.Args[1:]...))
 }
 
-func hLen(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func hLen(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("HLEN requires at least one argument")
+		conn.WriteError("HLEN requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
-	w.WriteInteger(n.HLen(key))
+	conn.WriteInteger(n.HLen(key))
 }
 
-func hKeys(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func hKeys(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("HKEYS requires at least one argument")
+		conn.WriteError("HKEYS requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
 	results := n.HKeys(key)
-	w.WriteArray(len(results))
+	conn.WriteArray(len(results))
 	for _, v := range results {
-		w.WriteBulk(v)
+		conn.WriteBulk(v)
 	}
 }
 
-func hExists(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func hExists(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("HEXISTS requires at least two arguments")
+		conn.WriteError("HEXISTS requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
@@ -1113,96 +1113,96 @@ func hExists(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if is {
 		r = 1
 	}
-	w.WriteInteger(r)
+	conn.WriteInteger(r)
 }
 
-func hGetAll(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func hGetAll(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("HGETALL requires at least one argument")
+		conn.WriteError("HGETALL requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
 	results := n.HGetAll(key)
-	w.WriteArray(len(results) * 2)
+	conn.WriteArray(len(results) * 2)
 	for k, v := range results {
-		w.WriteBulk(string(k))
-		w.WriteBulk(string(v))
+		conn.WriteBulk(string(k))
+		conn.WriteBulk(string(v))
 	}
 }
 
-func hIncrBy(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func hIncrBy(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("HINCRBY requires at least three arguments")
+		conn.WriteError("HINCRBY requires at least three arguments")
 		return
 	}
 	key := cmd.Args[0]
 	field := cmd.Args[1]
 	value, err := strconv.ParseInt(cmd.Args[2], 10, 64)
 	if err != nil {
-		w.WriteError("ERR value is not an integer or out of range")
+		conn.WriteError("ERR value is not an integer or out of range")
 		return
 	}
 	v, err := n.HIncrBy(key, field, value)
 	if err != nil {
-		w.WriteError(err.Error())
+		conn.WriteError(err.Error())
 		return
 	}
-	w.WriteInteger(v)
+	conn.WriteInteger(v)
 }
 
-func hIncrByFloat(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func hIncrByFloat(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("HINCRBYFLOAT requires at least three arguments")
+		conn.WriteError("HINCRBYFLOAT requires at least three arguments")
 		return
 	}
 	key := cmd.Args[0]
 	field := cmd.Args[1]
 	value, err := redis.FormatFloat64(cmd.Args[2], 0)
 	if err != nil {
-		w.WriteError("ERR value is not a valid float")
+		conn.WriteError("ERR value is not a valid float")
 		return
 	}
 	v, err := n.HIncrByFloat(key, field, value)
 	if err != nil {
-		w.WriteError(err.Error())
+		conn.WriteError(err.Error())
 		return
 	}
 	f := strconv.FormatFloat(v, 'f', -1, 64)
-	w.WriteBulk(f)
+	conn.WriteBulk(f)
 }
 
-func hSetNX(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func hSetNX(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("HSETNX requires at least three arguments")
+		conn.WriteError("HSETNX requires at least three arguments")
 		return
 	}
 	key := cmd.Args[0]
 	field := cmd.Args[1]
 	value := cmd.Args[2]
-	w.WriteInteger(n.HSetNX(key, field, []byte(value)))
+	conn.WriteInteger(n.HSetNX(key, field, []byte(value)))
 }
 
-func hMGet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func hMGet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("HMGET requires at least two arguments")
+		conn.WriteError("HMGET requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
 	fields := cmd.Args[1:]
 	results := n.HMGet(key, fields...)
-	w.WriteArray(len(results))
+	conn.WriteArray(len(results))
 	for _, v := range results {
 		if v == nil {
-			w.WriteNull()
+			conn.WriteNull()
 		} else {
-			w.WriteBulk(string(v))
+			conn.WriteBulk(string(v))
 		}
 	}
 }
 
-func hMSet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func hMSet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("HMSET requires at least three arguments")
+		conn.WriteError("HMSET requires at least three arguments")
 		return
 	}
 	key := cmd.Args[0]
@@ -1214,22 +1214,22 @@ func hMSet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		fields[cmd.Args[i]] = []byte(cmd.Args[i+1])
 	}
 	n.HMSet(key, fields)
-	w.WriteString("OK")
+	conn.WriteString("OK")
 }
 
-func hClear(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func hClear(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("HCLEAR requires at least one argument")
+		conn.WriteError("HCLEAR requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
 	n.HClear(key)
-	w.WriteString("OK")
+	conn.WriteString("OK")
 }
 
-func hScan(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func hScan(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("HSCAN requires at least one argument")
+		conn.WriteError("HSCAN requires at least one argument")
 		return
 	}
 	var err error
@@ -1243,36 +1243,36 @@ func hScan(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if cmd.Options.COUNT > 0 {
 		count, err = strconv.ParseInt(cmd.Args[cmd.Options.COUNT], 10, 64)
 		if err != nil {
-			w.WriteError("ERR value is not an integer or out of range")
+			conn.WriteError("ERR value is not an integer or out of range")
 			return
 		}
 	}
 	_, results := n.HScan(key, cursor, match, count)
-	w.WriteArray(2)
-	w.WriteBulk(strconv.FormatInt(cursor, 10))
-	w.WriteArray(len(results) * 2)
+	conn.WriteArray(2)
+	conn.WriteBulk(strconv.FormatInt(cursor, 10))
+	conn.WriteArray(len(results) * 2)
 	for k, v := range results {
-		w.WriteBulk(k)
-		w.WriteBulk(string(v))
+		conn.WriteBulk(k)
+		conn.WriteBulk(string(v))
 	}
 }
 
-func hVals(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func hVals(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("HVALS requires at least one argument")
+		conn.WriteError("HVALS requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
 	results := n.HVals(key)
-	w.WriteArray(len(results))
+	conn.WriteArray(len(results))
 	for _, v := range results {
-		w.WriteBulk(string(v))
+		conn.WriteBulk(string(v))
 	}
 }
 
-func lPush(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func lPush(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("LPUSH requires at least two arguments")
+		conn.WriteError("LPUSH requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
@@ -1280,12 +1280,12 @@ func lPush(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	for i := 1; i < len(cmd.Args); i++ {
 		values = append(values, []byte(cmd.Args[i]))
 	}
-	w.WriteInteger(n.LPush(key, values...))
+	conn.WriteInteger(n.LPush(key, values...))
 }
 
-func rPush(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func rPush(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("RPUSH requires at least two arguments")
+		conn.WriteError("RPUSH requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
@@ -1294,12 +1294,12 @@ func rPush(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		values = append(values, []byte(cmd.Args[i]))
 	}
 
-	w.WriteInteger(n.RPush(key, values...))
+	conn.WriteInteger(n.RPush(key, values...))
 }
 
-func lPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func lPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("LPOP requires at least one argument")
+		conn.WriteError("LPOP requires at least one argument")
 		return
 	}
 	var err error
@@ -1308,28 +1308,28 @@ func lPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) > 1 {
 		count, err = strconv.ParseInt(cmd.Args[1], 10, 64)
 		if err != nil {
-			w.WriteError("ERR value is not an integer or out of range")
+			conn.WriteError("ERR value is not an integer or out of range")
 			return
 		}
 	}
 	v := n.LPop(key, count)
 	if v == nil {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
 	if count == 1 {
-		w.WriteBulk(string(v[0]))
+		conn.WriteBulk(string(v[0]))
 		return
 	}
-	w.WriteArray(len(v))
+	conn.WriteArray(len(v))
 	for _, vv := range v {
-		w.WriteBulk(string(vv))
+		conn.WriteBulk(string(vv))
 	}
 }
 
-func rPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func rPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("RPOP requires at least one argument")
+		conn.WriteError("RPOP requires at least one argument")
 		return
 	}
 	var err error
@@ -1338,193 +1338,193 @@ func rPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if len(cmd.Args) > 1 {
 		count, err = strconv.ParseInt(cmd.Args[1], 10, 64)
 		if err != nil {
-			w.WriteError("ERR value is not an integer or out of range")
+			conn.WriteError("ERR value is not an integer or out of range")
 			return
 		}
 	}
 	v := n.RPop(key, count)
 	if v == nil {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
 	if count == 1 {
-		w.WriteBulk(string(v[0]))
+		conn.WriteBulk(string(v[0]))
 		return
 	}
-	w.WriteArray(len(v))
+	conn.WriteArray(len(v))
 	for _, vv := range v {
-		w.WriteBulk(string(vv))
+		conn.WriteBulk(string(vv))
 	}
 }
 
-func llen(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func llen(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("LLEN requires at least one argument")
+		conn.WriteError("LLEN requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
 	v := n.LLen(key)
 	if v == -1 {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
-	w.WriteInteger(v)
+	conn.WriteInteger(v)
 }
 
-func lIndex(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func lIndex(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("LINDEX requires at least two arguments")
+		conn.WriteError("LINDEX requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
 	index, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
 	v := n.LIndex(key, index)
 	if v == nil {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
-	w.WriteBulk(string(v))
+	conn.WriteBulk(string(v))
 }
 
-func lInsert(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func lInsert(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 4 {
-		w.WriteError("LINSERT requires at least four arguments")
+		conn.WriteError("LINSERT requires at least four arguments")
 		return
 	}
 	key := cmd.Args[0]
 	before := utils.ToUpper(cmd.Args[1]) == "BEFORE"
 	pivot := []byte(cmd.Args[2])
 	value := []byte(cmd.Args[3])
-	w.WriteInteger(n.LInsert(key, pivot, value, before))
+	conn.WriteInteger(n.LInsert(key, pivot, value, before))
 }
 
-func lPushx(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func lPushx(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("LPUSHX requires at least two arguments")
+		conn.WriteError("LPUSHX requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
 	value := []byte(cmd.Args[1])
-	w.WriteInteger(n.LPushX(key, value))
+	conn.WriteInteger(n.LPushX(key, value))
 }
 
-func rPushx(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func rPushx(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("RPUSHX requires at least two arguments")
+		conn.WriteError("RPUSHX requires at least two arguments")
 	}
 	key := cmd.Args[0]
 	value := []byte(cmd.Args[1])
-	w.WriteInteger(n.RPushX(key, value))
+	conn.WriteInteger(n.RPushX(key, value))
 }
 
-func lRem(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func lRem(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("LREM requires at least two arguments")
+		conn.WriteError("LREM requires at least two arguments")
 		return
 	}
 	var err error
 	key := cmd.Args[0]
 	count, err := strconv.ParseInt(cmd.Args[1], 10, 64)
 	if err != nil {
-		w.WriteError("ERR value is not an integer or out of range")
+		conn.WriteError("ERR value is not an integer or out of range")
 		return
 	}
 	value := []byte(cmd.Args[2])
-	w.WriteInteger(n.LRem(key, value, count))
+	conn.WriteInteger(n.LRem(key, value, count))
 }
 
-func lTrim(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func lTrim(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("LTRIM requires at least two arguments")
+		conn.WriteError("LTRIM requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
 	start, err := strconv.ParseInt(cmd.Args[1], 10, 64)
 	if err != nil {
-		w.WriteError("ERR start value is not an integer or out of range")
+		conn.WriteError("ERR start value is not an integer or out of range")
 		return
 	}
 	end, err := strconv.ParseInt(cmd.Args[2], 10, 64)
 	if err != nil {
-		w.WriteError("ERR end value is not an integer or out of range")
+		conn.WriteError("ERR end value is not an integer or out of range")
 		return
 	}
 	n.LTrim(key, start, end)
-	w.WriteString("OK")
+	conn.WriteString("OK")
 }
 
-func lSet(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func lSet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("LSET requires at least three arguments")
+		conn.WriteError("LSET requires at least three arguments")
 		return
 	}
 	key := cmd.Args[0]
 	index, err := strconv.ParseInt(cmd.Args[1], 10, 64)
 	if err != nil {
-		w.WriteError("ERR value is not an integer or out of range")
+		conn.WriteError("ERR value is not an integer or out of range")
 		return
 	}
 	value := []byte(cmd.Args[2])
 	n.LSet(key, index, value)
-	w.WriteString("OK")
+	conn.WriteString("OK")
 }
 
-func lRange(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func lRange(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("LRANGE requires at least two arguments")
+		conn.WriteError("LRANGE requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
 	start, err := strconv.ParseInt(cmd.Args[1], 10, 64)
 	if err != nil {
-		w.WriteError("ERR value is not an integer or out of range")
+		conn.WriteError("ERR value is not an integer or out of range")
 		return
 	}
 	end, err := strconv.ParseInt(cmd.Args[2], 10, 64)
 	if err != nil {
-		w.WriteError("ERR value is not an integer or out of range")
+		conn.WriteError("ERR value is not an integer or out of range")
 		return
 	}
 	results := n.LRange(key, start, end)
-	w.WriteArray(len(results))
+	conn.WriteArray(len(results))
 	for _, v := range results {
-		w.WriteBulk(string(v))
+		conn.WriteBulk(string(v))
 	}
 }
 
-func lPopRPush(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func lPopRPush(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("LPOPRPUSH requires at least two arguments")
+		conn.WriteError("LPOPRPUSH requires at least two arguments")
 		return
 	}
 	source := cmd.Args[0]
 	destination := cmd.Args[1]
 	v := n.LPopRPush(source, destination)
 	if v == nil {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
-	w.WriteBulk(string(v))
+	conn.WriteBulk(string(v))
 }
 
-func rPopLPush(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func rPopLPush(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("RPOPLPUSH requires at least two arguments")
+		conn.WriteError("RPOPLPUSH requires at least two arguments")
 		return
 	}
 	source := cmd.Args[0]
 	destination := cmd.Args[1]
 	v := n.RPopLPush(source, destination)
 	if v == nil {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
-	w.WriteBulk(string(v))
+	conn.WriteBulk(string(v))
 }
 
-func bLPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func bLPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("BLPOP requires at least two arguments")
+		conn.WriteError("BLPOP requires at least two arguments")
 		return
 	}
 	keys := make([]string, 0, len(cmd.Args)-1)
@@ -1533,22 +1533,22 @@ func bLPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	}
 	timeout, err := strconv.ParseInt(cmd.Args[len(cmd.Args)-1], 10, 64)
 	if err != nil {
-		w.WriteError("ERR timeout value is not an integer or out of range")
+		conn.WriteError("ERR timeout value is not an integer or out of range")
 		return
 	}
 	k, v := n.BLPop(time.Duration(timeout)*time.Second, keys...)
 	if k == "" {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
-	w.WriteArray(2)
-	w.WriteBulk(k)
-	w.WriteBulk(string(v))
+	conn.WriteArray(2)
+	conn.WriteBulk(k)
+	conn.WriteBulk(string(v))
 }
 
-func bRPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func bRPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("BRPOP requires at least two arguments")
+		conn.WriteError("BRPOP requires at least two arguments")
 		return
 	}
 	keys := make([]string, 0, len(cmd.Args)-1)
@@ -1557,28 +1557,28 @@ func bRPop(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	}
 	timeout, err := strconv.ParseInt(cmd.Args[len(cmd.Args)-1], 10, 64)
 	if err != nil {
-		w.WriteError("ERR timeout value is not an integer or out of range")
+		conn.WriteError("ERR timeout value is not an integer or out of range")
 		return
 	}
 	k, v := n.BRPop(time.Duration(timeout)*time.Second, keys...)
 	if k == "" {
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
-	w.WriteArray(2)
-	w.WriteBulk(k)
-	w.WriteBulk(string(v))
+	conn.WriteArray(2)
+	conn.WriteBulk(k)
+	conn.WriteBulk(string(v))
 }
 
 // ZADD key [NX | XX] [GT | LT] [CH] [INCR] score member [score member   ...]
-func zAdd(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func zAdd(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("ZADD requires at least three arguments")
+		conn.WriteError("ZADD requires at least three arguments")
 		return
 	}
 	itemStart := max(cmd.Options.NX, cmd.Options.XX, cmd.Options.LT, cmd.Options.GT, cmd.Options.CH, cmd.Options.INCR)
 	if itemStart+1 > len(cmd.Args) {
-		w.WriteError("ZADD requires at least one score-member pair")
+		conn.WriteError("ZADD requires at least one score-member pair")
 		return
 	}
 	itemStart++
@@ -1590,49 +1590,49 @@ func zAdd(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		}
 		score, err := strconv.ParseFloat(cmd.Args[i], 64)
 		if err != nil {
-			w.WriteError("ERR score value is not a valid float")
+			conn.WriteError("ERR score value is not a valid float")
 			return
 		}
 		member := cmd.Args[i+1]
 		if cmd.Options.INCR > 0 {
 			score = n.ZIncrBy(key, member, score)
-			w.WriteBulk(strconv.FormatFloat(score, 'f', -1, 64))
+			conn.WriteBulk(strconv.FormatFloat(score, 'f', -1, 64))
 			return
 		}
 		if cmd.Options.XX > 0 {
-			w.WriteInteger(n.ZAddXX(key, member, score))
+			conn.WriteInteger(n.ZAddXX(key, member, score))
 			return
 		}
 		if cmd.Options.NX > 0 {
-			w.WriteInteger(n.ZAddNX(key, member, score))
+			conn.WriteInteger(n.ZAddNX(key, member, score))
 			return
 		}
 		if cmd.Options.LT > 0 {
-			w.WriteInteger(n.ZAddLT(key, member, score))
+			conn.WriteInteger(n.ZAddLT(key, member, score))
 			return
 		}
 		if cmd.Options.GT > 0 {
-			w.WriteInteger(n.ZAddGT(key, member, score))
+			conn.WriteInteger(n.ZAddGT(key, member, score))
 			return
 		}
 		count += n.ZAdd(key, member, score)
 	}
-	w.WriteInteger(count)
+	conn.WriteInteger(count)
 }
 
-func zCard(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func zCard(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("ZCARD requires at least one argument")
+		conn.WriteError("ZCARD requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
-	w.WriteInteger(n.ZCard(key))
+	conn.WriteInteger(n.ZCard(key))
 }
 
 // ZRANK key member [WITHSCORE]
-func zRank(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func zRank(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("ZRANK requires at least two argument")
+		conn.WriteError("ZRANK requires at least two argument")
 		return
 	}
 	key := cmd.Args[0]
@@ -1640,20 +1640,20 @@ func zRank(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if cmd.Options.WITHSCORES > 0 {
 		rank, el := n.ZRankWithScore(key, member)
 		if el != nil {
-			w.WriteArray(2)
-			w.WriteInteger(rank)
-			w.WriteBulk(el.Member)
+			conn.WriteArray(2)
+			conn.WriteInteger(rank)
+			conn.WriteBulk(el.Member)
 			return
 		}
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
-	w.WriteInteger(n.ZRank(key, member))
+	conn.WriteInteger(n.ZRank(key, member))
 }
 
-func zRevRank(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func zRevRank(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("ZREVRANK requires at least two argument")
+		conn.WriteError("ZREVRANK requires at least two argument")
 		return
 	}
 	key := cmd.Args[0]
@@ -1661,47 +1661,47 @@ func zRevRank(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if cmd.Options.WITHSCORES > 0 {
 		rank, el := n.ZRevRankWithScore(key, member)
 		if el != nil {
-			w.WriteArray(2)
-			w.WriteInteger(rank)
-			w.WriteBulk(el.Member)
+			conn.WriteArray(2)
+			conn.WriteInteger(rank)
+			conn.WriteBulk(el.Member)
 			return
 		}
-		w.WriteNull()
+		conn.WriteNull()
 		return
 	}
-	w.WriteInteger(n.ZRevRank(key, member))
+	conn.WriteInteger(n.ZRevRank(key, member))
 }
 
-func zScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func zScore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("ZSCORE requires at least two argument")
+		conn.WriteError("ZSCORE requires at least two argument")
 		return
 	}
 	key := cmd.Args[0]
 	member := cmd.Args[1]
 	score := n.ZScore(key, member)
-	w.WriteBulk(strconv.FormatFloat(score, 'f', -1, 64))
+	conn.WriteBulk(strconv.FormatFloat(score, 'f', -1, 64))
 }
 
-func zIncrBy(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func zIncrBy(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("ZINCRBY requires at least three arguments")
+		conn.WriteError("ZINCRBY requires at least three arguments")
 		return
 	}
 	key := cmd.Args[0]
 	score, err := redis.FormatFloat64(cmd.Args[1], 0)
 	if err != nil {
-		w.WriteError("ERR score value is not a valid float")
+		conn.WriteError("ERR score value is not a valid float")
 		return
 	}
 	member := cmd.Args[2]
 	v := n.ZIncrBy(key, member, score)
-	w.WriteBulk(strconv.FormatFloat(v, 'f', -1, 64))
+	conn.WriteBulk(strconv.FormatFloat(v, 'f', -1, 64))
 }
 
-func zRange(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func zRange(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("ZRANGE requires at least three arguments")
+		conn.WriteError("ZRANGE requires at least three arguments")
 		return
 	}
 	key := cmd.Args[0]
@@ -1718,7 +1718,7 @@ func zRange(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 			min, err = redis.FormatFloat64(cmd.Args[1], n.ZMin(key).Score)
 		}
 		if err != nil {
-			w.WriteError("ERR start value is not an integer or out of range")
+			conn.WriteError("ERR start value is not an integer or out of range")
 			return
 		}
 		if cmd.Args[2][0] == '(' {
@@ -1730,134 +1730,134 @@ func zRange(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 			max, err = redis.FormatFloat64(cmd.Args[2], n.ZMax(key).Score)
 		}
 		if err != nil {
-			w.WriteError("ERR stop value is not an integer or out of range")
+			conn.WriteError("ERR stop value is not an integer or out of range")
 			return
 		}
 		var offset, count int64 = 0, -1
 		if cmd.Options.LIMIT > 0 {
 			offset, err = strconv.ParseInt(cmd.Args[cmd.Options.LIMIT], 10, 64)
 			if err != nil {
-				w.WriteError("ERR offset value is not an integer or out of range")
+				conn.WriteError("ERR offset value is not an integer or out of range")
 				return
 			}
 			count, err = strconv.ParseInt(cmd.Args[cmd.Options.LIMIT+1], 10, 64)
 			if err != nil {
-				w.WriteError("ERR count value is not an integer or out of range")
+				conn.WriteError("ERR count value is not an integer or out of range")
 				return
 			}
 		}
 		if cmd.Options.WITHSCORES > 0 {
 			if cmd.Options.REV > 0 {
 				results := n.ZRevRangeByScoreWithScores(key, min, max, offset, count, mode)
-				w.WriteArray(len(results) * 2)
+				conn.WriteArray(len(results) * 2)
 				for _, v := range results {
-					w.WriteBulk(v.Member)
-					w.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
+					conn.WriteBulk(v.Member)
+					conn.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
 				}
 				return
 			}
 			results := n.ZRangeByScoreWithScores(key, min, max, offset, count, mode)
-			w.WriteArray(len(results) * 2)
+			conn.WriteArray(len(results) * 2)
 			for _, v := range results {
-				w.WriteBulk(v.Member)
-				w.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
+				conn.WriteBulk(v.Member)
+				conn.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
 			}
 			return
 		}
 		if cmd.Options.REV > 0 {
 			results := n.ZRevRangeByScore(key, min, max, offset, count, mode)
-			w.WriteArray(len(results))
+			conn.WriteArray(len(results))
 			for _, v := range results {
-				w.WriteBulk(v)
+				conn.WriteBulk(v)
 			}
 			return
 		}
 		results := n.ZRangeByScore(key, min, max, offset, count, mode)
-		w.WriteArray(len(results))
+		conn.WriteArray(len(results))
 		for _, v := range results {
-			w.WriteBulk(v)
+			conn.WriteBulk(v)
 		}
 		return
 	}
 	start, err := strconv.ParseInt(cmd.Args[1], 10, 64)
 	if err != nil {
-		w.WriteError("ERR start value is not an integer or out of range")
+		conn.WriteError("ERR start value is not an integer or out of range")
 		return
 	}
 	stop, err := strconv.ParseInt(cmd.Args[2], 10, 64)
 	if err != nil {
-		w.WriteError("ERR stop value is not an integer or out of range")
+		conn.WriteError("ERR stop value is not an integer or out of range")
 		return
 	}
 	if cmd.Options.WITHSCORES > 0 {
 		if cmd.Options.REV > 0 {
 			results := n.ZRevRangeWithScores(key, start, stop)
-			w.WriteArray(len(results) * 2)
+			conn.WriteArray(len(results) * 2)
 			for _, v := range results {
-				w.WriteBulk(v.Member)
-				w.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
+				conn.WriteBulk(v.Member)
+				conn.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
 			}
 			return
 		}
 		results := n.ZRangeWithScores(key, start, stop)
-		w.WriteArray(len(results) * 2)
+		conn.WriteArray(len(results) * 2)
 		for _, v := range results {
-			w.WriteBulk(v.Member)
-			w.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
+			conn.WriteBulk(v.Member)
+			conn.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
 		}
 		return
 	}
 	if cmd.Options.REV > 0 {
 		results := n.ZRevRange(key, start, stop)
-		w.WriteArray(len(results))
+		conn.WriteArray(len(results))
 		for _, v := range results {
-			w.WriteBulk(v)
+			conn.WriteBulk(v)
 		}
 		return
 	}
 	results := n.ZRange(key, start, stop)
-	w.WriteArray(len(results))
+	conn.WriteArray(len(results))
 	for _, v := range results {
-		w.WriteBulk(v)
+		conn.WriteBulk(v)
 	}
 }
 
-func zRevRange(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func zRevRange(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("ZREVRANGE requires at least three arguments")
+		conn.WriteError("ZREVRANGE requires at least three arguments")
 		return
 	}
 	key := cmd.Args[0]
 	start, err := strconv.ParseInt(cmd.Args[1], 10, 64)
 	if err != nil {
-		w.WriteError("ERR start value is not an integer or out of range")
+		conn.WriteError("ERR start value is not an integer or out of range")
 		return
 	}
 	stop, err := strconv.ParseInt(cmd.Args[2], 10, 64)
 	if err != nil {
-		w.WriteError("ERR stop value is not an integer or out of range")
+		conn.WriteError("ERR stop value is not an integer or out of range")
 		return
 	}
 	if cmd.Options.WITHSCORES > 0 {
 		results := n.ZRevRangeWithScores(key, start, stop)
-		w.WriteArray(len(results) * 2)
+		conn.WriteArray(len(results) * 2)
 		for _, v := range results {
-			w.WriteBulk(v.Member)
-			w.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
+			conn.WriteBulk(v.Member)
+			conn.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
 		}
 		return
 	}
 	results := n.ZRevRange(key, start, stop)
-	w.WriteArray(len(results))
+	conn.WriteArray(len(results))
 	for _, v := range results {
-		w.WriteBulk(v)
+		conn.WriteBulk(v)
 	}
 }
 
 // ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
-func zRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func zRangeByScore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("ZRANGEBYSCORE requires at least three arguments")
+		conn.WriteError("ZRANGEBYSCORE requires at least three arguments")
 		return
 	}
 	var mode = 0
@@ -1867,7 +1867,7 @@ func zRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	}
 	min, err := redis.FormatFloat64(cmd.Args[1], n.ZMin(key).Score)
 	if err != nil {
-		w.WriteError("ERR min value is not a valid float")
+		conn.WriteError("ERR min value is not a valid float")
 		return
 	}
 	if cmd.Args[2][0] == '(' {
@@ -1875,42 +1875,42 @@ func zRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	}
 	max, err := redis.FormatFloat64(cmd.Args[2], n.ZMax(key).Score)
 	if err != nil {
-		w.WriteError("ERR max value is not a valid float")
+		conn.WriteError("ERR max value is not a valid float")
 		return
 	}
 	var offset, count int64 = 0, -1
 	if cmd.Options.LIMIT > 0 {
 		offset, err = strconv.ParseInt(cmd.Args[cmd.Options.LIMIT], 10, 64)
 		if err != nil {
-			w.WriteError("ERR offset value is not an integer or out of range")
+			conn.WriteError("ERR offset value is not an integer or out of range")
 			return
 		}
 		count, err = strconv.ParseInt(cmd.Args[cmd.Options.LIMIT+1], 10, 64)
 		if err != nil {
-			w.WriteError("ERR count value is not an integer or out of range")
+			conn.WriteError("ERR count value is not an integer or out of range")
 			return
 		}
 	}
 	if cmd.Options.WITHSCORES > 0 {
 		results := n.ZRangeByScoreWithScores(key, min, max, offset, count, mode)
-		w.WriteArray(len(results) * 2)
+		conn.WriteArray(len(results) * 2)
 		for _, v := range results {
-			w.WriteBulk(v.Member)
-			w.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
+			conn.WriteBulk(v.Member)
+			conn.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
 		}
 		return
 
 	}
 	results := n.ZRangeByScore(key, min, max, offset, count, mode)
-	w.WriteArray(len(results))
+	conn.WriteArray(len(results))
 	for _, v := range results {
-		w.WriteBulk(v)
+		conn.WriteBulk(v)
 	}
 }
 
-func zRevRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func zRevRangeByScore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("ZREVRANGEBYSCORE requires at least three arguments")
+		conn.WriteError("ZREVRANGEBYSCORE requires at least three arguments")
 		return
 	}
 	key := cmd.Args[0]
@@ -1920,7 +1920,7 @@ func zRevRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	}
 	min, err := redis.FormatFloat64(cmd.Args[2], n.ZMin(key).Score)
 	if err != nil {
-		w.WriteError("ERR min value is not a valid float")
+		conn.WriteError("ERR min value is not a valid float")
 		return
 	}
 	if cmd.Args[1][0] == '(' {
@@ -1928,41 +1928,41 @@ func zRevRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	}
 	max, err := redis.FormatFloat64(cmd.Args[1], n.ZMax(key).Score)
 	if err != nil {
-		w.WriteError("ERR max value is not a valid float")
+		conn.WriteError("ERR max value is not a valid float")
 		return
 	}
 	var offset, count int64 = 0, -1
 	if cmd.Options.LIMIT > 0 {
 		offset, err = strconv.ParseInt(cmd.Args[cmd.Options.LIMIT], 10, 64)
 		if err != nil {
-			w.WriteError("ERR offset value is not an integer or out of range")
+			conn.WriteError("ERR offset value is not an integer or out of range")
 			return
 		}
 		count, err = strconv.ParseInt(cmd.Args[cmd.Options.LIMIT+1], 10, 64)
 		if err != nil {
-			w.WriteError("ERR count value is not an integer or out of range")
+			conn.WriteError("ERR count value is not an integer or out of range")
 			return
 		}
 	}
 	if cmd.Options.WITHSCORES > 0 {
 		results := n.ZRevRangeByScoreWithScores(key, min, max, offset, count, mode)
-		w.WriteArray(len(results) * 2)
+		conn.WriteArray(len(results) * 2)
 		for _, v := range results {
-			w.WriteBulk(v.Member)
-			w.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
+			conn.WriteBulk(v.Member)
+			conn.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
 		}
 		return
 	}
 	results := n.ZRevRangeByScore(key, min, max, offset, count, mode)
-	w.WriteArray(len(results))
+	conn.WriteArray(len(results))
 	for _, v := range results {
-		w.WriteBulk(v)
+		conn.WriteBulk(v)
 	}
 }
 
-func zCount(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func zCount(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("ZCOUNT requires at least three arguments")
+		conn.WriteError("ZCOUNT requires at least three arguments")
 		return
 	}
 	key := cmd.Args[0]
@@ -1972,7 +1972,7 @@ func zCount(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	}
 	min, err := redis.FormatFloat64(cmd.Args[1], n.ZMin(key).Score)
 	if err != nil {
-		w.WriteError("ERR min value is not a valid float")
+		conn.WriteError("ERR min value is not a valid float")
 		return
 	}
 	if cmd.Args[2][0] == '(' {
@@ -1980,65 +1980,65 @@ func zCount(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	}
 	max, err := redis.FormatFloat64(cmd.Args[2], n.ZMax(key).Score)
 	if err != nil {
-		w.WriteError("ERR max value is not a valid float")
+		conn.WriteError("ERR max value is not a valid float")
 		return
 	}
-	w.WriteInteger(n.ZCount(key, min, max, mode))
+	conn.WriteInteger(n.ZCount(key, min, max, mode))
 }
 
-func zRem(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func zRem(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("ZREM requires at least two arguments")
+		conn.WriteError("ZREM requires at least two arguments")
 	}
 	key := cmd.Args[0]
-	w.WriteInteger(n.ZRem(key, cmd.Args[1:]...))
+	conn.WriteInteger(n.ZRem(key, cmd.Args[1:]...))
 }
 
-func zRemRangeByRank(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func zRemRangeByRank(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("ZREMRANGEBYRANK requires at least three arguments")
+		conn.WriteError("ZREMRANGEBYRANK requires at least three arguments")
 	}
 	key := cmd.Args[0]
 	start, err := strconv.ParseInt(cmd.Args[1], 10, 64)
 	if err != nil {
-		w.WriteError("ERR start value is not a valid float")
+		conn.WriteError("ERR start value is not a valid float")
 		return
 	}
 	stop, err := strconv.ParseInt(cmd.Args[2], 10, 64)
 	if err != nil {
-		w.WriteError("ERR stop value is not a valid float")
+		conn.WriteError("ERR stop value is not a valid float")
 		return
 	}
-	w.WriteInteger(n.ZRemRangeByRank(key, start, stop))
+	conn.WriteInteger(n.ZRemRangeByRank(key, start, stop))
 }
 
-func zRemRangeByScore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func zRemRangeByScore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("ZREMRANGEBYSCORE requires at least three arguments")
+		conn.WriteError("ZREMRANGEBYSCORE requires at least three arguments")
 	}
 	key := cmd.Args[0]
 	min, err := redis.FormatFloat64(cmd.Args[1], n.ZMin(key).Score)
 	if err != nil {
-		w.WriteError("ERR min value is not a valid float")
+		conn.WriteError("ERR min value is not a valid float")
 		return
 	}
 	max, err := redis.FormatFloat64(cmd.Args[1], n.ZMax(key).Score)
 	if err != nil {
-		w.WriteError("ERR max value is not a valid float")
+		conn.WriteError("ERR max value is not a valid float")
 		return
 	}
-	w.WriteInteger(n.ZRemRangeByScore(key, min, max))
+	conn.WriteInteger(n.ZRemRangeByScore(key, min, max))
 }
 
-func zUnionStore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func zUnionStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("ZUNIONSTORE requires at least three arguments")
+		conn.WriteError("ZUNIONSTORE requires at least three arguments")
 		return
 	}
 	destination := cmd.Args[0]
 	numKeys, err := strconv.ParseInt(cmd.Args[1], 10, 64)
 	if err != nil {
-		w.WriteError("ERR numkeys value is not a valid integer")
+		conn.WriteError("ERR numkeys value is not a valid integer")
 		return
 	}
 	keys := cmd.Args[2 : 2+numKeys]
@@ -2046,14 +2046,14 @@ func zUnionStore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	var aggregate string
 	if cmd.Options.WEIGHTS > 0 {
 		if len(cmd.Args) < cmd.Options.WEIGHTS+int(numKeys) {
-			w.WriteError("ERR syntax error")
+			conn.WriteError("ERR syntax error")
 			return
 		}
 		weights = make([]float64, numKeys)
 		for i := 0; i < len(weights); i++ {
 			weights[i], err = redis.FormatFloat64(cmd.Args[i+cmd.Options.WEIGHTS], 1)
 			if err != nil {
-				w.WriteError("ERR weight value is not a valid float")
+				conn.WriteError("ERR weight value is not a valid float")
 				return
 			}
 		}
@@ -2062,18 +2062,18 @@ func zUnionStore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		aggregate = cmd.Args[cmd.Options.AGGREGATE]
 	}
 	n.ZUnionStore(destination, keys, weights, utils.ToUpper(aggregate))
-	w.WriteInteger(n.ZCard(destination))
+	conn.WriteInteger(n.ZCard(destination))
 }
 
-func zInterStore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func zInterStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 3 {
-		w.WriteError("ZINTERSTORE requires at least three arguments")
+		conn.WriteError("ZINTERSTORE requires at least three arguments")
 		return
 	}
 	destination := cmd.Args[0]
 	numKeys, err := strconv.ParseInt(cmd.Args[1], 10, 64)
 	if err != nil {
-		w.WriteError("ERR numkeys value is not a valid integer")
+		conn.WriteError("ERR numkeys value is not a valid integer")
 		return
 	}
 	keys := cmd.Args[2 : 2+numKeys]
@@ -2081,14 +2081,14 @@ func zInterStore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	var aggregate string
 	if cmd.Options.WEIGHTS > 0 {
 		if len(cmd.Args) < cmd.Options.WEIGHTS+int(numKeys) {
-			w.WriteError("ERR syntax error")
+			conn.WriteError("ERR syntax error")
 			return
 		}
 		weights = make([]float64, numKeys)
 		for i := 0; i < len(weights); i++ {
 			weights[i], err = redis.FormatFloat64(cmd.Args[i+cmd.Options.WEIGHTS], 1)
 			if err != nil {
-				w.WriteError("ERR weight value is not a valid float")
+				conn.WriteError("ERR weight value is not a valid float")
 				return
 			}
 		}
@@ -2097,21 +2097,21 @@ func zInterStore(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 		aggregate = cmd.Args[cmd.Options.AGGREGATE]
 	}
 	n.ZInterStore(destination, keys, weights, utils.ToUpper(aggregate))
-	w.WriteInteger(n.ZCard(destination))
+	conn.WriteInteger(n.ZCard(destination))
 }
 
-func zClear(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func zClear(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) == 0 {
-		w.WriteError("ZCLEAR requires at least one argument")
+		conn.WriteError("ZCLEAR requires at least one argument")
 	}
 	key := cmd.Args[0]
 	n.ZClear(key)
-	w.WriteString("OK")
+	conn.WriteString("OK")
 }
 
-func zExists(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func zExists(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	if len(cmd.Args) < 2 {
-		w.WriteError("ZEXISTS requires at least two arguments")
+		conn.WriteError("ZEXISTS requires at least two arguments")
 	}
 	key := cmd.Args[0]
 	member := cmd.Args[1]
@@ -2120,12 +2120,12 @@ func zExists(n *Nodis, w *redis.Writer, cmd *redis.Command) {
 	if is {
 		r = 1
 	}
-	w.WriteInteger(r)
+	conn.WriteInteger(r)
 }
 
-func save(n *Nodis, w *redis.Writer, cmd *redis.Command) {
+func save(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	n.store.mu.Lock()
 	n.store.save()
 	n.store.mu.Unlock()
-	w.WriteString("OK")
+	conn.WriteString("OK")
 }

@@ -21,7 +21,6 @@ import (
 	"github.com/diiyw/nodis/ds/zset"
 	"github.com/diiyw/nodis/fs"
 	"github.com/diiyw/nodis/pb"
-	"github.com/diiyw/nodis/utils"
 	"github.com/tidwall/btree"
 )
 
@@ -51,7 +50,7 @@ func newStore(path string, fileSize int64, metaPoolSize int, filesystem fs.Fs) *
 	}
 	for i := 0; i < metaPoolSize; i++ {
 		s.metaPool[i] = &metadata{
-			Mutex: &sync.Mutex{},
+			RWMutex: &sync.RWMutex{},
 		}
 	}
 	_ = filesystem.MkdirAll(path)
@@ -91,73 +90,6 @@ func newStore(path string, fileSize int64, metaPoolSize int, filesystem fs.Fs) *
 	return s
 }
 
-func (s *store) spread(hashCode uint32) *metadata {
-	tableSize := uint32(s.metaPoolSize)
-	return s.metaPool[(tableSize-1)&hashCode]
-}
-
-func (s *store) getMetadata(key string) *metadata {
-	m := s.spread(utils.Fnv32(key))
-	m.Lock()
-	return m
-}
-
-func (s *store) writeKey(key string, newFn func() ds.DataStruct) *metadata {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	meta := s.getMetadata(key)
-	k, ok := s.keys.Get(key)
-	if ok {
-		if k.expired(time.Now().UnixMilli()) {
-			if newFn == nil {
-				return meta
-			}
-		}
-		d, ok := s.values.Get(key)
-		if ok {
-			meta.set(k, d)
-			meta.markChanged()
-			return meta
-		}
-		meta = s.fromStorage(k, meta)
-		meta.markChanged()
-		return meta
-	}
-	if newFn != nil {
-		d := newFn()
-		if d == nil {
-			return meta
-		}
-		k = newKey()
-		s.keys.Set(key, k)
-		s.values.Set(key, d)
-		meta.set(k, d)
-		meta.markChanged()
-		return meta
-	}
-	return meta
-}
-
-func (s *store) readKey(key string) *metadata {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	meta := s.getMetadata(key)
-	k, ok := s.keys.Get(key)
-	if ok {
-		if k.expired(time.Now().UnixMilli()) {
-			return meta
-		}
-		d, ok := s.values.Get(key)
-		if !ok {
-			// read from storage
-			return s.fromStorage(k, meta)
-		}
-		meta.set(k, d)
-		return meta
-	}
-	return meta
-}
-
 func (s *store) delKey(key string) {
 	s.mu.Lock()
 	s.keys.Delete(key)
@@ -165,7 +97,7 @@ func (s *store) delKey(key string) {
 	s.mu.Unlock()
 }
 
-func (s *store) fromStorage(k *Key, meta *metadata) *metadata {
+func (s *store) fromStorage(k *Key, meta *metadata, changed bool) *metadata {
 	// try get from storage
 	v, err := s.getEntryRaw(k)
 	if err == nil && len(v) > 0 {
@@ -176,7 +108,7 @@ func (s *store) fromStorage(k *Key, meta *metadata) *metadata {
 		}
 		if value != nil {
 			s.values.Set(key, value)
-			meta.set(k, value)
+			meta.set(k, value, changed)
 			return meta
 		}
 	}
@@ -230,8 +162,10 @@ func (s *store) parseDs(data []byte) (string, ds.DataStruct, error) {
 // save flush changed keys to disk
 func (s *store) save() {
 	now := time.Now().UnixMilli()
+	tx := newTx(s)
+	defer tx.commit()
 	s.keys.Scan(func(key string, k *Key) bool {
-		meta := s.getMetadata(key)
+		meta := tx.readKey(key)
 		defer meta.commit()
 		if !k.changed || k.expired(now) {
 			return true
@@ -258,8 +192,10 @@ func (s *store) tidy(ms int64) {
 	}
 	now := time.Now().UnixMilli()
 	recycleTime := now - ms
+	tx := newTx(s)
+	defer tx.commit()
 	s.keys.Scan(func(key string, k *Key) bool {
-		meta := s.getMetadata(key)
+		meta := tx.readKey(key)
 		defer meta.commit()
 		if k.expired(now) {
 			s.keys.Delete(key)
@@ -466,8 +402,10 @@ func (s *store) close() error {
 	indexData := &pb.Index{
 		Items: make([]*pb.Index_Item, 0, s.keys.Len()),
 	}
+	tx := newTx(s)
+	defer tx.commit()
 	s.keys.Scan(func(key string, k *Key) bool {
-		meta := s.getMetadata(key)
+		meta := tx.readKey(key)
 		indexData.Items = append(indexData.Items, &pb.Index_Item{
 			Key:  key,
 			Data: k.marshal(),
@@ -504,15 +442,4 @@ func (s *store) clear() error {
 	s.keys.Clear()
 	s.values.Clear()
 	return nil
-}
-
-// Unlock the key
-func (s *store) unlock(key string) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Println("Unlock error: ", r)
-		}
-	}()
-	m := s.spread(utils.Fnv32(key))
-	m.commit()
 }

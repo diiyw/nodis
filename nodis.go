@@ -98,16 +98,18 @@ func (n *Nodis) SetEntry(data []byte) error {
 }
 
 // GetEntry gets an entity
-func (n *Nodis) GetEntry(key string) []byte {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
+func (n *Nodis) GetEntry(key string) (data []byte) {
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		var entity = newEntry(key, meta.ds, meta.key.expiration)
 		meta.commit()
+		data, _ = entity.Marshal()
 		return nil
-	}
-	var entity = newEntry(key, meta.ds, meta.key.expiration)
-	meta.commit()
-	data, _ := entity.Marshal()
-	return data
+	})
+	return
 }
 
 // parseDs the data
@@ -245,24 +247,29 @@ func (n *Nodis) Serve(addr string) error {
 		log.Printf("Nodis closed %v \n", n.Close())
 		os.Exit(0)
 	}()
-	return redis.Serve(addr, func(w *redis.Writer, cmd *redis.Command) {
+	return redis.Serve(addr, func(conn *redis.Conn, cmd *redis.Command) {
 		c := getCommand(cmd.Name)
 		if c == nil {
-			w.WriteError("ERR unknown command: " + cmd.Name)
+			conn.WriteError("ERR unknown command: " + cmd.Name)
 			return
 		}
 		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					log.Println("Recovered from ", r)
-					w.WriteError("WRONGTYPE Operation against a key holding the wrong kind of value")
-					w.Flush()
-					if len(cmd.Args) > 0 {
-						n.store.unlock(cmd.Args[0])
-					}
-				}
-			}()
-			c(n, w, cmd)
+			c(n, conn, cmd)
 		}()
 	})
+}
+
+func (n *Nodis) Update(fn func(tx *Tx) error) error {
+	tx := &Tx{
+		store:       n.store,
+		lockedMetas: make([]*metadata, 0),
+	}
+	defer func() {
+		tx.commit()
+		if r := recover(); r != nil {
+			log.Println("Recovered from ", r)
+			return
+		}
+	}()
+	return fn(tx)
 }

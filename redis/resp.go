@@ -298,10 +298,16 @@ func (r *Reader) readBulk() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	r.readByteN(l)
+	err = r.readByteN(l)
+	if err != nil {
+		return "", err
+	}
 	v := r.flushCopyString()
 	// Read the trailing CRLF
-	r.readLine()
+	err = r.readLine()
+	if err != nil {
+		return "", err
+	}
 	r.malloc()
 	return v, nil
 }
@@ -478,11 +484,6 @@ func (w *Writer) WriteNullMap() {
 
 func (w *Writer) WriteOK() {
 	w.writeBytes([]byte("+OK\r\n")...)
-}
-
-// Close closes the writer
-func (w *Writer) Close() error {
-	return w.writer.(net.Conn).Close()
 }
 
 func (w *Writer) RemoteAddr() string {

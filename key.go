@@ -54,28 +54,31 @@ func (k *Key) unmarshal(b []byte) {
 // Del a key
 func (n *Nodis) Del(keys ...string) int64 {
 	var c int64 = 0
-	for _, key := range keys {
-		meta := n.store.writeKey(key, nil)
-		if !meta.isOk() {
-			meta.commit()
-			continue
+	_ = n.Update(func(tx *Tx) error {
+		for _, key := range keys {
+			meta := tx.writeKey(key, nil)
+			if !meta.isOk() {
+				continue
+			}
+			n.store.delKey(key)
+			c++
 		}
-		n.store.delKey(key)
-		c++
-		meta.commit()
-	}
+		return nil
+	})
 	return c
 }
 
 func (n *Nodis) Exists(keys ...string) int64 {
 	var num int64
-	for _, key := range keys {
-		meta := n.store.readKey(key)
-		if meta.isOk() {
-			num++
+	_ = n.Update(func(tx *Tx) error {
+		for _, key := range keys {
+			meta := tx.readKey(key)
+			if meta.isOk() {
+				num++
+			}
 		}
-		meta.commit()
-	}
+		return nil
+	})
 	return num
 }
 
@@ -84,18 +87,21 @@ func (n *Nodis) Expire(key string, seconds int64) int64 {
 	if seconds == 0 {
 		return n.Del(key)
 	}
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	if meta.key.expiration == 0 {
-		meta.key.expiration = time.Now().UnixMilli()
-	}
-	meta.key.expiration += seconds * 1000
-	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
-	meta.commit()
-	return 1
+	var v int64 = 1
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			v = 0
+			return nil
+		}
+		if meta.key.expiration == 0 {
+			meta.key.expiration = time.Now().UnixMilli()
+		}
+		meta.key.expiration += seconds * 1000
+		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		return nil
+	})
+	return v
 }
 
 // ExpirePX the keys in milliseconds
@@ -103,182 +109,208 @@ func (n *Nodis) ExpirePX(key string, milliseconds int64) int64 {
 	if milliseconds == 0 {
 		return n.Del(key)
 	}
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	if meta.key.expiration == 0 {
-		meta.key.expiration = time.Now().UnixMilli()
-	}
-	meta.key.expiration += milliseconds
-	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
-	meta.commit()
-	return 1
+	var v int64 = 1
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			v = 0
+			return nil
+		}
+		if meta.key.expiration == 0 {
+			meta.key.expiration = time.Now().UnixMilli()
+		}
+		meta.key.expiration += milliseconds
+		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		return nil
+	})
+	return v
 }
 
 // ExpireNX the keys only when the key has no expiry
 func (n *Nodis) ExpireNX(key string, seconds int64) int64 {
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	if meta.key.expiration != 0 {
-		return 0
-	}
-	meta.key.expiration = time.Now().UnixMilli() + seconds*1000
-	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
-	meta.commit()
-	return 1
+	var v int64 = 1
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			v = 0
+			return nil
+		}
+		if meta.key.expiration != 0 {
+			v = 0
+			return nil
+		}
+		meta.key.expiration = time.Now().UnixMilli() + seconds*1000
+		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		return nil
+	})
+	return v
 }
 
 // ExpireXX the keys only when the key has an existing expiry
 func (n *Nodis) ExpireXX(key string, seconds int64) int64 {
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	if meta.key.expiration == 0 {
-		meta.commit()
-		return 0
-	}
-	meta.key.expiration += seconds * 1000
-	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
-	meta.commit()
-	return 1
+	var v int64 = 1
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			v = 0
+			return nil
+		}
+		if meta.key.expiration == 0 {
+			v = 0
+			return nil
+		}
+		meta.key.expiration += seconds * 1000
+		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		return nil
+	})
+	return v
 }
 
 // ExpireLT the keys only when the new expiry is less than current one
 func (n *Nodis) ExpireLT(key string, seconds int64) int64 {
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	if meta.key.expiration == 0 {
-		meta.commit()
-		return 0
-	}
-	ms := seconds * 1000
-	if meta.key.expiration > time.Now().UnixMilli()-ms {
-		meta.key.expiration -= ms
-		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
-		meta.commit()
-		return 1
-	}
-	meta.commit()
-	return 0
+	var v int64 = 1
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			v = 0
+			return nil
+		}
+		if meta.key.expiration == 0 {
+			v = 0
+			return nil
+		}
+		ms := seconds * 1000
+		if meta.key.expiration > time.Now().UnixMilli()-ms {
+			meta.key.expiration -= ms
+			n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		}
+		return nil
+	})
+	return v
 }
 
 // ExpireGT the keys only when the new expiry is greater than current one
 func (n *Nodis) ExpireGT(key string, seconds int64) int64 {
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	now := time.Now().UnixMilli()
-	if meta.key.expiration == 0 {
-		meta.key.expiration = now
-	}
-	ms := seconds * 1000
-	if meta.key.expiration < now+ms {
-		meta.key.expiration += ms
-		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
-		meta.commit()
-		return 1
-	}
-	meta.commit()
-	return 0
+	var v int64 = 1
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			v = 0
+			return nil
+		}
+		now := time.Now().UnixMilli()
+		if meta.key.expiration == 0 {
+			meta.key.expiration = now
+		}
+		ms := seconds * 1000
+		if meta.key.expiration < now+ms {
+			meta.key.expiration += ms
+			n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		}
+		return nil
+	})
+	return v
 }
 
 // ExpireAt the keys
 func (n *Nodis) ExpireAt(key string, timestamp time.Time) int64 {
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	meta.key.expiration = timestamp.UnixMilli()
-	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
-	meta.commit()
-	return 1
+	var v int64 = 1
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			v = 0
+			return nil
+		}
+		meta.key.expiration = timestamp.UnixMilli()
+		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		return nil
+	})
+	return v
 }
 
 // ExpireAtNX the keys only when the key has no expiry
 func (n *Nodis) ExpireAtNX(key string, timestamp time.Time) int64 {
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	if meta.key.expiration != 0 {
-		meta.commit()
-		return 0
-	}
-	meta.key.expiration = timestamp.UnixMilli()
-	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
-	meta.commit()
-	return 1
+	var v int64 = 1
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			v = 0
+			return nil
+		}
+		if meta.key.expiration != 0 {
+			v = 0
+			return nil
+		}
+		meta.key.expiration = timestamp.UnixMilli()
+		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		return nil
+	})
+	return v
 }
 
 // ExpireAtXX the keys only when the key has an existing expiry
 func (n *Nodis) ExpireAtXX(key string, timestamp time.Time) int64 {
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	if meta.key.expiration != 0 {
-		meta.commit()
-		return 0
-	}
-	meta.key.expiration = timestamp.UnixMilli()
-	n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
-	meta.commit()
-	return 1
+	var v int64 = 1
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			v = 0
+			return nil
+		}
+		if meta.key.expiration != 0 {
+			v = 0
+			return nil
+		}
+		meta.key.expiration = timestamp.UnixMilli()
+		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		return nil
+	})
+	return v
 }
 
 // ExpireAtLT the keys only when the new expiry is less than current one
 func (n *Nodis) ExpireAtLT(key string, timestamp time.Time) int64 {
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	if meta.key.expiration != 0 {
-		meta.commit()
-		return 0
-	}
-	unix := timestamp.UnixMilli()
-	if meta.key.expiration > unix {
-		meta.key.expiration = unix
-		meta.commit()
-		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
-		return 1
-	}
-	return 0
+	var v int64 = 1
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			v = 0
+			return nil
+		}
+		if meta.key.expiration != 0 {
+			v = 0
+			return nil
+		}
+		unix := timestamp.UnixMilli()
+		if meta.key.expiration > unix {
+			meta.key.expiration = unix
+			n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		}
+		return nil
+	})
+	return v
 }
 
 // ExpireAtGT the keys only when the new expiry is greater than current one
 func (n *Nodis) ExpireAtGT(key string, timestamp time.Time) int64 {
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	unix := timestamp.UnixMilli()
-	if meta.key.expiration == 0 {
-		meta.key.expiration = unix
-	}
-	if meta.key.expiration < unix {
-		meta.key.expiration = unix
-		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
-		return 1
-	}
-	return 0
+	var v int64 = 1
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			v = 0
+			return nil
+		}
+		unix := timestamp.UnixMilli()
+		if meta.key.expiration == 0 {
+			meta.key.expiration = unix
+		}
+		if meta.key.expiration < unix {
+			meta.key.expiration = unix
+			n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		}
+		return nil
+	})
+	return v
 }
 
 // Keys gets the keys
@@ -299,76 +331,81 @@ func (n *Nodis) Keys(pattern string) []string {
 
 // TTL gets the TTL
 func (n *Nodis) TTL(key string) time.Duration {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
-		return -2
-	}
-	if meta.key.expiration == 0 {
-		meta.commit()
-		return -1
-	}
-	s := meta.key.expiration / 1000
-	ns := (meta.key.expiration - s*1000) * 1000 * 1000
-	meta.commit()
-	return time.Until(time.Unix(s, ns)).Round(time.Second)
+	var v time.Duration
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			v = -2
+			return nil
+		}
+		if meta.key.expiration == 0 {
+			v = -1
+			return nil
+		}
+		s := meta.key.expiration / 1000
+		ns := (meta.key.expiration - s*1000) * 1000 * 1000
+		v = time.Until(time.Unix(s, ns)).Round(time.Second)
+		return nil
+	})
+	return v
 }
 
 // Rename a key
 func (n *Nodis) Rename(key, dstKey string) error {
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		meta.commit()
-		return errors.New("key not exists")
-	}
-	v, ok := n.store.values.Get(key)
-	if !ok {
-		return errors.New("key does not exist")
-	}
-	dstMeta := n.store.writeKey(dstKey, nil)
-	n.store.delKey(key)
-	n.store.values.Set(dstKey, v)
-	n.store.keys.Set(dstKey, newKey())
-	meta.commit()
-	dstMeta.commit()
-	n.notify(pb.NewOp(pb.OpType_Rename, key).DstKey(dstKey))
-	return nil
+	return n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			return errors.New("key not exists")
+		}
+		v, ok := n.store.values.Get(key)
+		if !ok {
+			return errors.New("key does not exist")
+		}
+		_ = tx.writeKey(dstKey, nil)
+		n.store.delKey(key)
+		n.store.values.Set(dstKey, v)
+		n.store.keys.Set(dstKey, newKey())
+		n.notify(pb.NewOp(pb.OpType_Rename, key).DstKey(dstKey))
+		return nil
+	})
 }
 
 // RenameNX a key
 func (n *Nodis) RenameNX(key, dstKey string) error {
-	dstMeta := n.store.writeKey(dstKey, nil)
-	if dstMeta.isOk() {
-		dstMeta.commit()
-		return errors.New("newKey exists")
-	}
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		return errors.New("key does not exist")
-	}
-	v, ok := n.store.values.Get(key)
-	if !ok {
-		return errors.New("key does not exist")
-	}
-	n.store.delKey(key)
-	n.store.values.Set(dstKey, v)
-	n.store.keys.Set(dstKey, newKey())
-	meta.commit()
-	dstMeta.commit()
-	n.notify(pb.NewOp(pb.OpType_Rename, key).DstKey(dstKey))
-	return nil
+	return n.Update(func(tx *Tx) error {
+		dstMeta := tx.writeKey(dstKey, nil)
+		if dstMeta.isOk() {
+			return errors.New("newKey exists")
+		}
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			return errors.New("key does not exist")
+		}
+		v, ok := n.store.values.Get(key)
+		if !ok {
+			return errors.New("key does not exist")
+		}
+		n.store.delKey(key)
+		n.store.values.Set(dstKey, v)
+		n.store.keys.Set(dstKey, newKey())
+		n.notify(pb.NewOp(pb.OpType_Rename, key).DstKey(dstKey))
+		return nil
+	})
 }
 
 // Type gets the type of key
 func (n *Nodis) Type(key string) string {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
-		return "none"
-	}
-	v := meta.ds.Type()
-	meta.commit()
-	return ds.DataTypeMap[v]
+	var v string
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			v = "none"
+			return nil
+		}
+		v = ds.DataTypeMap[meta.ds.Type()]
+		return nil
+	})
+	return v
 }
 
 // Scan the keys
@@ -419,17 +456,19 @@ func (n *Nodis) RandomKey() string {
 
 // Persist the key
 func (n *Nodis) Persist(key string) int64 {
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	if meta.key.expiration == 0 {
-		meta.commit()
-		return 0
-	}
-	meta.key.expiration = 0
-	n.notify(pb.NewOp(pb.OpType_Persist, key))
-	meta.commit()
-	return 1
+	var v int64 = 0
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			return nil
+		}
+		if meta.key.expiration == 0 {
+			return nil
+		}
+		v = 1
+		meta.key.expiration = 0
+		n.notify(pb.NewOp(pb.OpType_Persist, key))
+		return nil
+	})
+	return v
 }

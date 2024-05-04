@@ -7,15 +7,17 @@ import (
 )
 
 type metadata struct {
-	*sync.Mutex
-	key *Key
-	ds  ds.DataStruct
-	ok  bool
+	*sync.RWMutex
+	key       *Key
+	ds        ds.DataStruct
+	ok        bool
+	writeable bool
 }
 
-func (m *metadata) set(key *Key, d ds.DataStruct) *metadata {
+func (m *metadata) set(key *Key, d ds.DataStruct, changed bool) *metadata {
 	m.key = key
 	m.ds = d
+	m.key.changed = changed
 	m.ok = true
 	return m
 }
@@ -31,12 +33,14 @@ func (m *metadata) markChanged() {
 }
 
 func (m *metadata) commit() {
-	if !m.ok {
-		m.Unlock()
-		return
-	}
 	m.ds = nil
 	m.key = nil
 	m.ok = false
-	m.Unlock()
+	writeable := m.writeable
+	m.writeable = false
+	if writeable {
+		m.Unlock()
+	} else {
+		m.RUnlock()
+	}
 }

@@ -11,291 +11,350 @@ func (n *Nodis) newZSet() ds.DataStruct {
 }
 
 func (n *Nodis) ZAdd(key string, member string, score float64) int64 {
-	meta := n.store.writeKey(key, n.newZSet)
-	v := meta.ds.(*zset.SortedSet).ZAdd(member, score)
-	meta.commit()
-	n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
+	var v int64
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, n.newZSet)
+		v = meta.ds.(*zset.SortedSet).ZAdd(member, score)
+		n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
+		return nil
+	})
 	return v
 }
 
 // ZAddXX Only update elements that already exist. Don't add new elements.
 func (n *Nodis) ZAddXX(key string, member string, score float64) int64 {
-	meta := n.store.writeKey(key, n.newZSet)
-	v := meta.ds.(*zset.SortedSet).ZAddXX(member, score)
-	n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
-	meta.commit()
+	var v int64
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, n.newZSet)
+		v = meta.ds.(*zset.SortedSet).ZAddXX(member, score)
+		n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
+		return nil
+	})
 	return v
 }
 
 func (n *Nodis) ZAddNX(key string, member string, score float64) int64 {
-	meta := n.store.writeKey(key, n.newZSet)
-	v := meta.ds.(*zset.SortedSet).ZAddNX(member, score)
-	n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
-	meta.commit()
+	var v int64
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, n.newZSet)
+		v = meta.ds.(*zset.SortedSet).ZAddNX(member, score)
+		n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
+		return nil
+	})
 	return v
 }
 
 // ZAddLT add member if score less than the current score
 func (n *Nodis) ZAddLT(key string, member string, score float64) int64 {
-	meta := n.store.writeKey(key, n.newZSet)
-	if meta.ds.(*zset.SortedSet).ZAddLT(member, score) {
-		n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
-		meta.commit()
-		return 1
-	}
-	meta.commit()
-	return 0
+	var v int64
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, n.newZSet)
+		if meta.ds.(*zset.SortedSet).ZAddLT(member, score) {
+			n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
+			v = 1
+		}
+		return nil
+	})
+	return v
 }
 
 // ZAddGT add member if score greater than the current score
 func (n *Nodis) ZAddGT(key string, member string, score float64) int64 {
-	meta := n.store.writeKey(key, n.newZSet)
-	if meta.ds.(*zset.SortedSet).ZAddGT(member, score) {
-		n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
-		meta.commit()
-		return 1
-	}
-	meta.commit()
-	return 0
+	var v int64
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, n.newZSet)
+		if meta.ds.(*zset.SortedSet).ZAddGT(member, score) {
+			n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
+			v = 1
+		}
+		return nil
+	})
+	return v
 }
 
 func (n *Nodis) ZCard(key string) int64 {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	v := meta.ds.(*zset.SortedSet).ZCard()
-	meta.commit()
+	var v int64
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		v = meta.ds.(*zset.SortedSet).ZCard()
+		return nil
+	})
 	return v
 }
 
 func (n *Nodis) ZRank(key string, member string) int64 {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	v := meta.ds.(*zset.SortedSet).ZRank(member)
-	meta.commit()
+	var v int64
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		v = meta.ds.(*zset.SortedSet).ZRank(member)
+		return nil
+	})
 	return v
 }
 
 func (n *Nodis) ZRankWithScore(key string, member string) (int64, *zset.Item) {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
-		return 0, nil
-	}
-	c, v := meta.ds.(*zset.SortedSet).ZRankWithScore(member)
-	meta.commit()
+	var c int64
+	var v *zset.Item
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		c, v = meta.ds.(*zset.SortedSet).ZRankWithScore(member)
+		return nil
+	})
 	return c, v
 }
 
 func (n *Nodis) ZRevRank(key string, member string) int64 {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	v := meta.ds.(*zset.SortedSet).ZRevRank(member)
-	meta.commit()
+	var v int64
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		v = meta.ds.(*zset.SortedSet).ZRevRank(member)
+		return nil
+	})
 	return v
 }
 
 func (n *Nodis) ZRevRankWithScore(key string, member string) (int64, *zset.Item) {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
-		return 0, nil
-	}
-	c, v := meta.ds.(*zset.SortedSet).ZRevRankWithScore(member)
-	meta.commit()
+	var c int64
+	var v *zset.Item
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		c, v = meta.ds.(*zset.SortedSet).ZRevRankWithScore(member)
+		return nil
+	})
 	return c, v
 }
 
 func (n *Nodis) ZScore(key string, member string) float64 {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	v := meta.ds.(*zset.SortedSet).ZScore(member)
-	meta.commit()
+	var v float64
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		v = meta.ds.(*zset.SortedSet).ZScore(member)
+		return nil
+	})
 	return v
 }
 
 func (n *Nodis) ZIncrBy(key string, member string, score float64) float64 {
-	meta := n.store.writeKey(key, n.newZSet)
-	v := meta.ds.(*zset.SortedSet).ZIncrBy(member, score)
-	meta.commit()
-	n.notify(pb.NewOp(pb.OpType_ZIncrBy, key).Member(member).Score(score))
+	var v float64
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, n.newZSet)
+		v = meta.ds.(*zset.SortedSet).ZIncrBy(member, score)
+		n.notify(pb.NewOp(pb.OpType_ZIncrBy, key).Member(member).Score(score))
+		return nil
+	})
 	return v
 }
 
 func (n *Nodis) ZRange(key string, start int64, stop int64) []string {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
-		return nil
-	}
-	els := meta.ds.(*zset.SortedSet).ZRange(start, stop)
-	meta.commit()
-	members := make([]string, len(els))
-	for i, el := range els {
-		if el == nil {
-			continue
+	var v []string
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
 		}
-		members[i] = el.Member
-	}
-	return members
+		els := meta.ds.(*zset.SortedSet).ZRange(start, stop)
+		v = make([]string, len(els))
+		for i, el := range els {
+			if el == nil {
+				continue
+			}
+			v[i] = el.Member
+		}
+		return nil
+	})
+	return v
 }
 
 func (n *Nodis) ZRangeWithScores(key string, start int64, stop int64) []*zset.Item {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
+	var v []*zset.Item
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+
+			return nil
+		}
+		v = meta.ds.(*zset.SortedSet).ZRange(start, stop)
 		return nil
-	}
-	v := meta.ds.(*zset.SortedSet).ZRange(start, stop)
-	meta.commit()
+	})
 	return v
 }
 
 func (n *Nodis) ZRevRange(key string, start int64, stop int64) []string {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
-		return nil
-	}
-	els := meta.ds.(*zset.SortedSet).ZRevRange(start, stop)
-	meta.commit()
-	members := make([]string, len(els))
-	for i, el := range els {
-		if el == nil {
-			continue
+	var v []string
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
 		}
-		members[i] = el.Member
-	}
-	return members
+		els := meta.ds.(*zset.SortedSet).ZRevRange(start, stop)
+
+		v = make([]string, len(els))
+		for i, el := range els {
+			if el == nil {
+				continue
+			}
+			v[i] = el.Member
+		}
+		return nil
+	})
+	return v
 }
 
 func (n *Nodis) ZRevRangeWithScores(key string, start int64, stop int64) []*zset.Item {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
+	var v []*zset.Item
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		v = meta.ds.(*zset.SortedSet).ZRevRange(start, stop)
 		return nil
-	}
-	v := meta.ds.(*zset.SortedSet).ZRevRange(start, stop)
-	meta.commit()
+	})
 	return v
 }
 
 func (n *Nodis) ZRangeByScore(key string, min float64, max float64, offset, count int64, mode int) []string {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
+	var v []string
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		els := meta.ds.(*zset.SortedSet).ZRangeByScore(min, max, offset, count, mode)
+		v = make([]string, len(els))
+		for i, el := range els {
+			v[i] = el.Member
+		}
 		return nil
-	}
-	els := meta.ds.(*zset.SortedSet).ZRangeByScore(min, max, offset, count, mode)
-	meta.commit()
-	members := make([]string, len(els))
-	for i, el := range els {
-		members[i] = el.Member
-	}
-	return members
+	})
+	return v
 }
 
 func (n *Nodis) ZRangeByScoreWithScores(key string, min float64, max float64, offset, count int64, mode int) []*zset.Item {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
+	var v []*zset.Item
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+
+			return nil
+		}
+		v = meta.ds.(*zset.SortedSet).ZRangeByScore(min, max, offset, count, mode)
 		return nil
-	}
-	v := meta.ds.(*zset.SortedSet).ZRangeByScore(min, max, offset, count, mode)
-	meta.commit()
+	})
 	return v
 }
 
 func (n *Nodis) ZRevRangeByScore(key string, min float64, max float64, offset, count int64, mode int) []string {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
+	var v []string
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		els := meta.ds.(*zset.SortedSet).ZRevRangeByScore(min, max, offset, count, mode)
+		v = make([]string, len(els))
+		for i, el := range els {
+			v[i] = el.Member
+		}
 		return nil
-	}
-	els := meta.ds.(*zset.SortedSet).ZRevRangeByScore(min, max, offset, count, mode)
-	meta.commit()
-	members := make([]string, len(els))
-	for i, el := range els {
-		members[i] = el.Member
-	}
-	return members
+	})
+	return v
 }
 
 func (n *Nodis) ZRevRangeByScoreWithScores(key string, min float64, max float64, offset, count int64, mode int) []*zset.Item {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
+	var v []*zset.Item
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+
+			return nil
+		}
+		v = meta.ds.(*zset.SortedSet).ZRevRangeByScore(min, max, offset, count, mode)
 		return nil
-	}
-	v := meta.ds.(*zset.SortedSet).ZRevRangeByScore(min, max, offset, count, mode)
-	meta.commit()
+	})
 	return v
 }
 
 func (n *Nodis) ZRem(key string, members ...string) int64 {
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	var removed int64 = meta.ds.(*zset.SortedSet).ZRem(members...)
-	meta.key.changed = removed > 0
-	meta.commit()
-	if removed > 0 {
-		n.notify(pb.NewOp(pb.OpType_ZRem, key).Members(members))
-	}
-	return removed
+	var v int64
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			return nil
+		}
+		v = meta.ds.(*zset.SortedSet).ZRem(members...)
+		meta.key.changed = v > 0
+		if v > 0 {
+			n.notify(pb.NewOp(pb.OpType_ZRem, key).Members(members))
+		}
+		return nil
+	})
+	return v
 }
 
 func (n *Nodis) ZRemRangeByRank(key string, start int64, stop int64) int64 {
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	removed := meta.ds.(*zset.SortedSet).ZRemRangeByRank(start, stop)
-	meta.key.changed = removed > 0
-	meta.commit()
-	if removed > 0 {
-		n.notify(pb.NewOp(pb.OpType_ZRemRangeByRank, key).Start(start).Stop(stop))
-	}
-	return removed
+	var v int64
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			return nil
+		}
+		v = meta.ds.(*zset.SortedSet).ZRemRangeByRank(start, stop)
+		meta.key.changed = v > 0
+		if v > 0 {
+			n.notify(pb.NewOp(pb.OpType_ZRemRangeByRank, key).Start(start).Stop(stop))
+		}
+		return nil
+	})
+	return v
 }
 
 func (n *Nodis) ZRemRangeByScore(key string, min float64, max float64) int64 {
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	removed := meta.ds.(*zset.SortedSet).ZRemRangeByScore(min, max)
-	meta.key.changed = removed > 0
-	meta.commit()
-	if removed > 0 {
-		n.notify(pb.NewOp(pb.OpType_ZRemRangeByScore, key).Min(min).Max(max))
-	}
-	return removed
+	var v int64
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			return nil
+		}
+		v = meta.ds.(*zset.SortedSet).ZRemRangeByScore(min, max)
+		meta.key.changed = v > 0
+
+		if v > 0 {
+			n.notify(pb.NewOp(pb.OpType_ZRemRangeByScore, key).Min(min).Max(max))
+		}
+		return nil
+	})
+	return v
 }
 
 func (n *Nodis) ZExists(key string, member string) bool {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
-		return false
-	}
-	v := meta.ds.(*zset.SortedSet).ZExists(member)
-	meta.commit()
+	var v bool
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		v = meta.ds.(*zset.SortedSet).ZExists(member)
+		return nil
+	})
 	return v
 }
 
@@ -303,144 +362,63 @@ func (n *Nodis) ZClear(key string) {
 	n.Del(key)
 }
 
-// zCount returns the number of elements in the sorted set at key with a score between min and max.
+// ZCount returns the number of elements in the sorted set at key with a score between min and max.
 func (n *Nodis) ZCount(key string, min, max float64, mode int) int64 {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	v := meta.ds.(*zset.SortedSet).ZCount(min, max, mode)
-	meta.commit()
+	var v int64
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		v = meta.ds.(*zset.SortedSet).ZCount(min, max, mode)
+		return nil
+	})
 	return v
 }
 
 // ZMax returns the member with the highest score in the sorted set at key.
 func (n *Nodis) ZMax(key string) *zset.Item {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
+	var v *zset.Item
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		v = meta.ds.(*zset.SortedSet).ZMax()
 		return nil
-	}
-	v := meta.ds.(*zset.SortedSet).ZMax()
-	meta.commit()
+	})
 	return v
 }
 
 // ZMin returns the member with the lowest score in the sorted set at key.
 func (n *Nodis) ZMin(key string) *zset.Item {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
+	var v *zset.Item
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		v = meta.ds.(*zset.SortedSet).ZMin()
 		return nil
-	}
-	v := meta.ds.(*zset.SortedSet).ZMin()
-	meta.commit()
+	})
 	return v
 }
 
 func (n *Nodis) ZUnion(keys []string, weights []float64, aggregate string) []*zset.Item {
-	lockedKeys := make([]*metadata, 0, len(keys))
-	for _, key := range keys {
-		ds := n.store.readKey(key)
-		if !ds.isOk() {
-			ds.commit()
-			continue
-		}
-		lockedKeys = append(lockedKeys, ds)
-	}
-	if len(lockedKeys) == 0 {
-		return nil
-	}
-	var items = make(map[string]float64)
-	for i, m := range lockedKeys {
-		var weight float64 = 1
-		if i < len(weights) {
-			weight = weights[i]
-		}
-		zs := m.ds.(*zset.SortedSet).ZRange(0, -1)
-		for _, z := range zs {
-			if aggregate == "SUM" || aggregate == "" {
-				if _, ok := items[z.Member]; !ok {
-					items[z.Member] = z.Score * weight
-				} else {
-					items[z.Member] = items[z.Member]*weight + weight*z.Score
-				}
+	var v []*zset.Item
+	_ = n.Update(func(tx *Tx) error {
+		var items = make(map[string]float64)
+		for i, key := range keys {
+			m := tx.readKey(key)
+			if !m.isOk() {
+				continue
 			}
-			if aggregate == "MIN" {
-				if _, ok := items[z.Member]; !ok || z.Score < items[z.Member] {
-					items[z.Member] = z.Score * weight
-				}
+			var weight float64 = 1
+			if i < len(weights) {
+				weight = weights[i]
 			}
-			if aggregate == "MAX" {
-				if _, ok := items[z.Member]; !ok || z.Score > items[z.Member] {
-					items[z.Member] = z.Score * weight
-				}
-			}
-		}
-		m.commit()
-	}
-	var result []*zset.Item
-	for member, score := range items {
-		result = append(result, &zset.Item{Member: member, Score: score})
-	}
-	return result
-}
-
-// ZUnionStore computes the union of numkeys sorted sets given by the specified keys, and stores the result in destination.
-func (n *Nodis) ZUnionStore(destination string, keys []string, weights []float64, aggregate string) int64 {
-	meta := n.store.writeKey(destination, n.newZSet)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	items := n.ZUnion(keys, weights, aggregate)
-	if len(items) == 0 {
-		meta.commit()
-		return 0
-	}
-	for _, item := range items {
-		meta.ds.(*zset.SortedSet).ZAdd(item.Member, item.Score)
-	}
-	meta.commit()
-	n.notify(pb.NewOp(pb.OpType_ZUnionStore, destination).Keys(keys).Weights(weights).Aggregate(aggregate))
-	return int64(len(items))
-}
-
-func (n *Nodis) ZInter(keys []string, weights []float64, aggregate string) []*zset.Item {
-	lockedKeys := make([]*metadata, 0, len(keys))
-	for _, key := range keys {
-		other := n.store.readKey(key)
-		lockedKeys = append(lockedKeys, other)
-		if !other.isOk() || other.ds.(*zset.SortedSet).ZCard() == 0 {
-			for _, m := range lockedKeys {
-				m.commit()
-			}
-			return nil
-		}
-	}
-	if len(lockedKeys) == 0 {
-		return nil
-	}
-	var items = make(map[string]float64)
-	for i, m := range lockedKeys {
-		var weight float64 = 1
-		if i < len(weights) {
-			weight = weights[i]
-		}
-		zs := m.ds.(*zset.SortedSet).ZRange(0, -1)
-		for _, z := range zs {
-			var found = true
-			for j, otherZ := range lockedKeys {
-				if i == j {
-					continue
-				}
-				if !otherZ.ds.(*zset.SortedSet).ZExists(z.Member) {
-					found = false
-					break
-				}
-			}
-			if found {
+			zs := m.ds.(*zset.SortedSet).ZRange(0, -1)
+			for _, z := range zs {
 				if aggregate == "SUM" || aggregate == "" {
 					if _, ok := items[z.Member]; !ok {
 						items[z.Member] = z.Score * weight
@@ -460,33 +438,106 @@ func (n *Nodis) ZInter(keys []string, weights []float64, aggregate string) []*zs
 				}
 			}
 		}
-	}
-	for _, m := range lockedKeys {
-		m.commit()
-	}
-	var result []*zset.Item
-	for member, score := range items {
-		result = append(result, &zset.Item{Member: member, Score: score})
-	}
-	return result
+		for member, score := range items {
+			v = append(v, &zset.Item{Member: member, Score: score})
+		}
+		return nil
+	})
+	return v
+}
+
+// ZUnionStore computes the union of numkeys sorted sets given by the specified keys, and stores the result in destination.
+func (n *Nodis) ZUnionStore(destination string, keys []string, weights []float64, aggregate string) int64 {
+	var v int64
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(destination, n.newZSet)
+		if !meta.isOk() {
+			return nil
+		}
+		items := n.ZUnion(keys, weights, aggregate)
+		if len(items) == 0 {
+			return nil
+		}
+		for _, item := range items {
+			meta.ds.(*zset.SortedSet).ZAdd(item.Member, item.Score)
+		}
+		n.notify(pb.NewOp(pb.OpType_ZUnionStore, destination).Keys(keys).Weights(weights).Aggregate(aggregate))
+		v = int64(len(items))
+		return nil
+	})
+	return v
+}
+
+func (n *Nodis) ZInter(keys []string, weights []float64, aggregate string) []*zset.Item {
+	var v []*zset.Item
+	_ = n.Update(func(tx *Tx) error {
+		var items = make(map[string]float64)
+		for i, key := range keys {
+			m := tx.readKey(key)
+			var weight float64 = 1
+			if i < len(weights) {
+				weight = weights[i]
+			}
+			zs := m.ds.(*zset.SortedSet).ZRange(0, -1)
+			for _, z := range zs {
+				var found = true
+				for j, otherKey := range keys {
+					otherZ := tx.readKey(otherKey)
+					if i == j {
+						continue
+					}
+					if !otherZ.ds.(*zset.SortedSet).ZExists(z.Member) {
+						found = false
+						break
+					}
+				}
+				if found {
+					if aggregate == "SUM" || aggregate == "" {
+						if _, ok := items[z.Member]; !ok {
+							items[z.Member] = z.Score * weight
+						} else {
+							items[z.Member] = items[z.Member]*weight + weight*z.Score
+						}
+					}
+					if aggregate == "MIN" {
+						if _, ok := items[z.Member]; !ok || z.Score < items[z.Member] {
+							items[z.Member] = z.Score * weight
+						}
+					}
+					if aggregate == "MAX" {
+						if _, ok := items[z.Member]; !ok || z.Score > items[z.Member] {
+							items[z.Member] = z.Score * weight
+						}
+					}
+				}
+			}
+		}
+		for member, score := range items {
+			v = append(v, &zset.Item{Member: member, Score: score})
+		}
+		return nil
+	})
+	return v
 }
 
 // ZInterStore computes the intersection of numkeys sorted sets given by the specified keys, and stores the result in destination.
 func (n *Nodis) ZInterStore(destination string, keys []string, weights []float64, aggregate string) int64 {
-	items := n.ZInter(keys, weights, aggregate)
-	meta := n.store.writeKey(destination, n.newZSet)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	if len(items) == 0 {
-		meta.commit()
-		return 0
-	}
-	for _, item := range items {
-		meta.ds.(*zset.SortedSet).ZAdd(item.Member, item.Score)
-	}
-	meta.commit()
-	n.notify(pb.NewOp(pb.OpType_ZInterStore, destination).Keys(keys).Weights(weights).Aggregate(aggregate))
-	return int64(len(items))
+	var v int64
+	_ = n.Update(func(tx *Tx) error {
+		items := n.ZInter(keys, weights, aggregate)
+		meta := tx.writeKey(destination, n.newZSet)
+		if !meta.isOk() {
+			return nil
+		}
+		if len(items) == 0 {
+			return nil
+		}
+		for _, item := range items {
+			meta.ds.(*zset.SortedSet).ZAdd(item.Member, item.Score)
+		}
+		n.notify(pb.NewOp(pb.OpType_ZInterStore, destination).Keys(keys).Weights(weights).Aggregate(aggregate))
+		v = int64(len(items))
+		return nil
+	})
+	return v
 }

@@ -12,22 +12,27 @@ func (n *Nodis) newSet() ds.DataStruct {
 
 // SAdd adds the specified members to the set stored at key.
 func (n *Nodis) SAdd(key string, members ...string) int64 {
-	meta := n.store.writeKey(key, n.newSet)
-	v := meta.ds.(*set.Set).SAdd(members...)
-	meta.commit()
-	n.notify(pb.NewOp(pb.OpType_SAdd, key).Members(members))
+	var v int64
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, n.newSet)
+		v = meta.ds.(*set.Set).SAdd(members...)
+		n.notify(pb.NewOp(pb.OpType_SAdd, key).Members(members))
+		return nil
+	})
 	return v
 }
 
 // SCard gets the set members count.
 func (n *Nodis) SCard(key string) int64 {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	v := meta.ds.(*set.Set).SCard()
-	meta.commit()
+	var v int64
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		v = meta.ds.(*set.Set).SCard()
+		return nil
+	})
 	return v
 }
 
@@ -36,26 +41,23 @@ func (n *Nodis) SDiff(keys ...string) []string {
 	if len(keys) == 0 {
 		return nil
 	}
-	meta := n.store.readKey(keys[0])
-	if !meta.isOk() {
-		meta.commit()
-		return nil
-	}
-	lockedKeys := []*metadata{}
-	otherSets := make([]*set.Set, len(keys)-1)
-	for i, s := range keys[1:] {
-		metaX := n.store.readKey(s)
+	var v []string
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(keys[0])
 		if !meta.isOk() {
-			continue
+			return nil
 		}
-		lockedKeys = append(lockedKeys, metaX)
-		otherSets[i] = metaX.ds.(*set.Set)
-	}
-	v := meta.ds.(*set.Set).SDiff(otherSets...)
-	for _, s := range lockedKeys {
-		s.commit()
-	}
-	meta.commit()
+		otherSets := make([]*set.Set, len(keys)-1)
+		for i, s := range keys[1:] {
+			metaX := tx.readKey(s)
+			if !meta.isOk() {
+				continue
+			}
+			otherSets[i] = metaX.ds.(*set.Set)
+		}
+		v = meta.ds.(*set.Set).SDiff(otherSets...)
+		return nil
+	})
 	return v
 }
 
@@ -77,21 +79,20 @@ func (n *Nodis) SInter(keys ...string) []string {
 	if len(keys) == 1 {
 		return n.SMembers(keys[0])
 	}
-	lockedSets := make([]*metadata, 0, len(keys))
-	otherSets := make([]*set.Set, 0, len(keys))
-	for _, s := range keys {
-		setDs := n.store.readKey(s)
-		if !setDs.isOk() {
-			setDs.commit()
-			continue
+	var v []string
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(keys[0])
+		otherSets := make([]*set.Set, 0, len(keys))
+		for _, s := range keys[1:] {
+			setDs := tx.readKey(s)
+			if !setDs.isOk() {
+				continue
+			}
+			otherSets = append(otherSets, setDs.ds.(*set.Set))
 		}
-		lockedSets = append(lockedSets, setDs)
-		otherSets = append(otherSets, setDs.ds.(*set.Set))
-	}
-	v := lockedSets[0].ds.(*set.Set).SInter(otherSets[1:]...)
-	for _, s := range lockedSets {
-		s.commit()
-	}
+		v = meta.ds.(*set.Set).SInter(otherSets[1:]...)
+		return nil
+	})
 	return v
 }
 
@@ -112,21 +113,20 @@ func (n *Nodis) SUnion(keys ...string) []string {
 	if len(keys) == 1 {
 		return n.SMembers(keys[0])
 	}
-	lockedSets := make([]*metadata, 0, len(keys))
-	otherSets := make([]*set.Set, 0, len(keys))
-	for _, s := range keys {
-		setDs := n.store.readKey(s)
-		if !setDs.isOk() {
-			setDs.commit()
-			continue
+	var v []string
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(keys[0])
+		otherSets := make([]*set.Set, 0, len(keys))
+		for _, s := range keys[1:] {
+			setDs := tx.readKey(s)
+			if !setDs.isOk() {
+				continue
+			}
+			otherSets = append(otherSets, setDs.ds.(*set.Set))
 		}
-		lockedSets = append(lockedSets, setDs)
-		otherSets = append(otherSets, setDs.ds.(*set.Set))
-	}
-	v := lockedSets[0].ds.(*set.Set).SUnion(otherSets[1:]...)
-	for _, s := range lockedSets {
-		s.commit()
-	}
+		v = meta.ds.(*set.Set).SUnion(otherSets[1:]...)
+		return nil
+	})
 	return v
 }
 
@@ -141,97 +141,111 @@ func (n *Nodis) SUnionStore(destination string, keys ...string) int64 {
 
 // SIsMember returns if member is a member of the set stored at key.
 func (n *Nodis) SIsMember(key, member string) bool {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
-		return false
-	}
-	v := meta.ds.(*set.Set).SIsMember(member)
-	meta.commit()
+	var v bool
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		v = meta.ds.(*set.Set).SIsMember(member)
+		return nil
+	})
 	return v
 }
 
 // SMembers returns all the members of the set value stored at key.
 func (n *Nodis) SMembers(key string) []string {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
+	var v []string
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		v = meta.ds.(*set.Set).SMembers()
 		return nil
-	}
-	v := meta.ds.(*set.Set).SMembers()
-	meta.commit()
+	})
 	return v
 }
 
 // SRem removes the specified members from the set stored at key.
 func (n *Nodis) SRem(key string, members ...string) int64 {
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		meta.commit()
-		return 0
-	}
-	v := meta.ds.(*set.Set).SRem(members...)
-	meta.commit()
-	n.notify(pb.NewOp(pb.OpType_SRem, key).Members(members))
+	var v int64
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			return nil
+		}
+		v = meta.ds.(*set.Set).SRem(members...)
+		n.notify(pb.NewOp(pb.OpType_SRem, key).Members(members))
+		return nil
+	})
 	return v
 }
 
 // SScan scans the set value stored at key.
 func (n *Nodis) SScan(key string, cursor int64, match string, count int64) (int64, []string) {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
-		return 0, nil
-	}
-	c, v := meta.ds.(*set.Set).SScan(cursor, match, count)
-	meta.commit()
+	var c int64
+	var v []string
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		c, v = meta.ds.(*set.Set).SScan(cursor, match, count)
+		return nil
+	})
 	return c, v
 }
 
 // SPop removes and returns a random element from the set value stored at key.
 func (n *Nodis) SPop(key string, count int64) []string {
-	meta := n.store.writeKey(key, nil)
-	if !meta.isOk() {
-		meta.commit()
+	var v []string
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			return nil
+		}
+		if count == 0 {
+			count = 1
+		}
+		v = meta.ds.(*set.Set).SPop(count)
+		n.notify(pb.NewOp(pb.OpType_SRem, key).Members(v))
 		return nil
-	}
-	if count == 0 {
-		count = 1
-	}
-	members := meta.ds.(*set.Set).SPop(count)
-	meta.commit()
-	n.notify(pb.NewOp(pb.OpType_SRem, key).Members(members))
-	return members
+	})
+	return v
 }
 
 // SMove moves a member from one set to another.
 func (n *Nodis) SMove(source, destination, member string) bool {
-	meta := n.store.writeKey(source, nil)
-	if !meta.isOk() {
-		meta.commit()
-		return false
-	}
-	v := meta.ds.(*set.Set).SRem(member)
-	if v == 0 {
-		meta.commit()
-		return false
-	}
-	meta.commit()
-	meta = n.store.writeKey(destination, n.newSet)
-	v = meta.ds.(*set.Set).SAdd(member)
-	n.notify(pb.NewOp(pb.OpType_SAdd, destination).Members([]string{member}))
-	meta.commit()
-	return v > 0
+	var v bool
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.writeKey(source, nil)
+		if !meta.isOk() {
+			return nil
+		}
+		m := meta.ds.(*set.Set).SRem(member)
+		if m == 0 {
+			return nil
+		}
+		meta = tx.writeKey(destination, n.newSet)
+		m = meta.ds.(*set.Set).SAdd(member)
+		n.notify(pb.NewOp(pb.OpType_SAdd, destination).Members([]string{member}))
+		v = m > 0
+		return nil
+	})
+	return v
 }
 
 // SRandMember returns one or more random elements from the set value stored at key.
 func (n *Nodis) SRandMember(key string, count int64) []string {
-	meta := n.store.readKey(key)
-	if !meta.isOk() {
-		meta.commit()
+	var v []string
+	_ = n.Update(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		v = meta.ds.(*set.Set).SRandMember(count)
 		return nil
-	}
-	v := meta.ds.(*set.Set).SRandMember(count)
-	meta.commit()
+	})
 	return v
 }
