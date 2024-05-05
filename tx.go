@@ -1,9 +1,10 @@
 package nodis
 
 import (
+	"time"
+
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/utils"
-	"time"
 )
 
 type Tx struct {
@@ -38,41 +39,45 @@ func (tx *Tx) rLockKey(key string) *metadata {
 	return meta
 }
 
-func (tx *Tx) writeKey(key string, newFn func() ds.DataStruct) *metadata {
-	meta := tx.lockKey(key)
-	meta.writeable = true
-	tx.store.mu.Lock()
-	defer tx.store.mu.Unlock()
-	k, ok := tx.store.keys.Get(key)
-	if ok {
-		if k.expired(time.Now().UnixMilli()) {
-			if newFn == nil {
-				return meta
-			}
-		}
-		d, ok := tx.store.values.Get(key)
-		if ok {
-			meta.set(k, d)
-			meta.key.changed = true
-			return meta
-		}
-		meta = tx.store.fromStorage(k, meta)
-		meta.key.changed = true
-		return meta
-	}
+func (tx *Tx) newKey(meta *metadata, key string, newFn func() ds.DataStruct) *metadata {
 	if newFn != nil {
+		tx.store.mu.Lock()
+		defer tx.store.mu.Unlock()
 		d := newFn()
 		if d == nil {
 			return meta
 		}
-		k = newKey()
+		k := newKey()
 		tx.store.keys.Set(key, k)
 		tx.store.values.Set(key, d)
 		meta.set(k, d)
 		meta.key.changed = true
-		return meta
 	}
 	return meta
+}
+
+func (tx *Tx) writeKey(key string, newFn func() ds.DataStruct) *metadata {
+	meta := tx.lockKey(key)
+	meta.writeable = true
+	tx.store.mu.RLock()
+	k, ok := tx.store.keys.Get(key)
+	if ok && !k.expired(time.Now().UnixMilli()) {
+		// not expired
+		d, ok := tx.store.values.Get(key)
+		if ok {
+			meta.set(k, d)
+			meta.key.changed = true
+			tx.store.mu.RUnlock()
+			return meta
+		}
+		meta = tx.store.fromStorage(k, meta)
+		meta.key.changed = true
+		tx.store.mu.RUnlock()
+		return meta
+	}
+	tx.store.mu.RUnlock()
+	meta.ok = false
+	return tx.newKey(meta, key, newFn)
 }
 
 func (tx *Tx) readKey(key string) *metadata {
@@ -82,6 +87,7 @@ func (tx *Tx) readKey(key string) *metadata {
 	k, ok := tx.store.keys.Get(key)
 	if ok {
 		if k.expired(time.Now().UnixMilli()) {
+			meta.ok = false
 			return meta
 		}
 		d, ok := tx.store.values.Get(key)

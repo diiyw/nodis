@@ -26,14 +26,13 @@ func (m *metadata) isOk() bool {
 }
 
 func (m *metadata) commit() {
-	m.ds = nil
-	m.key = nil
-	m.ok = false
-	writeable := m.writeable
-	m.writeable = false
-	if writeable {
+	if m.writeable {
+		m.ds = nil
+		m.key = nil
+		m.ok = false
+		m.writeable = false
 		m.Unlock()
-	} else {
-		m.RUnlock()
+		return
 	}
+	m.RUnlock()
 }

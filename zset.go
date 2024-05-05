@@ -474,6 +474,9 @@ func (n *Nodis) ZInter(keys []string, weights []float64, aggregate string) []*zs
 		var items = make(map[string]float64)
 		for i, key := range keys {
 			m := tx.readKey(key)
+			if !m.isOk() {
+				return nil
+			}
 			var weight float64 = 1
 			if i < len(weights) {
 				weight = weights[i]

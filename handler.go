@@ -1531,7 +1531,7 @@ func bLPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for i := 0; i < len(cmd.Args)-1; i++ {
 		keys = append(keys, cmd.Args[i])
 	}
-	timeout, err := strconv.ParseInt(cmd.Args[len(cmd.Args)-1], 10, 64)
+	timeout, err := strconv.ParseFloat(cmd.Args[len(cmd.Args)-1], 64)
 	if err != nil {
 		conn.WriteError("ERR timeout value is not an integer or out of range")
 		return

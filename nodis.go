@@ -254,11 +254,11 @@ func (n *Nodis) Serve(addr string) error {
 		}
 		func() {
 			defer func() {
-				//if r := recover(); r != nil {
-				//	log.Println("Recovered from ", r)
-				//	conn.WriteError("ERR " + cmd.Name + " error" + r.(error).Error())
-				//	return
-				//}
+				if r := recover(); r != nil {
+					log.Println("Recovered from ", r)
+					conn.WriteError("ERR " + cmd.Name + " error" + r.(error).Error())
+					return
+				}
 			}()
 			c(n, conn, cmd)
 		}()

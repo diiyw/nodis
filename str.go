@@ -52,11 +52,11 @@ func (n *Nodis) SetPX(key string, value []byte, milliseconds int64) {
 func (n *Nodis) SetNX(key string, value []byte) bool {
 	var ok bool
 	_ = n.Update(func(tx *Tx) error {
-		meta := tx.readKey(key)
+		meta := tx.writeKey(key, nil)
 		if meta.isOk() {
 			return nil
 		}
-		meta = tx.writeKey(key, n.newStr)
+		meta = tx.newKey(meta, key, n.newStr)
 		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value))
 		meta.ds.(*str.String).Set(value)
 		ok = true
