@@ -252,6 +252,22 @@ func (n *Nodis) Serve(addr string) error {
 			conn.WriteError("ERR unknown command: " + cmd.Name)
 			return
 		}
+		if conn.Multi {
+			if cmd.Name == "MULTI" {
+				conn.WriteError("ERR MULTI calls can not be nested")
+				return
+			}
+			if cmd.Name != "MULTI" && cmd.Name != "EXEC" {
+				newCmd := &redis.Command{
+					Name:    cmd.Name,
+					Options: cmd.Options,
+				}
+				newCmd.Args = cmd.Args
+				conn.Commands = append(conn.Commands, newCmd)
+				conn.WriteString("QUEUED")
+				return
+			}
+		}
 		func() {
 			defer func() {
 				if r := recover(); r != nil {

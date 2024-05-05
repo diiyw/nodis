@@ -39,9 +39,9 @@ Simple way to embed in your application.
 | QUIT                | SAVE       		| EXPIRE          | INCR                | SCARD           | HDEL            | LPOP             | ZRANK                 |
 | ECHO                | INFO          	| EXPIREAT        | DECR                | SPOP            | HLEN            | RPOP             | ZREVRANK              |
 | DBSIZE              |             	| KEYS            | SETBIT              | SDIFF           | HKEYS           | LLEN             | ZSCORE                |
-|                     |                 | TTL             | GETBIT              | SINTER          | HEXISTS         | LINDEX           | ZINCRBY               |
-|                     |                 | RENAME          | INCR              	| SISMEMBER       | HGETALL         | LINSERT          | ZRANGE                |
-|                     |                 | TYPE            | DESR                | SMEMBERS        | HINCRBY         | LPUSHX           | ZREVRANGE             |
+| MULTI               |                 | TTL             | GETBIT              | SINTER          | HEXISTS         | LINDEX           | ZINCRBY               |
+| DISCARD             |                 | RENAME          | INCR              	| SISMEMBER       | HGETALL         | LINSERT          | ZRANGE                |
+| EXEC                |                 | TYPE            | DESR                | SMEMBERS        | HINCRBY         | LPUSHX           | ZREVRANGE             |
 |                     |                 | SCAN            | SETEX               | SREM            | HICRBYFLOAT    	| RPUSHX           | ZRANGEBYSCORE         |
 |                     |                 | RANDOMKEY       | INCRBY              | SMOVE           | HSETNX          | LREM             | ZREVRANGEBYSCORE      |
 |                     |                 | RENAMEEX        | DECRBY              | SRANDMEMBER     | HMGET           | LSET             | ZREM                  |

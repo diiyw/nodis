@@ -27,6 +27,12 @@ func getCommand(name string) func(n *Nodis, conn *redis.Conn, cmd *redis.Command
 		return quit
 	case "FLUSHDB":
 		return flushDB
+	case "MULTI":
+		return multi
+	case "DISCARD":
+		return discard
+	case "EXEC":
+		return exec
 	case "FLUSHALL":
 		return flushDB
 	case "SAVE":
@@ -302,6 +308,42 @@ func quit(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 func flushDB(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	n.Clear()
 	conn.WriteOK()
+}
+
+func multi(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+	if conn.Multi {
+		conn.WriteError("ERR MULTI calls can not be nested")
+		return
+	}
+	conn.Multi = true
+	conn.WriteOK()
+}
+
+func discard(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+	conn.Multi = false
+	conn.Commands = nil
+	conn.WriteOK()
+}
+
+func exec(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+	if !conn.Multi {
+		conn.WriteError("ERR EXEC without MULTI")
+		return
+	}
+	if len(conn.Commands) == 0 {
+		conn.WriteArray(0)
+		return
+	}
+	conn.WriteArray(len(conn.Commands))
+	for _, command := range conn.Commands {
+		c := getCommand(command.Name)
+		if c == nil {
+			conn.WriteError("ERR unknown command: " + command.Name)
+			return
+		}
+		c(n, conn, command)
+	}
+	conn.Multi = false
 }
 
 func del(n *Nodis, conn *redis.Conn, cmd *redis.Command) {

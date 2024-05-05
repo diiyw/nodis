@@ -37,18 +37,19 @@ English | [简体中文](https://github.com/diiyw/nodis/blob/main/README_zh-cn.m
 | PING                | FLUSHDB     	| EXISTS          | SET                 | SSCAN           | HGET            | RPUSH            | ZCARD                 |
 | QUIT                | SAVE       		| EXPIRE          | INCR                | SCARD           | HDEL            | LPOP             | ZRANK                 |
 | ECHO                | INFO          	| EXPIREAT        | DECR                | SPOP            | HLEN            | RPOP             | ZREVRANK              |
-|                     |             	| KEYS            | SETBIT              | SDIFF           | HKEYS           | LLEN             | ZSCORE                |
-|                     |                 | TTL             | GETBIT              | SINTER          | HEXISTS         | LINDEX           | ZINCRBY               |
-|                     |                 | RENAME          | INCR              	| SISMEMBER       | HGETALL         | LINSERT          | ZRANGE                |
-|                     |                 | TYPE            | DESR                | SMEMBERS        | HINCRBY         | LPUSHX           | ZREVRANGE             |
+| DBSIZE              |             	| KEYS            | SETBIT              | SDIFF           | HKEYS           | LLEN             | ZSCORE                |
+| MULTI               |                 | TTL             | GETBIT              | SINTER          | HEXISTS         | LINDEX           | ZINCRBY               |
+| DISCARD             |                 | RENAME          | INCR              	| SISMEMBER       | HGETALL         | LINSERT          | ZRANGE                |
+| EXEC                |                 | TYPE            | DESR                | SMEMBERS        | HINCRBY         | LPUSHX           | ZREVRANGE             |
 |                     |                 | SCAN            | SETEX               | SREM            | HICRBYFLOAT    	| RPUSHX           | ZRANGEBYSCORE         |
-|                     |                 | RANDOMKEY       | INCRBY              |                 | HSETNX          | LREM             | ZREVRANGEBYSCORE      |
-|                     |                 |                 | DECRBY              |                 | HMGET           | LSET             | ZREM                  |
-|                     |                 |                 |                     |                 | HMSET           | LRANGE           | ZREMRANGEBYRANK       |
-|                     |                 |                 |                     |                 | HCLEAR          | LPOPRPUSH        | ZREMRANGEBYSCORE      |
-|                     |                 |                 |                     |                 | HSCAN           | RPOPLPUSH        | ZCLEAR                |
-|                     |                 |                 |                     |                 | HVALS           |                  | ZEXISTS               |
-|                     |                 |                 |                     |                 |                 |                  |                       |
+|                     |                 | RANDOMKEY       | INCRBY              | SMOVE           | HSETNX          | LREM             | ZREVRANGEBYSCORE      |
+|                     |                 | RENAMEEX        | DECRBY              | SRANDMEMBER     | HMGET           | LSET             | ZREM                  |
+|                     |                 | PERSIST         | SETNX               | SINTERSTORE     | HMSET           | LRANGE           | ZREMRANGEBYRANK       |
+|                     |                 |                 | INCRBYFLOAT         | SUNIONSTORE     | HCLEAR          | LPOPRPUSH        | ZREMRANGEBYSCORE      |
+|                     |                 |                 | APPEND              |                 | HSCAN           | RPOPLPUSH        | ZCLEAR                |
+|                     |                 |                 | GETRANGE            |                 | HVALS           | BLPOP            | ZEXISTS               |
+|                     |                 |                 | STRLEN              |                 |                 | BRPOP            | ZUNIONSTORE           |
+|                     |                 |                 | STRLEN              |                 |                 | BRPOP            | ZINTERSTORE		   |
 ## Get Started
 ```bash
  go get github.com/diiyw/nodis@v1.5.0

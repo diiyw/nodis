@@ -10,6 +10,7 @@ type Conn struct {
 	*Reader
 	*Writer
 	Network  net.Conn
+	Multi    bool
 	Commands []*Command
 }
 
