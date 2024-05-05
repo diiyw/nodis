@@ -25,12 +25,6 @@ func (m *metadata) isOk() bool {
 	return m.ok
 }
 
-func (m *metadata) markChanged() {
-	if m.ok {
-		m.key.changed = true
-	}
-}
-
 func (m *metadata) commit() {
 	m.ds = nil
 	m.key = nil
