@@ -191,11 +191,10 @@ func (n *Nodis) ExpireLT(key string, seconds int64) int64 {
 
 // ExpireGT the keys only when the new expiry is greater than current one
 func (n *Nodis) ExpireGT(key string, seconds int64) int64 {
-	var v int64 = 1
+	var v int64 = 0
 	_ = n.Update(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
-			v = 0
 			return nil
 		}
 		now := time.Now().UnixMilli()
@@ -206,6 +205,7 @@ func (n *Nodis) ExpireGT(key string, seconds int64) int64 {
 		if meta.key.expiration < now+ms {
 			meta.key.expiration += ms
 			n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+			v = 1
 		}
 		return nil
 	})

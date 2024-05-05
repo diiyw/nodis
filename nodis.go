@@ -105,7 +105,6 @@ func (n *Nodis) GetEntry(key string) (data []byte) {
 			return nil
 		}
 		var entity = newEntry(key, meta.ds, meta.key.expiration)
-		meta.commit()
 		data, _ = entity.Marshal()
 		return nil
 	})
@@ -254,6 +253,13 @@ func (n *Nodis) Serve(addr string) error {
 			return
 		}
 		func() {
+			defer func() {
+				//if r := recover(); r != nil {
+				//	log.Println("Recovered from ", r)
+				//	conn.WriteError("ERR " + cmd.Name + " error" + r.(error).Error())
+				//	return
+				//}
+			}()
 			c(n, conn, cmd)
 		}()
 	})
@@ -264,12 +270,6 @@ func (n *Nodis) Update(fn func(tx *Tx) error) error {
 		store:       n.store,
 		lockedMetas: make([]*metadata, 0),
 	}
-	defer func() {
-		tx.commit()
-		if r := recover(); r != nil {
-			log.Println("Recovered from ", r)
-			return
-		}
-	}()
+	defer tx.commit()
 	return fn(tx)
 }

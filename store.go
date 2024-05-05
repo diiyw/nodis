@@ -97,7 +97,7 @@ func (s *store) delKey(key string) {
 	s.mu.Unlock()
 }
 
-func (s *store) fromStorage(k *Key, meta *metadata, changed bool) *metadata {
+func (s *store) fromStorage(k *Key, meta *metadata) *metadata {
 	// try get from storage
 	v, err := s.getEntryRaw(k)
 	if err == nil && len(v) > 0 {
@@ -108,7 +108,7 @@ func (s *store) fromStorage(k *Key, meta *metadata, changed bool) *metadata {
 		}
 		if value != nil {
 			s.values.Set(key, value)
-			meta.set(k, value, changed)
+			meta.set(k, value)
 			return meta
 		}
 	}
@@ -165,8 +165,7 @@ func (s *store) save() {
 	tx := newTx(s)
 	defer tx.commit()
 	s.keys.Scan(func(key string, k *Key) bool {
-		meta := tx.readKey(key)
-		defer meta.commit()
+		_ = tx.rLockKey(key)
 		if !k.changed || k.expired(now) {
 			return true
 		}
@@ -195,8 +194,7 @@ func (s *store) tidy(ms int64) {
 	tx := newTx(s)
 	defer tx.commit()
 	s.keys.Scan(func(key string, k *Key) bool {
-		meta := tx.readKey(key)
-		defer meta.commit()
+		_ = tx.rLockKey(key)
 		if k.expired(now) {
 			s.keys.Delete(key)
 			s.values.Delete(key)
@@ -405,12 +403,11 @@ func (s *store) close() error {
 	tx := newTx(s)
 	defer tx.commit()
 	s.keys.Scan(func(key string, k *Key) bool {
-		meta := tx.readKey(key)
+		_ = tx.rLockKey(key)
 		indexData.Items = append(indexData.Items, &pb.Index_Item{
 			Key:  key,
 			Data: k.marshal(),
 		})
-		meta.commit()
 		return true
 	})
 	data, err := proto.Marshal(indexData)

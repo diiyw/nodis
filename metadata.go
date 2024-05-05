@@ -14,10 +14,9 @@ type metadata struct {
 	writeable bool
 }
 
-func (m *metadata) set(key *Key, d ds.DataStruct, changed bool) *metadata {
+func (m *metadata) set(key *Key, d ds.DataStruct) *metadata {
 	m.key = key
 	m.ds = d
-	m.key.changed = changed
 	m.ok = true
 	return m
 }

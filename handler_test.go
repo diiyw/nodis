@@ -14,7 +14,7 @@ func TestClient_SetName(t *testing.T) {
 		Args: []string{"SETNAME"},
 	}
 
-	client(n, w, cmd)
+	client(n, &redis.Conn{Writer: w}, cmd)
 
 	expected := []byte("+OK\r\n")
 	if string(w.Bytes()) != string(expected) {
@@ -29,7 +29,7 @@ func TestClient_InvalidSubcommand(t *testing.T) {
 		Args: []string{"INVALID"},
 	}
 
-	client(n, w, cmd)
+	client(n, &redis.Conn{Writer: w}, cmd)
 
 	expected := []byte("-CLIENT subcommand must be provided\r\n")
 	if string(w.Bytes()) != string(expected) {
@@ -48,7 +48,7 @@ func TestClient_Config(t *testing.T) {
 		},
 	}
 
-	config(n, w, cmd)
+	config(n, &redis.Conn{Writer: w}, cmd)
 
 	expected := []byte("*2\r\n$9\r\ndatabases\r\n$1\r\n0\r\n")
 	if string(w.Bytes()) != string(expected) {
@@ -64,7 +64,7 @@ func TestClient_Config_InvalidArgs(t *testing.T) {
 		Args: []string{"GET"},
 	}
 
-	config(n, w, cmd)
+	config(n, &redis.Conn{Writer: w}, cmd)
 
 	expected := []byte("-CONFIG GET requires at least two argument\r\n")
 	if string(w.Bytes()) != string(expected) {
@@ -80,7 +80,7 @@ func TestClient_Config_InvalidOption(t *testing.T) {
 		Args: []string{"GET", "INVALID"},
 	}
 
-	config(n, w, cmd)
+	config(n, &redis.Conn{Writer: w}, cmd)
 
 	expected := []byte("$-1\r\n")
 	if string(w.Bytes()) != string(expected) {
@@ -94,7 +94,7 @@ func TestClient_Ping(t *testing.T) {
 		Args: []string{"PING"},
 	}
 
-	ping(n, w, cmd)
+	ping(n, &redis.Conn{Writer: w}, cmd)
 
 	expected := []byte("$4\r\nPING\r\n")
 	if string(w.Bytes()) != string(expected) {
@@ -109,7 +109,7 @@ func TestClient_Ping_NoArgs(t *testing.T) {
 		Args: []string{},
 	}
 
-	ping(n, w, cmd)
+	ping(n, &redis.Conn{Writer: w}, cmd)
 
 	expected := []byte("$4\r\nPONG\r\n")
 	if string(w.Bytes()) != string(expected) {
@@ -124,7 +124,7 @@ func TestClient_Echo(t *testing.T) {
 		Args: []string{"Hello, World!"},
 	}
 
-	echo(n, w, cmd)
+	echo(n, &redis.Conn{Writer: w}, cmd)
 
 	expected := []byte("$13\r\nHello, World!\r\n")
 	if string(w.Bytes()) != string(expected) {
@@ -139,7 +139,7 @@ func TestClient_Echo_NoArgs(t *testing.T) {
 		Args: []string{},
 	}
 
-	echo(n, w, cmd)
+	echo(n, &redis.Conn{Writer: w}, cmd)
 
 	expected := []byte("$-1\r\n")
 	if string(w.Bytes()) != string(expected) {

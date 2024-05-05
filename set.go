@@ -82,7 +82,7 @@ func (n *Nodis) SInter(keys ...string) []string {
 	var v []string
 	_ = n.Update(func(tx *Tx) error {
 		meta := tx.readKey(keys[0])
-		otherSets := make([]*set.Set, 0, len(keys))
+		otherSets := make([]*set.Set, 0, len(keys)-1)
 		for _, s := range keys[1:] {
 			setDs := tx.readKey(s)
 			if !setDs.isOk() {
@@ -90,7 +90,7 @@ func (n *Nodis) SInter(keys ...string) []string {
 			}
 			otherSets = append(otherSets, setDs.ds.(*set.Set))
 		}
-		v = meta.ds.(*set.Set).SInter(otherSets[1:]...)
+		v = meta.ds.(*set.Set).SInter(otherSets...)
 		return nil
 	})
 	return v
@@ -116,7 +116,7 @@ func (n *Nodis) SUnion(keys ...string) []string {
 	var v []string
 	_ = n.Update(func(tx *Tx) error {
 		meta := tx.readKey(keys[0])
-		otherSets := make([]*set.Set, 0, len(keys))
+		otherSets := make([]*set.Set, 0, len(keys)-1)
 		for _, s := range keys[1:] {
 			setDs := tx.readKey(s)
 			if !setDs.isOk() {
@@ -124,7 +124,7 @@ func (n *Nodis) SUnion(keys ...string) []string {
 			}
 			otherSets = append(otherSets, setDs.ds.(*set.Set))
 		}
-		v = meta.ds.(*set.Set).SUnion(otherSets[1:]...)
+		v = meta.ds.(*set.Set).SUnion(otherSets...)
 		return nil
 	})
 	return v

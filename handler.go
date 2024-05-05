@@ -2124,8 +2124,6 @@ func zExists(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 }
 
 func save(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
-	n.store.mu.Lock()
 	n.store.save()
-	n.store.mu.Unlock()
 	conn.WriteString("OK")
 }
