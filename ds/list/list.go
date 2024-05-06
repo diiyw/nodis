@@ -156,6 +156,9 @@ func (l *DoublyLinkedList) LLen() int64 {
 
 // LIndex returns the element at index in the list
 func (l *DoublyLinkedList) LIndex(index int64) []byte {
+	if index < 0 {
+		index = l.length + index
+	}
 	currentNode := l.head
 	var currentIndex int64 = 0
 	for currentNode != nil {

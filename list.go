@@ -17,7 +17,7 @@ func (n *Nodis) newList() ds.DataStruct {
 
 func (n *Nodis) LPush(key string, values ...[]byte) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newList)
 		meta.ds.(*list.DoublyLinkedList).LPush(values...)
 		v = meta.ds.(*list.DoublyLinkedList).LLen()
@@ -29,7 +29,7 @@ func (n *Nodis) LPush(key string, values ...[]byte) int64 {
 
 func (n *Nodis) RPush(key string, values ...[]byte) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newList)
 		meta.ds.(*list.DoublyLinkedList).RPush(values...)
 		v = meta.ds.(*list.DoublyLinkedList).LLen()
@@ -41,7 +41,7 @@ func (n *Nodis) RPush(key string, values ...[]byte) int64 {
 
 func (n *Nodis) LPop(key string, count int64) [][]byte {
 	var v [][]byte
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			return nil
@@ -58,7 +58,7 @@ func (n *Nodis) LPop(key string, count int64) [][]byte {
 
 func (n *Nodis) RPop(key string, count int64) [][]byte {
 	var v [][]byte
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			return nil
@@ -75,7 +75,7 @@ func (n *Nodis) RPop(key string, count int64) [][]byte {
 
 func (n *Nodis) LLen(key string) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -93,7 +93,7 @@ func (n *Nodis) LLen(key string) int64 {
 
 func (n *Nodis) LIndex(key string, index int64) []byte {
 	var v []byte
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -106,7 +106,7 @@ func (n *Nodis) LIndex(key string, index int64) []byte {
 
 func (n *Nodis) LInsert(key string, pivot, data []byte, before bool) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			return nil
@@ -120,7 +120,7 @@ func (n *Nodis) LInsert(key string, pivot, data []byte, before bool) int64 {
 
 func (n *Nodis) LPushX(key string, data []byte) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			return nil
@@ -134,7 +134,7 @@ func (n *Nodis) LPushX(key string, data []byte) int64 {
 
 func (n *Nodis) RPushX(key string, data []byte) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			return nil
@@ -148,7 +148,7 @@ func (n *Nodis) RPushX(key string, data []byte) int64 {
 
 func (n *Nodis) LRem(key string, data []byte, count int64) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			return nil
@@ -162,7 +162,7 @@ func (n *Nodis) LRem(key string, data []byte, count int64) int64 {
 
 func (n *Nodis) LSet(key string, index int64, data []byte) bool {
 	var v bool
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newList)
 		n.notify(pb.NewOp(pb.OpType_LSet, key).Value(data).Index(index))
 		v = meta.ds.(*list.DoublyLinkedList).LSet(index, data)
@@ -172,7 +172,7 @@ func (n *Nodis) LSet(key string, index int64, data []byte) bool {
 }
 
 func (n *Nodis) LTrim(key string, start, stop int64) {
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			return nil
@@ -185,7 +185,7 @@ func (n *Nodis) LTrim(key string, start, stop int64) {
 
 func (n *Nodis) LRange(key string, start, stop int64) [][]byte {
 	var v [][]byte
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -198,7 +198,7 @@ func (n *Nodis) LRange(key string, start, stop int64) [][]byte {
 
 func (n *Nodis) LPopRPush(source, destination string) []byte {
 	var v [][]byte
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(source, nil)
 		if !meta.isOk() {
 
@@ -221,7 +221,7 @@ func (n *Nodis) LPopRPush(source, destination string) []byte {
 
 func (n *Nodis) RPopLPush(source, destination string) []byte {
 	var v [][]byte
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(source, nil)
 		if !meta.isOk() {
 			return nil

@@ -11,7 +11,7 @@ import (
 	"github.com/diiyw/nodis/utils"
 )
 
-func getCommand(name string) func(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func getCommand(name string) func(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	switch name {
 	case "CLIENT":
 		return client
@@ -231,7 +231,7 @@ func getCommand(name string) func(n *Nodis, conn *redis.Conn, cmd *redis.Command
 	return nil
 }
 
-func client(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func client(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("CLIENT subcommand must be provided")
 		return
@@ -244,9 +244,10 @@ func client(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	default:
 		conn.WriteError("CLIENT subcommand must be provided")
 	}
+	return
 }
 
-func config(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func config(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("CONFIG GET requires at least two argument")
 		return
@@ -264,13 +265,15 @@ func config(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		}
 	}
 	conn.WriteNull()
+	return
 }
 
-func dbSize(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func dbSize(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	conn.WriteInteger(int64(n.store.keys.Len()))
+	return
 }
 
-func info(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func info(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	memStats := runtime.MemStats{}
 	runtime.ReadMemStats(&memStats)
 	usedMemory := strconv.FormatUint(memStats.HeapInuse+memStats.StackInuse, 10)
@@ -282,50 +285,57 @@ process_id:` + pid + `
 # Memory
 used_memory:` + usedMemory + `
 `)
+	return
 }
 
-func ping(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func ping(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteBulk("PONG")
 		return
 	}
 	conn.WriteBulk(cmd.Args[0])
+	return
 }
 
-func echo(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func echo(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteNull()
 		return
 	}
 	conn.WriteBulk(cmd.Args[0])
+	return
 }
 
-func quit(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func quit(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	conn.WriteOK()
 	conn.Network.Close()
+	return
 }
 
-func flushDB(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func flushDB(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	n.Clear()
 	conn.WriteOK()
+	return
 }
 
-func multi(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func multi(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if conn.Multi {
 		conn.WriteError("ERR MULTI calls can not be nested")
 		return
 	}
 	conn.Multi = true
 	conn.WriteOK()
+	return
 }
 
-func discard(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func discard(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	conn.Multi = false
 	conn.Commands = nil
 	conn.WriteOK()
+	return
 }
 
-func exec(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func exec(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if !conn.Multi {
 		conn.WriteError("ERR EXEC without MULTI")
 		return
@@ -344,26 +354,29 @@ func exec(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		c(n, conn, command)
 	}
 	conn.Multi = false
+	return
 }
 
-func del(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func del(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("DEL requires at least one argument")
 		return
 	}
 	conn.WriteInteger(n.Del(cmd.Args...))
+	return
 }
 
-func exists(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func exists(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("EXISTS requires at least one argument")
 		return
 	}
 	conn.WriteInteger(n.Exists(cmd.Args...))
+	return
 }
 
 // EXPIRE key seconds [NX | XX | GT | LT]
-func expire(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func expire(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("EXPIRE requires at least two arguments")
 		return
@@ -386,10 +399,11 @@ func expire(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(n.Expire(cmd.Args[0], seconds))
+	return
 }
 
 // EXPIREAT key unix-time-seconds [NX | XX | GT | LT]
-func expireAt(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func expireAt(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("EXPIREAT requires at least two arguments")
 		return
@@ -413,9 +427,10 @@ func expireAt(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(n.ExpireAt(cmd.Args[0], e))
+	return
 }
 
-func keys(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func keys(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("KEYS requires at least one argument")
 		return
@@ -425,9 +440,10 @@ func keys(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for _, v := range keys {
 		conn.WriteBulk(v)
 	}
+	return
 }
 
-func ttl(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func ttl(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("TTL requires at least one argument")
 		return
@@ -442,26 +458,29 @@ func ttl(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(int64(v.Seconds()))
+	return
 }
 
-func Persist(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func Persist(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("PERSIST requires at least one argument")
 		return
 	}
 	conn.WriteInteger(n.Persist(cmd.Args[0]))
+	return
 }
 
-func randomKey(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func randomKey(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	key := n.RandomKey()
 	if key == "" {
 		conn.WriteNull()
 		return
 	}
 	conn.WriteBulk(key)
+	return
 }
 
-func rename(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func rename(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("RENAME requires at least two arguments")
 		return
@@ -474,9 +493,10 @@ func rename(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(0)
+	return
 }
 
-func renameNx(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func renameNx(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("RENAMENX requires at least two arguments")
 		return
@@ -489,19 +509,21 @@ func renameNx(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(0)
+	return
 }
 
-func typ(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func typ(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("TYPE requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
 	conn.WriteString(n.Type(key))
+	return
 }
 
 // SCAN cursor [MATCH pattern] [COUNT count] [TYPE type]
-func scan(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func scan(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("SCAN requires at least one argument")
 		return
@@ -530,10 +552,11 @@ func scan(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for _, v := range keys {
 		conn.WriteBulk(v)
 	}
+	return
 }
 
 // SET key value [NX | XX] [GET] [EX seconds | PX milliseconds | EXAT unix-time-seconds | PXAT unix-time-milliseconds | KEEPTTL]
-func setString(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func setString(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("SET requires at least two arguments")
 		return
@@ -582,9 +605,10 @@ func setString(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteOK()
+	return
 }
 
-func mSet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func mSet(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 || len(cmd.Args)%2 != 0 {
 		conn.WriteError("MSET requires at least two arguments")
 		return
@@ -593,9 +617,10 @@ func mSet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		n.Set(cmd.Args[i], []byte(cmd.Args[i+1]))
 	}
 	conn.WriteOK()
+	return
 }
 
-func appendString(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func appendString(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("APPEND requires at least two arguments")
 		return
@@ -603,9 +628,10 @@ func appendString(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	key := cmd.Args[0]
 	value := []byte(cmd.Args[1])
 	conn.WriteInteger(n.Append(key, value))
+	return
 }
 
-func setex(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func setex(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("SETEX requires at least three arguments")
 		return
@@ -615,9 +641,10 @@ func setex(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	value := []byte(cmd.Args[2])
 	n.SetEX(key, value, seconds)
 	conn.WriteOK()
+	return
 }
 
-func setnx(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func setnx(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("SETNX requires at least two arguments")
 		return
@@ -629,9 +656,10 @@ func setnx(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(0)
+	return
 }
 
-func incr(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func incr(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("INCR requires at least one argument")
 		return
@@ -643,9 +671,10 @@ func incr(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(v)
+	return
 }
 
-func incrBy(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func incrBy(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("INCRBY requires at least two arguments")
 		return
@@ -662,9 +691,10 @@ func incrBy(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(v)
+	return
 }
 
-func decr(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func decr(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("DECR requires at least one argument")
 		return
@@ -676,9 +706,10 @@ func decr(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(v)
+	return
 }
 
-func decrBy(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func decrBy(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("INCRBY requires at least two arguments")
 		return
@@ -695,9 +726,10 @@ func decrBy(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(v)
+	return
 }
 
-func incrByFloat(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func incrByFloat(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("INCRBYFLOAT requires at least two arguments")
 		return
@@ -714,9 +746,10 @@ func incrByFloat(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteBulk(strconv.FormatFloat(v, 'f', -1, 64))
+	return
 }
 
-func getString(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func getString(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("GET requires at least one argument")
 		return
@@ -727,9 +760,10 @@ func getString(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteBulk(string(v))
+	return
 }
 
-func mGet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func mGet(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("MGET requires at least one argument")
 		return
@@ -743,9 +777,10 @@ func mGet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		}
 		conn.WriteBulk(string(value))
 	}
+	return
 }
 
-func getRange(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func getRange(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("GETRANGE requires at least three arguments")
 		return
@@ -763,18 +798,20 @@ func getRange(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	}
 	v := n.GetRange(key, start, end)
 	conn.WriteBulk(string(v))
+	return
 }
 
-func strLen(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func strLen(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("STRLEN requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
 	conn.WriteInteger(n.StrLen(key))
+	return
 }
 
-func setBit(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func setBit(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("SETBIT requires at least three arguments")
 		return
@@ -791,9 +828,10 @@ func setBit(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(n.SetBit(key, offset, value == 1))
+	return
 }
 
-func getBit(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func getBit(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("GETBIT requires at least two arguments")
 		return
@@ -805,9 +843,10 @@ func getBit(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(n.GetBit(key, offset))
+	return
 }
 
-func bitCount(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func bitCount(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("BITCOUNT requires at least one argument")
 		return
@@ -830,18 +869,20 @@ func bitCount(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		}
 	}
 	conn.WriteInteger(n.BitCount(key, start, end, cmd.Options.BIT > 0))
+	return
 }
 
-func sAdd(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func sAdd(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("SADD requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
 	conn.WriteInteger(n.SAdd(key, cmd.Args[1:]...))
+	return
 }
 
-func sMove(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func sMove(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("SMOVE requires at least three arguments")
 		return
@@ -854,10 +895,11 @@ func sMove(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(0)
+	return
 }
 
 // SSCAN key cursor [MATCH pattern] [COUNT count]
-func sScan(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func sScan(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 1 {
 		conn.WriteError("SSCAN requires at least one argument")
 		return
@@ -883,9 +925,10 @@ func sScan(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for _, v := range keys {
 		conn.WriteBulk(v)
 	}
+	return
 }
 
-func sPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func sPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 1 {
 		conn.WriteError("SPOP requires at least one argument")
 		return
@@ -917,18 +960,20 @@ func sPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for _, v := range results {
 		conn.WriteBulk(v)
 	}
+	return
 }
 
-func scard(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func scard(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("SCARD requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
 	conn.WriteInteger(n.SCard(key))
+	return
 }
 
-func sDiff(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func sDiff(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("SDIFF requires at least two arguments")
 		return
@@ -938,9 +983,10 @@ func sDiff(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for _, v := range results {
 		conn.WriteBulk(v)
 	}
+	return
 }
 
-func sDiffStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func sDiffStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("SDIFFSTORE requires at least two arguments")
 		return
@@ -953,9 +999,10 @@ func sDiffStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	}
 	results := n.SDiffStore(dst, keys...)
 	conn.WriteInteger(results)
+	return
 }
 
-func sInter(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func sInter(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("SINTER requires at least two arguments")
 		return
@@ -965,9 +1012,10 @@ func sInter(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for _, v := range results {
 		conn.WriteBulk(v)
 	}
+	return
 }
 
-func sInterStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func sInterStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("SINTERSTORE requires at least two arguments")
 		return
@@ -980,9 +1028,10 @@ func sInterStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	}
 	results := n.SInterStore(dst, keys...)
 	conn.WriteInteger(results)
+	return
 }
 
-func sUnion(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func sUnion(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("SUNION requires at least two arguments")
 		return
@@ -992,9 +1041,10 @@ func sUnion(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for _, v := range results {
 		conn.WriteBulk(v)
 	}
+	return
 }
 
-func sUnionStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func sUnionStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("SUNIONSTORE requires at least two arguments")
 		return
@@ -1007,8 +1057,10 @@ func sUnionStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	}
 	results := n.SUnionStore(dst, keys...)
 	conn.WriteInteger(results)
+	return
 }
-func sIsMember(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+
+func sIsMember(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("SISMEMBER requires at least two arguments")
 		return
@@ -1021,9 +1073,10 @@ func sIsMember(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		r = 1
 	}
 	conn.WriteInteger(r)
+	return
 }
 
-func sMembers(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func sMembers(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("SMEMBERS requires at least one argument")
 		return
@@ -1034,9 +1087,10 @@ func sMembers(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for _, v := range results {
 		conn.WriteBulk(v)
 	}
+	return
 }
 
-func sRandMember(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func sRandMember(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("SRANDMEMBER requires at least one argument")
 		return
@@ -1064,18 +1118,20 @@ func sRandMember(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for _, v := range results {
 		conn.WriteBulk(v)
 	}
+	return
 }
 
-func sRem(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func sRem(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("SREM requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
 	conn.WriteInteger(n.SRem(key, cmd.Args[1:]...))
+	return
 }
 
-func hSet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func hSet(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("HSET requires at least three arguments")
 		return
@@ -1095,9 +1151,10 @@ func hSet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		i += n.HMSet(key, fields)
 	}
 	conn.WriteInteger(i)
+	return
 }
 
-func hGet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func hGet(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("HGET requires at least two arguments")
 		return
@@ -1110,27 +1167,30 @@ func hGet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteBulk(v)
+	return
 }
 
-func hDel(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func hDel(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("HDEL requires at least two arguments")
 		return
 	}
 	key := cmd.Args[0]
 	conn.WriteInteger(n.HDel(key, cmd.Args[1:]...))
+	return
 }
 
-func hLen(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func hLen(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("HLEN requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
 	conn.WriteInteger(n.HLen(key))
+	return
 }
 
-func hKeys(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func hKeys(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("HKEYS requires at least one argument")
 		return
@@ -1141,9 +1201,10 @@ func hKeys(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for _, v := range results {
 		conn.WriteBulk(v)
 	}
+	return
 }
 
-func hExists(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func hExists(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("HEXISTS requires at least two arguments")
 		return
@@ -1156,9 +1217,10 @@ func hExists(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		r = 1
 	}
 	conn.WriteInteger(r)
+	return
 }
 
-func hGetAll(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func hGetAll(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("HGETALL requires at least one argument")
 		return
@@ -1170,9 +1232,10 @@ func hGetAll(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		conn.WriteBulk(string(k))
 		conn.WriteBulk(string(v))
 	}
+	return
 }
 
-func hIncrBy(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func hIncrBy(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("HINCRBY requires at least three arguments")
 		return
@@ -1190,9 +1253,10 @@ func hIncrBy(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(v)
+	return
 }
 
-func hIncrByFloat(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func hIncrByFloat(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("HINCRBYFLOAT requires at least three arguments")
 		return
@@ -1211,9 +1275,10 @@ func hIncrByFloat(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	}
 	f := strconv.FormatFloat(v, 'f', -1, 64)
 	conn.WriteBulk(f)
+	return
 }
 
-func hSetNX(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func hSetNX(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("HSETNX requires at least three arguments")
 		return
@@ -1222,9 +1287,10 @@ func hSetNX(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	field := cmd.Args[1]
 	value := cmd.Args[2]
 	conn.WriteInteger(n.HSetNX(key, field, []byte(value)))
+	return
 }
 
-func hMGet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func hMGet(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("HMGET requires at least two arguments")
 		return
@@ -1240,9 +1306,10 @@ func hMGet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 			conn.WriteBulk(string(v))
 		}
 	}
+	return
 }
 
-func hMSet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func hMSet(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("HMSET requires at least three arguments")
 		return
@@ -1257,9 +1324,10 @@ func hMSet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	}
 	n.HMSet(key, fields)
 	conn.WriteString("OK")
+	return
 }
 
-func hClear(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func hClear(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("HCLEAR requires at least one argument")
 		return
@@ -1267,9 +1335,10 @@ func hClear(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	key := cmd.Args[0]
 	n.HClear(key)
 	conn.WriteString("OK")
+	return
 }
 
-func hScan(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func hScan(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("HSCAN requires at least one argument")
 		return
@@ -1297,9 +1366,10 @@ func hScan(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		conn.WriteBulk(k)
 		conn.WriteBulk(string(v))
 	}
+	return
 }
 
-func hVals(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func hVals(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("HVALS requires at least one argument")
 		return
@@ -1310,9 +1380,10 @@ func hVals(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for _, v := range results {
 		conn.WriteBulk(string(v))
 	}
+	return
 }
 
-func lPush(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func lPush(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("LPUSH requires at least two arguments")
 		return
@@ -1323,9 +1394,10 @@ func lPush(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		values = append(values, []byte(cmd.Args[i]))
 	}
 	conn.WriteInteger(n.LPush(key, values...))
+	return
 }
 
-func rPush(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func rPush(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("RPUSH requires at least two arguments")
 		return
@@ -1337,9 +1409,10 @@ func rPush(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	}
 
 	conn.WriteInteger(n.RPush(key, values...))
+	return
 }
 
-func lPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func lPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("LPOP requires at least one argument")
 		return
@@ -1367,9 +1440,10 @@ func lPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for _, vv := range v {
 		conn.WriteBulk(string(vv))
 	}
+	return
 }
 
-func rPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func rPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("RPOP requires at least one argument")
 		return
@@ -1397,9 +1471,10 @@ func rPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for _, vv := range v {
 		conn.WriteBulk(string(vv))
 	}
+	return
 }
 
-func llen(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func llen(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("LLEN requires at least one argument")
 		return
@@ -1411,9 +1486,10 @@ func llen(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(v)
+	return
 }
 
-func lIndex(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func lIndex(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("LINDEX requires at least two arguments")
 		return
@@ -1426,9 +1502,10 @@ func lIndex(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteBulk(string(v))
+	return
 }
 
-func lInsert(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func lInsert(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 4 {
 		conn.WriteError("LINSERT requires at least four arguments")
 		return
@@ -1438,9 +1515,10 @@ func lInsert(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	pivot := []byte(cmd.Args[2])
 	value := []byte(cmd.Args[3])
 	conn.WriteInteger(n.LInsert(key, pivot, value, before))
+	return
 }
 
-func lPushx(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func lPushx(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("LPUSHX requires at least two arguments")
 		return
@@ -1448,18 +1526,20 @@ func lPushx(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	key := cmd.Args[0]
 	value := []byte(cmd.Args[1])
 	conn.WriteInteger(n.LPushX(key, value))
+	return
 }
 
-func rPushx(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func rPushx(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("RPUSHX requires at least two arguments")
 	}
 	key := cmd.Args[0]
 	value := []byte(cmd.Args[1])
 	conn.WriteInteger(n.RPushX(key, value))
+	return
 }
 
-func lRem(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func lRem(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("LREM requires at least two arguments")
 		return
@@ -1473,9 +1553,10 @@ func lRem(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	}
 	value := []byte(cmd.Args[2])
 	conn.WriteInteger(n.LRem(key, value, count))
+	return
 }
 
-func lTrim(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func lTrim(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("LTRIM requires at least two arguments")
 		return
@@ -1493,9 +1574,10 @@ func lTrim(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	}
 	n.LTrim(key, start, end)
 	conn.WriteString("OK")
+	return
 }
 
-func lSet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func lSet(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("LSET requires at least three arguments")
 		return
@@ -1509,9 +1591,10 @@ func lSet(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	value := []byte(cmd.Args[2])
 	n.LSet(key, index, value)
 	conn.WriteString("OK")
+	return
 }
 
-func lRange(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func lRange(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("LRANGE requires at least two arguments")
 		return
@@ -1532,9 +1615,10 @@ func lRange(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for _, v := range results {
 		conn.WriteBulk(string(v))
 	}
+	return
 }
 
-func lPopRPush(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func lPopRPush(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("LPOPRPUSH requires at least two arguments")
 		return
@@ -1547,9 +1631,10 @@ func lPopRPush(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteBulk(string(v))
+	return
 }
 
-func rPopLPush(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func rPopLPush(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("RPOPLPUSH requires at least two arguments")
 		return
@@ -1562,9 +1647,10 @@ func rPopLPush(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteBulk(string(v))
+	return
 }
 
-func bLPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func bLPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("BLPOP requires at least two arguments")
 		return
@@ -1586,9 +1672,10 @@ func bLPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	conn.WriteArray(2)
 	conn.WriteBulk(k)
 	conn.WriteBulk(string(v))
+	return
 }
 
-func bRPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func bRPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("BRPOP requires at least two arguments")
 		return
@@ -1610,10 +1697,11 @@ func bRPop(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	conn.WriteArray(2)
 	conn.WriteBulk(k)
 	conn.WriteBulk(string(v))
+	return
 }
 
 // ZADD key [NX | XX] [GT | LT] [CH] [INCR] score member [score member   ...]
-func zAdd(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func zAdd(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("ZADD requires at least three arguments")
 		return
@@ -1660,19 +1748,21 @@ func zAdd(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		count += n.ZAdd(key, member, score)
 	}
 	conn.WriteInteger(count)
+	return
 }
 
-func zCard(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func zCard(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("ZCARD requires at least one argument")
 		return
 	}
 	key := cmd.Args[0]
 	conn.WriteInteger(n.ZCard(key))
+	return
 }
 
 // ZRANK key member [WITHSCORE]
-func zRank(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func zRank(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("ZRANK requires at least two argument")
 		return
@@ -1691,9 +1781,10 @@ func zRank(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(n.ZRank(key, member))
+	return
 }
 
-func zRevRank(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func zRevRank(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("ZREVRANK requires at least two argument")
 		return
@@ -1712,9 +1803,10 @@ func zRevRank(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(n.ZRevRank(key, member))
+	return
 }
 
-func zScore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func zScore(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("ZSCORE requires at least two argument")
 		return
@@ -1723,9 +1815,10 @@ func zScore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	member := cmd.Args[1]
 	score := n.ZScore(key, member)
 	conn.WriteBulk(strconv.FormatFloat(score, 'f', -1, 64))
+	return
 }
 
-func zIncrBy(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func zIncrBy(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("ZINCRBY requires at least three arguments")
 		return
@@ -1739,9 +1832,10 @@ func zIncrBy(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	member := cmd.Args[2]
 	v := n.ZIncrBy(key, member, score)
 	conn.WriteBulk(strconv.FormatFloat(v, 'f', -1, 64))
+	return
 }
 
-func zRange(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func zRange(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("ZRANGE requires at least three arguments")
 		return
@@ -1862,9 +1956,10 @@ func zRange(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for _, v := range results {
 		conn.WriteBulk(v)
 	}
+	return
 }
 
-func zRevRange(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func zRevRange(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("ZREVRANGE requires at least three arguments")
 		return
@@ -1894,10 +1989,11 @@ func zRevRange(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for _, v := range results {
 		conn.WriteBulk(v)
 	}
+	return
 }
 
 // ZRANGEBYSCORE key min max [WITHSCORES] [LIMIT offset count]
-func zRangeByScore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func zRangeByScore(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("ZRANGEBYSCORE requires at least three arguments")
 		return
@@ -1948,9 +2044,10 @@ func zRangeByScore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for _, v := range results {
 		conn.WriteBulk(v)
 	}
+	return
 }
 
-func zRevRangeByScore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func zRevRangeByScore(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("ZREVRANGEBYSCORE requires at least three arguments")
 		return
@@ -2000,9 +2097,10 @@ func zRevRangeByScore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	for _, v := range results {
 		conn.WriteBulk(v)
 	}
+	return
 }
 
-func zCount(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func zCount(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("ZCOUNT requires at least three arguments")
 		return
@@ -2026,17 +2124,19 @@ func zCount(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(n.ZCount(key, min, max, mode))
+	return
 }
 
-func zRem(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func zRem(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("ZREM requires at least two arguments")
 	}
 	key := cmd.Args[0]
 	conn.WriteInteger(n.ZRem(key, cmd.Args[1:]...))
+	return
 }
 
-func zRemRangeByRank(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func zRemRangeByRank(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("ZREMRANGEBYRANK requires at least three arguments")
 	}
@@ -2052,9 +2152,10 @@ func zRemRangeByRank(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(n.ZRemRangeByRank(key, start, stop))
+	return
 }
 
-func zRemRangeByScore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func zRemRangeByScore(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("ZREMRANGEBYSCORE requires at least three arguments")
 	}
@@ -2070,9 +2171,10 @@ func zRemRangeByScore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		return
 	}
 	conn.WriteInteger(n.ZRemRangeByScore(key, min, max))
+	return
 }
 
-func zUnionStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func zUnionStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("ZUNIONSTORE requires at least three arguments")
 		return
@@ -2105,9 +2207,10 @@ func zUnionStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	}
 	n.ZUnionStore(destination, keys, weights, utils.ToUpper(aggregate))
 	conn.WriteInteger(n.ZCard(destination))
+	return
 }
 
-func zInterStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func zInterStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 3 {
 		conn.WriteError("ZINTERSTORE requires at least three arguments")
 		return
@@ -2140,18 +2243,20 @@ func zInterStore(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 	}
 	n.ZInterStore(destination, keys, weights, utils.ToUpper(aggregate))
 	conn.WriteInteger(n.ZCard(destination))
+	return
 }
 
-func zClear(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func zClear(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("ZCLEAR requires at least one argument")
 	}
 	key := cmd.Args[0]
 	n.ZClear(key)
 	conn.WriteString("OK")
+	return
 }
 
-func zExists(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func zExists(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("ZEXISTS requires at least two arguments")
 	}
@@ -2163,9 +2268,11 @@ func zExists(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
 		r = 1
 	}
 	conn.WriteInteger(r)
+	return
 }
 
-func save(n *Nodis, conn *redis.Conn, cmd *redis.Command) {
+func save(n *Nodis, conn *redis.Conn, cmd *redis.Command) (undoCmd *redis.Command) {
 	n.store.save()
 	conn.WriteString("OK")
+	return
 }

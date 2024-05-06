@@ -54,7 +54,7 @@ func (k *Key) unmarshal(b []byte) {
 // Del a key
 func (n *Nodis) Del(keys ...string) int64 {
 	var c int64 = 0
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		for _, key := range keys {
 			meta := tx.writeKey(key, nil)
 			if !meta.isOk() {
@@ -70,7 +70,7 @@ func (n *Nodis) Del(keys ...string) int64 {
 
 func (n *Nodis) Exists(keys ...string) int64 {
 	var num int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		for _, key := range keys {
 			meta := tx.readKey(key)
 			if meta.isOk() {
@@ -88,7 +88,7 @@ func (n *Nodis) Expire(key string, seconds int64) int64 {
 		return n.Del(key)
 	}
 	var v int64 = 1
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			v = 0
@@ -110,7 +110,7 @@ func (n *Nodis) ExpirePX(key string, milliseconds int64) int64 {
 		return n.Del(key)
 	}
 	var v int64 = 1
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			v = 0
@@ -129,7 +129,7 @@ func (n *Nodis) ExpirePX(key string, milliseconds int64) int64 {
 // ExpireNX the keys only when the key has no expiry
 func (n *Nodis) ExpireNX(key string, seconds int64) int64 {
 	var v int64 = 1
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			v = 0
@@ -149,7 +149,7 @@ func (n *Nodis) ExpireNX(key string, seconds int64) int64 {
 // ExpireXX the keys only when the key has an existing expiry
 func (n *Nodis) ExpireXX(key string, seconds int64) int64 {
 	var v int64 = 1
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			v = 0
@@ -169,7 +169,7 @@ func (n *Nodis) ExpireXX(key string, seconds int64) int64 {
 // ExpireLT the keys only when the new expiry is less than current one
 func (n *Nodis) ExpireLT(key string, seconds int64) int64 {
 	var v int64 = 1
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			v = 0
@@ -192,7 +192,7 @@ func (n *Nodis) ExpireLT(key string, seconds int64) int64 {
 // ExpireGT the keys only when the new expiry is greater than current one
 func (n *Nodis) ExpireGT(key string, seconds int64) int64 {
 	var v int64 = 0
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			return nil
@@ -215,7 +215,7 @@ func (n *Nodis) ExpireGT(key string, seconds int64) int64 {
 // ExpireAt the keys
 func (n *Nodis) ExpireAt(key string, timestamp time.Time) int64 {
 	var v int64 = 1
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			v = 0
@@ -231,7 +231,7 @@ func (n *Nodis) ExpireAt(key string, timestamp time.Time) int64 {
 // ExpireAtNX the keys only when the key has no expiry
 func (n *Nodis) ExpireAtNX(key string, timestamp time.Time) int64 {
 	var v int64 = 1
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			v = 0
@@ -251,7 +251,7 @@ func (n *Nodis) ExpireAtNX(key string, timestamp time.Time) int64 {
 // ExpireAtXX the keys only when the key has an existing expiry
 func (n *Nodis) ExpireAtXX(key string, timestamp time.Time) int64 {
 	var v int64 = 1
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			v = 0
@@ -271,7 +271,7 @@ func (n *Nodis) ExpireAtXX(key string, timestamp time.Time) int64 {
 // ExpireAtLT the keys only when the new expiry is less than current one
 func (n *Nodis) ExpireAtLT(key string, timestamp time.Time) int64 {
 	var v int64 = 1
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			v = 0
@@ -294,7 +294,7 @@ func (n *Nodis) ExpireAtLT(key string, timestamp time.Time) int64 {
 // ExpireAtGT the keys only when the new expiry is greater than current one
 func (n *Nodis) ExpireAtGT(key string, timestamp time.Time) int64 {
 	var v int64 = 1
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			v = 0
@@ -332,7 +332,7 @@ func (n *Nodis) Keys(pattern string) []string {
 // TTL gets the TTL
 func (n *Nodis) TTL(key string) time.Duration {
 	var v time.Duration
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			v = -2
@@ -352,7 +352,7 @@ func (n *Nodis) TTL(key string) time.Duration {
 
 // Rename a key
 func (n *Nodis) Rename(key, dstKey string) error {
-	return n.Update(func(tx *Tx) error {
+	return n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			return errors.New("key not exists")
@@ -372,7 +372,7 @@ func (n *Nodis) Rename(key, dstKey string) error {
 
 // RenameNX a key
 func (n *Nodis) RenameNX(key, dstKey string) error {
-	return n.Update(func(tx *Tx) error {
+	return n.exec(func(tx *Tx) error {
 		dstMeta := tx.writeKey(dstKey, nil)
 		if dstMeta.isOk() {
 			return errors.New("newKey exists")
@@ -396,7 +396,7 @@ func (n *Nodis) RenameNX(key, dstKey string) error {
 // Type gets the type of key
 func (n *Nodis) Type(key string) string {
 	var v string
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			v = "none"
@@ -457,7 +457,7 @@ func (n *Nodis) RandomKey() string {
 // Persist the key
 func (n *Nodis) Persist(key string) int64 {
 	var v int64 = 0
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			return nil

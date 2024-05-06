@@ -15,7 +15,7 @@ func (n *Nodis) newHash() ds.DataStruct {
 
 func (n *Nodis) HSet(key string, field string, value []byte) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newHash)
 		v = meta.ds.(*hash.HashMap).HSet(field, value)
 		n.notify(pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
@@ -26,7 +26,7 @@ func (n *Nodis) HSet(key string, field string, value []byte) int64 {
 
 func (n *Nodis) HGet(key string, field string) []byte {
 	var v []byte
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -39,7 +39,7 @@ func (n *Nodis) HGet(key string, field string) []byte {
 
 func (n *Nodis) HDel(key string, fields ...string) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			return nil
@@ -56,7 +56,7 @@ func (n *Nodis) HDel(key string, fields ...string) int64 {
 
 func (n *Nodis) HLen(key string) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -69,7 +69,7 @@ func (n *Nodis) HLen(key string) int64 {
 
 func (n *Nodis) HKeys(key string) []string {
 	var v []string
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -82,7 +82,7 @@ func (n *Nodis) HKeys(key string) []string {
 
 func (n *Nodis) HExists(key string, field string) bool {
 	var v bool
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -95,7 +95,7 @@ func (n *Nodis) HExists(key string, field string) bool {
 
 func (n *Nodis) HGetAll(key string) map[string][]byte {
 	var v map[string][]byte
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 
@@ -110,7 +110,7 @@ func (n *Nodis) HGetAll(key string) map[string][]byte {
 func (n *Nodis) HIncrBy(key string, field string, value int64) (int64, error) {
 	var v int64
 	var err error
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newHash)
 		v, err = meta.ds.(*hash.HashMap).HIncrBy(field, value)
 		n.notify(pb.NewOp(pb.OpType_HIncrBy, key).Fields(field).IncrInt(value))
@@ -122,7 +122,7 @@ func (n *Nodis) HIncrBy(key string, field string, value int64) (int64, error) {
 func (n *Nodis) HIncrByFloat(key string, field string, value float64) (float64, error) {
 	var v float64
 	var err error
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newHash)
 		v, err = meta.ds.(*hash.HashMap).HIncrByFloat(field, value)
 		n.notify(pb.NewOp(pb.OpType_HIncrByFloat, key).Fields(field).IncrFloat(value))
@@ -136,7 +136,7 @@ func (n *Nodis) HIncrByFloat(key string, field string, value float64) (float64, 
 // If field already exists, this operation has no effect.
 func (n *Nodis) HSetNX(key string, field string, value []byte) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if meta.isOk() && meta.ds.(*hash.HashMap).HExists(field) {
 			return nil
@@ -158,7 +158,7 @@ func (n *Nodis) HSetNX(key string, field string, value []byte) int64 {
 
 func (n *Nodis) HMSet(key string, fields map[string][]byte) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newHash)
 		var ops = make([]*pb.Op, 0, len(fields))
 		var v int64 = 0
@@ -175,7 +175,7 @@ func (n *Nodis) HMSet(key string, fields map[string][]byte) int64 {
 
 func (n *Nodis) HMGet(key string, fields ...string) [][]byte {
 	var v [][]byte
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -193,7 +193,7 @@ func (n *Nodis) HClear(key string) {
 func (n *Nodis) HScan(key string, cursor int64, match string, count int64) (int64, map[string][]byte) {
 	var c int64
 	var v map[string][]byte
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -206,7 +206,7 @@ func (n *Nodis) HScan(key string, cursor int64, match string, count int64) (int6
 
 func (n *Nodis) HVals(key string) [][]byte {
 	var v [][]byte
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 

@@ -13,7 +13,7 @@ func (n *Nodis) newSet() ds.DataStruct {
 // SAdd adds the specified members to the set stored at key.
 func (n *Nodis) SAdd(key string, members ...string) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newSet)
 		v = meta.ds.(*set.Set).SAdd(members...)
 		n.notify(pb.NewOp(pb.OpType_SAdd, key).Members(members))
@@ -25,7 +25,7 @@ func (n *Nodis) SAdd(key string, members ...string) int64 {
 // SCard gets the set members count.
 func (n *Nodis) SCard(key string) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -42,7 +42,7 @@ func (n *Nodis) SDiff(keys ...string) []string {
 		return nil
 	}
 	var v []string
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(keys[0])
 		if !meta.isOk() {
 			return nil
@@ -80,7 +80,7 @@ func (n *Nodis) SInter(keys ...string) []string {
 		return n.SMembers(keys[0])
 	}
 	var v []string
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(keys[0])
 		otherSets := make([]*set.Set, 0, len(keys)-1)
 		for _, s := range keys[1:] {
@@ -114,17 +114,16 @@ func (n *Nodis) SUnion(keys ...string) []string {
 		return n.SMembers(keys[0])
 	}
 	var v []string
-	_ = n.Update(func(tx *Tx) error {
-		meta := tx.readKey(keys[0])
-		otherSets := make([]*set.Set, 0, len(keys)-1)
-		for _, s := range keys[1:] {
+	_ = n.exec(func(tx *Tx) error {
+		otherSets := make([]*set.Set, 0, len(keys))
+		for _, s := range keys {
 			setDs := tx.readKey(s)
 			if !setDs.isOk() {
 				continue
 			}
 			otherSets = append(otherSets, setDs.ds.(*set.Set))
 		}
-		v = meta.ds.(*set.Set).SUnion(otherSets...)
+		v = otherSets[0].SUnion(otherSets[1:]...)
 		return nil
 	})
 	return v
@@ -142,7 +141,7 @@ func (n *Nodis) SUnionStore(destination string, keys ...string) int64 {
 // SIsMember returns if member is a member of the set stored at key.
 func (n *Nodis) SIsMember(key, member string) bool {
 	var v bool
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -156,7 +155,7 @@ func (n *Nodis) SIsMember(key, member string) bool {
 // SMembers returns all the members of the set value stored at key.
 func (n *Nodis) SMembers(key string) []string {
 	var v []string
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -170,7 +169,7 @@ func (n *Nodis) SMembers(key string) []string {
 // SRem removes the specified members from the set stored at key.
 func (n *Nodis) SRem(key string, members ...string) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			return nil
@@ -186,7 +185,7 @@ func (n *Nodis) SRem(key string, members ...string) int64 {
 func (n *Nodis) SScan(key string, cursor int64, match string, count int64) (int64, []string) {
 	var c int64
 	var v []string
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -200,7 +199,7 @@ func (n *Nodis) SScan(key string, cursor int64, match string, count int64) (int6
 // SPop removes and returns a random element from the set value stored at key.
 func (n *Nodis) SPop(key string, count int64) []string {
 	var v []string
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			return nil
@@ -218,7 +217,7 @@ func (n *Nodis) SPop(key string, count int64) []string {
 // SMove moves a member from one set to another.
 func (n *Nodis) SMove(source, destination, member string) bool {
 	var v bool
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(source, nil)
 		if !meta.isOk() {
 			return nil
@@ -239,7 +238,7 @@ func (n *Nodis) SMove(source, destination, member string) bool {
 // SRandMember returns one or more random elements from the set value stored at key.
 func (n *Nodis) SRandMember(key string, count int64) []string {
 	var v []string
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil

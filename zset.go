@@ -12,7 +12,7 @@ func (n *Nodis) newZSet() ds.DataStruct {
 
 func (n *Nodis) ZAdd(key string, member string, score float64) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newZSet)
 		v = meta.ds.(*zset.SortedSet).ZAdd(member, score)
 		n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
@@ -24,7 +24,7 @@ func (n *Nodis) ZAdd(key string, member string, score float64) int64 {
 // ZAddXX Only update elements that already exist. Don't add new elements.
 func (n *Nodis) ZAddXX(key string, member string, score float64) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newZSet)
 		v = meta.ds.(*zset.SortedSet).ZAddXX(member, score)
 		n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
@@ -35,7 +35,7 @@ func (n *Nodis) ZAddXX(key string, member string, score float64) int64 {
 
 func (n *Nodis) ZAddNX(key string, member string, score float64) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newZSet)
 		v = meta.ds.(*zset.SortedSet).ZAddNX(member, score)
 		n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
@@ -47,7 +47,7 @@ func (n *Nodis) ZAddNX(key string, member string, score float64) int64 {
 // ZAddLT add member if score less than the current score
 func (n *Nodis) ZAddLT(key string, member string, score float64) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newZSet)
 		if meta.ds.(*zset.SortedSet).ZAddLT(member, score) {
 			n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
@@ -61,7 +61,7 @@ func (n *Nodis) ZAddLT(key string, member string, score float64) int64 {
 // ZAddGT add member if score greater than the current score
 func (n *Nodis) ZAddGT(key string, member string, score float64) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newZSet)
 		if meta.ds.(*zset.SortedSet).ZAddGT(member, score) {
 			n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
@@ -74,7 +74,7 @@ func (n *Nodis) ZAddGT(key string, member string, score float64) int64 {
 
 func (n *Nodis) ZCard(key string) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -87,7 +87,7 @@ func (n *Nodis) ZCard(key string) int64 {
 
 func (n *Nodis) ZRank(key string, member string) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -101,7 +101,7 @@ func (n *Nodis) ZRank(key string, member string) int64 {
 func (n *Nodis) ZRankWithScore(key string, member string) (int64, *zset.Item) {
 	var c int64
 	var v *zset.Item
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -114,7 +114,7 @@ func (n *Nodis) ZRankWithScore(key string, member string) (int64, *zset.Item) {
 
 func (n *Nodis) ZRevRank(key string, member string) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -128,7 +128,7 @@ func (n *Nodis) ZRevRank(key string, member string) int64 {
 func (n *Nodis) ZRevRankWithScore(key string, member string) (int64, *zset.Item) {
 	var c int64
 	var v *zset.Item
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -141,7 +141,7 @@ func (n *Nodis) ZRevRankWithScore(key string, member string) (int64, *zset.Item)
 
 func (n *Nodis) ZScore(key string, member string) float64 {
 	var v float64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -154,7 +154,7 @@ func (n *Nodis) ZScore(key string, member string) float64 {
 
 func (n *Nodis) ZIncrBy(key string, member string, score float64) float64 {
 	var v float64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newZSet)
 		v = meta.ds.(*zset.SortedSet).ZIncrBy(member, score)
 		n.notify(pb.NewOp(pb.OpType_ZIncrBy, key).Member(member).Score(score))
@@ -165,7 +165,7 @@ func (n *Nodis) ZIncrBy(key string, member string, score float64) float64 {
 
 func (n *Nodis) ZRange(key string, start int64, stop int64) []string {
 	var v []string
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -185,7 +185,7 @@ func (n *Nodis) ZRange(key string, start int64, stop int64) []string {
 
 func (n *Nodis) ZRangeWithScores(key string, start int64, stop int64) []*zset.Item {
 	var v []*zset.Item
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 
@@ -199,7 +199,7 @@ func (n *Nodis) ZRangeWithScores(key string, start int64, stop int64) []*zset.It
 
 func (n *Nodis) ZRevRange(key string, start int64, stop int64) []string {
 	var v []string
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -220,7 +220,7 @@ func (n *Nodis) ZRevRange(key string, start int64, stop int64) []string {
 
 func (n *Nodis) ZRevRangeWithScores(key string, start int64, stop int64) []*zset.Item {
 	var v []*zset.Item
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -233,7 +233,7 @@ func (n *Nodis) ZRevRangeWithScores(key string, start int64, stop int64) []*zset
 
 func (n *Nodis) ZRangeByScore(key string, min float64, max float64, offset, count int64, mode int) []string {
 	var v []string
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -250,7 +250,7 @@ func (n *Nodis) ZRangeByScore(key string, min float64, max float64, offset, coun
 
 func (n *Nodis) ZRangeByScoreWithScores(key string, min float64, max float64, offset, count int64, mode int) []*zset.Item {
 	var v []*zset.Item
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 
@@ -264,7 +264,7 @@ func (n *Nodis) ZRangeByScoreWithScores(key string, min float64, max float64, of
 
 func (n *Nodis) ZRevRangeByScore(key string, min float64, max float64, offset, count int64, mode int) []string {
 	var v []string
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -281,7 +281,7 @@ func (n *Nodis) ZRevRangeByScore(key string, min float64, max float64, offset, c
 
 func (n *Nodis) ZRevRangeByScoreWithScores(key string, min float64, max float64, offset, count int64, mode int) []*zset.Item {
 	var v []*zset.Item
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 
@@ -295,7 +295,7 @@ func (n *Nodis) ZRevRangeByScoreWithScores(key string, min float64, max float64,
 
 func (n *Nodis) ZRem(key string, members ...string) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			return nil
@@ -312,7 +312,7 @@ func (n *Nodis) ZRem(key string, members ...string) int64 {
 
 func (n *Nodis) ZRemRangeByRank(key string, start int64, stop int64) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			return nil
@@ -329,7 +329,7 @@ func (n *Nodis) ZRemRangeByRank(key string, start int64, stop int64) int64 {
 
 func (n *Nodis) ZRemRangeByScore(key string, min float64, max float64) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			return nil
@@ -347,7 +347,7 @@ func (n *Nodis) ZRemRangeByScore(key string, min float64, max float64) int64 {
 
 func (n *Nodis) ZExists(key string, member string) bool {
 	var v bool
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -365,7 +365,7 @@ func (n *Nodis) ZClear(key string) {
 // ZCount returns the number of elements in the sorted set at key with a score between min and max.
 func (n *Nodis) ZCount(key string, min, max float64, mode int) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -379,7 +379,7 @@ func (n *Nodis) ZCount(key string, min, max float64, mode int) int64 {
 // ZMax returns the member with the highest score in the sorted set at key.
 func (n *Nodis) ZMax(key string) *zset.Item {
 	var v *zset.Item
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -393,7 +393,7 @@ func (n *Nodis) ZMax(key string) *zset.Item {
 // ZMin returns the member with the lowest score in the sorted set at key.
 func (n *Nodis) ZMin(key string) *zset.Item {
 	var v *zset.Item
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -406,7 +406,7 @@ func (n *Nodis) ZMin(key string) *zset.Item {
 
 func (n *Nodis) ZUnion(keys []string, weights []float64, aggregate string) []*zset.Item {
 	var v []*zset.Item
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		var items = make(map[string]float64)
 		for i, key := range keys {
 			m := tx.readKey(key)
@@ -449,7 +449,7 @@ func (n *Nodis) ZUnion(keys []string, weights []float64, aggregate string) []*zs
 // ZUnionStore computes the union of numkeys sorted sets given by the specified keys, and stores the result in destination.
 func (n *Nodis) ZUnionStore(destination string, keys []string, weights []float64, aggregate string) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(destination, n.newZSet)
 		if !meta.isOk() {
 			return nil
@@ -470,7 +470,7 @@ func (n *Nodis) ZUnionStore(destination string, keys []string, weights []float64
 
 func (n *Nodis) ZInter(keys []string, weights []float64, aggregate string) []*zset.Item {
 	var v []*zset.Item
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		var items = make(map[string]float64)
 		for i, key := range keys {
 			m := tx.readKey(key)
@@ -526,7 +526,7 @@ func (n *Nodis) ZInter(keys []string, weights []float64, aggregate string) []*zs
 // ZInterStore computes the intersection of numkeys sorted sets given by the specified keys, and stores the result in destination.
 func (n *Nodis) ZInterStore(destination string, keys []string, weights []float64, aggregate string) int64 {
 	var v int64
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		items := n.ZInter(keys, weights, aggregate)
 		meta := tx.writeKey(destination, n.newZSet)
 		if !meta.isOk() {

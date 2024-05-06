@@ -99,7 +99,7 @@ func (n *Nodis) SetEntry(data []byte) error {
 
 // GetEntry gets an entity
 func (n *Nodis) GetEntry(key string) (data []byte) {
-	_ = n.Update(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -281,7 +281,7 @@ func (n *Nodis) Serve(addr string) error {
 	})
 }
 
-func (n *Nodis) Update(fn func(tx *Tx) error) error {
+func (n *Nodis) exec(fn func(tx *Tx) error) error {
 	tx := &Tx{
 		store:       n.store,
 		lockedMetas: make([]*metadata, 0),
