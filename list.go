@@ -48,7 +48,7 @@ func (n *Nodis) LPop(key string, count int64) [][]byte {
 		}
 		v = meta.ds.(*list.DoublyLinkedList).LPop(count)
 		if meta.ds.(*list.DoublyLinkedList).LLen() == 0 {
-			n.store.delKey(key)
+			tx.delKey(key)
 		}
 		n.notify(pb.NewOp(pb.OpType_LPop, key).Count(count))
 		return nil
@@ -65,7 +65,7 @@ func (n *Nodis) RPop(key string, count int64) [][]byte {
 		}
 		v = meta.ds.(*list.DoublyLinkedList).RPop(count)
 		if meta.ds.(*list.DoublyLinkedList).LLen() == 0 {
-			n.store.delKey(key)
+			tx.delKey(key)
 		}
 		n.notify(pb.NewOp(pb.OpType_RPop, key).Count(count))
 		return nil
@@ -209,7 +209,7 @@ func (n *Nodis) LPopRPush(source, destination string) []byte {
 			return nil
 		}
 		if meta.ds.(*list.DoublyLinkedList).LLen() == 0 {
-			n.store.delKey(source)
+			tx.delKey(source)
 		}
 		dst := tx.writeKey(destination, n.newList)
 		dst.ds.(*list.DoublyLinkedList).RPush(v...)
@@ -231,7 +231,7 @@ func (n *Nodis) RPopLPush(source, destination string) []byte {
 			return nil
 		}
 		if meta.ds.(*list.DoublyLinkedList).LLen() == 0 {
-			n.store.delKey(source)
+			tx.delKey(source)
 		}
 		dst := tx.writeKey(destination, n.newList)
 		dst.ds.(*list.DoublyLinkedList).LPush(v...)

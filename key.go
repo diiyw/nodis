@@ -60,7 +60,7 @@ func (n *Nodis) Del(keys ...string) int64 {
 			if !meta.isOk() {
 				continue
 			}
-			n.store.delKey(key)
+			tx.delKey(key)
 			c++
 		}
 		return nil
@@ -362,7 +362,7 @@ func (n *Nodis) Rename(key, dstKey string) error {
 			return errors.New("key does not exist")
 		}
 		_ = tx.writeKey(dstKey, nil)
-		n.store.delKey(key)
+		tx.delKey(key)
 		n.store.values.Set(dstKey, v)
 		n.store.keys.Set(dstKey, newKey())
 		n.notify(pb.NewOp(pb.OpType_Rename, key).DstKey(dstKey))
@@ -385,7 +385,7 @@ func (n *Nodis) RenameNX(key, dstKey string) error {
 		if !ok {
 			return errors.New("key does not exist")
 		}
-		n.store.delKey(key)
+		tx.delKey(key)
 		n.store.values.Set(dstKey, v)
 		n.store.keys.Set(dstKey, newKey())
 		n.notify(pb.NewOp(pb.OpType_Rename, key).DstKey(dstKey))

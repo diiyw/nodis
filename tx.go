@@ -57,6 +57,13 @@ func (tx *Tx) newKey(meta *metadata, key string, newFn func() ds.DataStruct) *me
 	return meta.empty()
 }
 
+func (tx *Tx) delKey(key string) {
+	tx.store.mu.Lock()
+	tx.store.keys.Delete(key)
+	tx.store.values.Delete(key)
+	tx.store.mu.Unlock()
+}
+
 func (tx *Tx) writeKey(key string, newFn func() ds.DataStruct) *metadata {
 	meta := tx.lockKey(key)
 	meta.writeable = true

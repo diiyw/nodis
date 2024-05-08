@@ -90,13 +90,6 @@ func newStore(path string, fileSize int64, metaPoolSize int, filesystem fs.Fs) *
 	return s
 }
 
-func (s *store) delKey(key string) {
-	s.mu.Lock()
-	s.keys.Delete(key)
-	s.values.Delete(key)
-	s.mu.Unlock()
-}
-
 func (s *store) fromStorage(k *Key, meta *metadata) *metadata {
 	// try get from storage
 	v, err := s.getEntryRaw(k)

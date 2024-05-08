@@ -46,7 +46,7 @@ func (n *Nodis) HDel(key string, fields ...string) int64 {
 		}
 		v = meta.ds.(*hash.HashMap).HDel(fields...)
 		if meta.ds.(*hash.HashMap).HLen() == 0 {
-			n.store.delKey(key)
+			tx.delKey(key)
 		}
 		n.notify(pb.NewOp(pb.OpType_HDel, key).Fields(fields...))
 		return nil

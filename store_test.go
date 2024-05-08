@@ -228,15 +228,6 @@ func TestStoreRemove(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
-
-	// Call the remove method
-	store.delKey(key)
-
-	// Retrieve the value from the index
-	idx, _ := store.keys.Get(key)
-	if idx != nil {
-		t.Fatalf("Expected index to be nil, got %v", idx)
-	}
 }
 
 func TestStorePutRaw(t *testing.T) {
