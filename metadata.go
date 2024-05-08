@@ -25,11 +25,20 @@ func (m *metadata) isOk() bool {
 	return m.ok
 }
 
+func (m *metadata) empty() *metadata {
+	m.ds = nil
+	m.key = nil
+	m.ok = false
+	return m
+}
+
 func (m *metadata) commit() {
+	if m.RWMutex == nil {
+		// emptyMetadata
+		return
+	}
 	if m.writeable {
-		m.ds = nil
-		m.key = nil
-		m.ok = false
+		m.empty()
 		m.writeable = false
 		m.Unlock()
 		return

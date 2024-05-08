@@ -10,7 +10,7 @@ import (
 func TestClient_SetName(t *testing.T) {
 	n := &Nodis{}
 	w := redis.NewWriter(&bytes.Buffer{})
-	cmd := &redis.Command{
+	cmd := redis.Command{
 		Args: []string{"SETNAME"},
 	}
 
@@ -25,7 +25,7 @@ func TestClient_SetName(t *testing.T) {
 func TestClient_InvalidSubcommand(t *testing.T) {
 	n := &Nodis{}
 	w := redis.NewWriter(&bytes.Buffer{})
-	cmd := &redis.Command{
+	cmd := redis.Command{
 		Args: []string{"INVALID"},
 	}
 
@@ -40,7 +40,7 @@ func TestClient_InvalidSubcommand(t *testing.T) {
 func TestClient_Config(t *testing.T) {
 	n := &Nodis{}
 	w := redis.NewWriter(&bytes.Buffer{})
-	cmd := &redis.Command{
+	cmd := redis.Command{
 		Name: "CONFIG",
 		Args: []string{"GET", "DATABASES"},
 		Options: redis.Options{
@@ -59,7 +59,7 @@ func TestClient_Config(t *testing.T) {
 func TestClient_Config_InvalidArgs(t *testing.T) {
 	n := &Nodis{}
 	w := redis.NewWriter(&bytes.Buffer{})
-	cmd := &redis.Command{
+	cmd := redis.Command{
 		Name: "CONFIG",
 		Args: []string{"GET"},
 	}
@@ -75,7 +75,7 @@ func TestClient_Config_InvalidArgs(t *testing.T) {
 func TestClient_Config_InvalidOption(t *testing.T) {
 	n := &Nodis{}
 	w := redis.NewWriter(&bytes.Buffer{})
-	cmd := &redis.Command{
+	cmd := redis.Command{
 		Name: "CONFIG",
 		Args: []string{"GET", "INVALID"},
 	}
@@ -90,7 +90,7 @@ func TestClient_Config_InvalidOption(t *testing.T) {
 func TestClient_Ping(t *testing.T) {
 	n := &Nodis{}
 	w := redis.NewWriter(&bytes.Buffer{})
-	cmd := &redis.Command{
+	cmd := redis.Command{
 		Args: []string{"PING"},
 	}
 
@@ -105,7 +105,7 @@ func TestClient_Ping(t *testing.T) {
 func TestClient_Ping_NoArgs(t *testing.T) {
 	n := &Nodis{}
 	w := redis.NewWriter(&bytes.Buffer{})
-	cmd := &redis.Command{
+	cmd := redis.Command{
 		Args: []string{},
 	}
 
@@ -119,7 +119,7 @@ func TestClient_Ping_NoArgs(t *testing.T) {
 func TestClient_Echo(t *testing.T) {
 	n := &Nodis{}
 	w := redis.NewWriter(&bytes.Buffer{})
-	cmd := &redis.Command{
+	cmd := redis.Command{
 		Name: "ECHO",
 		Args: []string{"Hello, World!"},
 	}
@@ -135,7 +135,7 @@ func TestClient_Echo(t *testing.T) {
 func TestClient_Echo_NoArgs(t *testing.T) {
 	n := &Nodis{}
 	w := redis.NewWriter(&bytes.Buffer{})
-	cmd := &redis.Command{
+	cmd := redis.Command{
 		Args: []string{},
 	}
 

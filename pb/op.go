@@ -152,6 +152,12 @@ func (o *Op) Before(before bool) *Op {
 	return o
 }
 
+// Mode set the mode
+func (o *Op) Mode(mode int64) *Op {
+	o.Operation.Mode = mode
+	return o
+}
+
 func (o *Op) Reset() {
 	o.Operation.Reset()
 	opPool.Put(o)

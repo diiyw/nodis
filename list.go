@@ -220,7 +220,7 @@ func (n *Nodis) LPopRPush(source, destination string) []byte {
 }
 
 func (n *Nodis) RPopLPush(source, destination string) []byte {
-	var v [][]byte
+	var v = make([][]byte, 0)
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(source, nil)
 		if !meta.isOk() {

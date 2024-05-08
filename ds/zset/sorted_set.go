@@ -1,6 +1,7 @@
 package zset
 
 import (
+	"errors"
 	"path/filepath"
 
 	"github.com/diiyw/nodis/ds"
@@ -127,8 +128,12 @@ func (sortedSet *SortedSet) getRank(member string, desc bool) (rank int64) {
 }
 
 // ZRank returns the rank of the given member, sort by ascending order, rank starts from 0
-func (sortedSet *SortedSet) ZRank(member string) int64 {
-	return sortedSet.getRank(member, false)
+func (sortedSet *SortedSet) ZRank(member string) (int64, error) {
+	_, ok := sortedSet.dict.Get(member)
+	if !ok {
+		return 0, errors.New("member not found")
+	}
+	return sortedSet.getRank(member, false), nil
 }
 
 // ZRankWithScore returns the rank of the given member, sort by ascending order, rank starts from 0
@@ -141,8 +146,12 @@ func (sortedSet *SortedSet) ZRankWithScore(member string) (int64, *Item) {
 }
 
 // ZRevRank returns the rank of the given member, sort by descending order, rank starts from 0
-func (sortedSet *SortedSet) ZRevRank(member string) int64 {
-	return sortedSet.getRank(member, true)
+func (sortedSet *SortedSet) ZRevRank(member string) (int64, error) {
+	_, ok := sortedSet.dict.Get(member)
+	if !ok {
+		return 0, errors.New("member not found")
+	}
+	return sortedSet.getRank(member, true), nil
 }
 
 // ZRevRankWithScore returns the rank of the given member, sort by descending order, rank starts from 0
@@ -155,12 +164,12 @@ func (sortedSet *SortedSet) ZRevRankWithScore(member string) (int64, *Item) {
 }
 
 // ZScore returns the score of the given member
-func (sortedSet *SortedSet) ZScore(member string) float64 {
+func (sortedSet *SortedSet) ZScore(member string) (float64, error) {
 	element, ok := sortedSet.dict.Get(member)
 	if !ok {
-		return 0
+		return 0, errors.New("member not found")
 	}
-	return element.Score
+	return element.Score, nil
 }
 
 // forEachByRank visits each member which rank within [start, stop], sort by ascending order, rank starts from 0
@@ -319,8 +328,8 @@ func (sortedSet *SortedSet) zRange(min float64, max float64, offset int64, limit
 }
 
 // removeRange removes members which score or member within the given border
-func (sortedSet *SortedSet) removeRange(min float64, max float64) int64 {
-	removed := sortedSet.skiplist.removeRange(min, max, 0)
+func (sortedSet *SortedSet) removeRange(min float64, max float64, mode int) int64 {
+	removed := sortedSet.skiplist.removeRange(min, max, 0, mode)
 	for _, element := range removed {
 		sortedSet.dict.Delete(element.Member)
 	}
@@ -328,8 +337,8 @@ func (sortedSet *SortedSet) removeRange(min float64, max float64) int64 {
 }
 
 // ZRemRangeByScore removes members which score or member within the given border
-func (sortedSet *SortedSet) ZRemRangeByScore(min float64, max float64) int64 {
-	return sortedSet.removeRange(min, max)
+func (sortedSet *SortedSet) ZRemRangeByScore(min float64, max float64, mode int) int64 {
+	return sortedSet.removeRange(min, max, mode)
 }
 
 // ZRemRangeByRank removes member ranking within [start, stop]

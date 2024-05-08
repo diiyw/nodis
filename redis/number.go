@@ -2,7 +2,7 @@ package redis
 
 import "strconv"
 
-func FormatFloat64(s string, inf float64) (float64, error) {
+func FormatFloat64(s string) (float64, error) {
 	var f string
 	if s[0] == '(' {
 		f = s[1:]
@@ -12,7 +12,7 @@ func FormatFloat64(s string, inf float64) (float64, error) {
 	return strconv.ParseFloat(f, 64)
 }
 
-func FormatInt64(s string, inf int64) (int64, error) {
+func FormatInt64(s string) (int64, error) {
 	var i string
 	if s[0] == '(' {
 		i = s[1:]

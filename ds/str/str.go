@@ -25,6 +25,13 @@ func (s *String) Set(v []byte) {
 	s.V = v
 }
 
+// GetSet
+func (s *String) GetSet(v []byte) []byte {
+	old := s.V
+	s.V = v
+	return old
+}
+
 // Get the value
 func (s *String) Get() []byte {
 	return s.V

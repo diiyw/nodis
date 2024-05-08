@@ -85,17 +85,16 @@ func (n *Nodis) ZCard(key string) int64 {
 	return v
 }
 
-func (n *Nodis) ZRank(key string, member string) int64 {
-	var v int64
+func (n *Nodis) ZRank(key string, member string) (v int64, err error) {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
 		}
-		v = meta.ds.(*zset.SortedSet).ZRank(member)
+		v, err = meta.ds.(*zset.SortedSet).ZRank(member)
 		return nil
 	})
-	return v
+	return
 }
 
 func (n *Nodis) ZRankWithScore(key string, member string) (int64, *zset.Item) {
@@ -112,17 +111,16 @@ func (n *Nodis) ZRankWithScore(key string, member string) (int64, *zset.Item) {
 	return c, v
 }
 
-func (n *Nodis) ZRevRank(key string, member string) int64 {
-	var v int64
+func (n *Nodis) ZRevRank(key string, member string) (v int64, err error) {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
 		}
-		v = meta.ds.(*zset.SortedSet).ZRevRank(member)
+		v, err = meta.ds.(*zset.SortedSet).ZRevRank(member)
 		return nil
 	})
-	return v
+	return v, nil
 }
 
 func (n *Nodis) ZRevRankWithScore(key string, member string) (int64, *zset.Item) {
@@ -139,17 +137,16 @@ func (n *Nodis) ZRevRankWithScore(key string, member string) (int64, *zset.Item)
 	return c, v
 }
 
-func (n *Nodis) ZScore(key string, member string) float64 {
-	var v float64
+func (n *Nodis) ZScore(key string, member string) (v float64, err error) {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
 		}
-		v = meta.ds.(*zset.SortedSet).ZScore(member)
+		v, err = meta.ds.(*zset.SortedSet).ZScore(member)
 		return nil
 	})
-	return v
+	return
 }
 
 func (n *Nodis) ZIncrBy(key string, member string, score float64) float64 {
@@ -327,14 +324,14 @@ func (n *Nodis) ZRemRangeByRank(key string, start int64, stop int64) int64 {
 	return v
 }
 
-func (n *Nodis) ZRemRangeByScore(key string, min float64, max float64) int64 {
+func (n *Nodis) ZRemRangeByScore(key string, min float64, max float64, mode int) int64 {
 	var v int64
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			return nil
 		}
-		v = meta.ds.(*zset.SortedSet).ZRemRangeByScore(min, max)
+		v = meta.ds.(*zset.SortedSet).ZRemRangeByScore(min, max, mode)
 		meta.key.changed = v > 0
 
 		if v > 0 {

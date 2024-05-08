@@ -15,7 +15,7 @@ type Reader struct {
 	buf    []byte
 	r      int
 	l      int
-	cmd    *Command
+	cmd    Command
 }
 
 const defaultSize = 4096
@@ -24,9 +24,6 @@ func NewReader(rd io.Reader) *Reader {
 	return &Reader{
 		reader: rd,
 		buf:    make([]byte, defaultSize),
-		cmd: &Command{
-			Args: make([]string, 0),
-		},
 	}
 }
 
@@ -96,8 +93,9 @@ func (r *Reader) flushCopyString() string {
 func (r *Reader) reset() {
 	r.r = 0
 	r.l = 0
-	r.cmd.Args = make([]string, 0)
-	r.cmd.Options = Options{}
+	r.cmd = Command{
+		Args: make([]string, 0),
+	}
 }
 
 func (r *Reader) malloc() {

@@ -267,15 +267,21 @@ func (skiplist *skiplist) getLastInRange(min float64, max float64) *node {
 	return n
 }
 
-func (skiplist *skiplist) removeRange(min float64, max float64, limit int) (removed []*Item) {
+func (skiplist *skiplist) removeRange(min float64, max float64, limit int, mode int) (removed []*Item) {
 	update := make([]*node, maxLevel)
 	removed = make([]*Item, 0)
 	// find backward nodes (of target range) or last node of each level
 	node := skiplist.header
 	for i := skiplist.level - 1; i >= 0; i-- {
 		for node.level[i].forward != nil {
-			if min <= node.level[i].forward.Item.Score { // already in range
-				break
+			if mode&MinOpen == MinOpen {
+				if min < node.level[i].forward.Item.Score { // already in range
+					break
+				}
+			} else {
+				if min <= node.level[i].forward.Item.Score { // already in range
+					break
+				}
 			}
 			node = node.level[i].forward
 		}
@@ -287,8 +293,14 @@ func (skiplist *skiplist) removeRange(min float64, max float64, limit int) (remo
 
 	// remove nodes in range
 	for node != nil {
-		if max < node.Item.Score { // already out of range
-			break
+		if mode&MaxOpen == MaxOpen {
+			if max <= node.Item.Score { // already out of range
+				break
+			}
+		} else {
+			if max < node.Item.Score { // already out of range
+				break
+			}
 		}
 		next := node.level[0].forward
 		removedElement := node.Item

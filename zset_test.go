@@ -88,14 +88,14 @@ func TestZSet_ZRank(t *testing.T) {
 	n.ZAdd("zset", "a", 1)
 	n.ZAdd("zset", "b", 2)
 	n.ZAdd("zset", "c", 3)
-	if n.ZRank("zset", "a") != 0 {
-		t.Errorf("ZRank() = %v, want %v", n.ZRank("zset", "a"), 1)
+	if v, _ := n.ZRank("zset", "a"); v != 0 {
+		t.Errorf("ZRank() = %v, want %v", v, 0)
 	}
-	if n.ZRank("zset", "b") != 1 {
-		t.Errorf("ZRank() = %v, want %v", n.ZRank("zset", "b"), 2)
+	if v, _ := n.ZRank("zset", "b"); v != 1 {
+		t.Errorf("ZRank() = %v, want %v", v, 1)
 	}
-	if n.ZRank("zset", "c") != 2 {
-		t.Errorf("ZRank() = %v, want %v", n.ZRank("zset", "c"), 3)
+	if v, _ := n.ZRank("zset", "c"); v != 2 {
+		t.Errorf("ZRank() = %v, want %v", v, 2)
 	}
 }
 
@@ -153,14 +153,17 @@ func TestZSet_ZRevRank(t *testing.T) {
 	n.ZAdd("zset", "a", 1)
 	n.ZAdd("zset", "b", 2)
 	n.ZAdd("zset", "c", 3)
-	if n.ZRevRank("zset", "a") != 2 {
-		t.Errorf("ZRevRank() = %v, want %v", n.ZRevRank("zset", "a"), 2)
+	a, _ := n.ZRevRank("zset", "a")
+	b, _ := n.ZRevRank("zset", "b")
+	c, _ := n.ZRevRank("zset", "c")
+	if a != 2 {
+		t.Errorf("ZRevRank() = %v, want %v", a, 2)
 	}
-	if n.ZRevRank("zset", "b") != 1 {
-		t.Errorf("ZRevRank() = %v, want %v", n.ZRevRank("zset", "b"), 1)
+	if b != 1 {
+		t.Errorf("ZRevRank() = %v, want %v", b, 1)
 	}
-	if n.ZRevRank("zset", "c") != 0 {
-		t.Errorf("ZRevRank() = %v, want %v", n.ZRevRank("zset", "c"), 0)
+	if c != 0 {
+		t.Errorf("ZRevRank() = %v, want %v", c, 0)
 	}
 }
 
@@ -174,14 +177,14 @@ func TestZSet_ZScore(t *testing.T) {
 	n.ZAdd("zset", "a", 1)
 	n.ZAdd("zset", "b", 2)
 	n.ZAdd("zset", "c", 3)
-	if n.ZScore("zset", "a") != 1 {
-		t.Errorf("ZScore() = %v, want %v", n.ZScore("zset", "a"), 1)
+	if v, _ := n.ZScore("zset", "a"); v != 1 {
+		t.Errorf("ZScore() = %v, want %v", v, 1)
 	}
-	if n.ZScore("zset", "b") != 2 {
-		t.Errorf("ZScore() = %v, want %v", n.ZScore("zset", "b"), 2)
+	if v, _ := n.ZScore("zset", "b"); v != 2 {
+		t.Errorf("ZScore() = %v, want %v", v, 2)
 	}
-	if n.ZScore("zset", "c") != 3 {
-		t.Errorf("ZScore() = %v, want %v", n.ZScore("zset", "c"), 3)
+	if v, _ := n.ZScore("zset", "c"); v != 3 {
+		t.Errorf("ZScore() = %v, want %v", v, 3)
 	}
 }
 
@@ -194,8 +197,8 @@ func TestZSet_ZIncrBy(t *testing.T) {
 	defer n.Close()
 	n.ZAdd("zset", "a", 1)
 	n.ZIncrBy("zset", "a", 1)
-	if n.ZScore("zset", "a") != 2 {
-		t.Errorf("ZIncrBy() = %v, want %v", n.ZScore("zset", "a"), 2)
+	if v, _ := n.ZScore("zset", "a"); v != 2 {
+		t.Errorf("ZIncrBy() = %v, want %v", v, 2)
 	}
 }
 
@@ -241,7 +244,7 @@ func TestZSet_ZRemRangeByScore(t *testing.T) {
 	n.ZAdd("zset", "a", 1)
 	n.ZAdd("zset", "b", 2)
 	n.ZAdd("zset", "c", 3)
-	n.ZRemRangeByScore("zset", 1, 2)
+	n.ZRemRangeByScore("zset", 1, 2, 0)
 	if n.ZCard("zset") != 1 {
 		t.Errorf("ZCard() = %v, want %v", n.ZCard("zset"), 1)
 	}

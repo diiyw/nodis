@@ -432,11 +432,11 @@ func (s *store) close() error {
 func (s *store) clear() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.keys.Clear()
+	s.values.Clear()
 	err := s.aof.Truncate(0)
 	if err != nil {
 		return err
 	}
-	s.keys.Clear()
-	s.values.Clear()
 	return nil
 }

@@ -55,7 +55,7 @@ func TestNodis_OpenAndCloseBigdata10000(t *testing.T) {
 		}
 	}
 	for i := 10000; i < 20000; i++ {
-		v := n.ZScore("zset", strconv.Itoa(i))
+		v, _ := n.ZScore("zset", strconv.Itoa(i))
 		if v != float64(i) {
 			t.Errorf("ZScore() = %v, want %v", v, i)
 		}
@@ -188,7 +188,7 @@ func TestNodis_Patch(t *testing.T) {
 	if string(v) != "string" {
 		t.Errorf("Get() = %v, want %v", v, "test_new")
 	}
-	s := n.ZScore("zset", "zset")
+	s, _ := n.ZScore("zset", "zset")
 	if s != 10 {
 		t.Errorf("ZScore() = %v, want %v", s, 10)
 	}
@@ -280,7 +280,7 @@ func TestNodis_OpenAndClose(t *testing.T) {
 	if v == nil {
 		t.Errorf("Get() = %s, want %v", v, "set")
 	}
-	s := n.ZScore("zset", "zset")
+	s, _ := n.ZScore("zset", "zset")
 	if s != 1 {
 		t.Errorf("ZScore() = %v, want %v", v, 1)
 	}

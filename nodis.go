@@ -209,7 +209,7 @@ func (n *Nodis) patch(op *pb.Op) error {
 	case pb.OpType_ZRemRangeByRank:
 		n.ZRemRangeByRank(op.Key, op.Operation.Start, op.Operation.Stop)
 	case pb.OpType_ZRemRangeByScore:
-		n.ZRemRangeByScore(op.Key, op.Operation.Min, op.Operation.Max)
+		n.ZRemRangeByScore(op.Key, op.Operation.Min, op.Operation.Max, int(op.Operation.Mode))
 	case pb.OpType_Rename:
 		_ = n.Rename(op.Key, op.Operation.DstKey)
 	default:
@@ -246,28 +246,8 @@ func (n *Nodis) Serve(addr string) error {
 		log.Printf("Nodis closed %v \n", n.Close())
 		os.Exit(0)
 	}()
-	return redis.Serve(addr, func(conn *redis.Conn, cmd *redis.Command) {
+	return redis.Serve(addr, func(conn *redis.Conn, cmd redis.Command) {
 		c := getCommand(cmd.Name)
-		if c == nil {
-			conn.WriteError("ERR unknown command: " + cmd.Name)
-			return
-		}
-		if conn.Multi {
-			if cmd.Name == "MULTI" {
-				conn.WriteError("ERR MULTI calls can not be nested")
-				return
-			}
-			if cmd.Name != "MULTI" && cmd.Name != "EXEC" {
-				newCmd := &redis.Command{
-					Name:    cmd.Name,
-					Options: cmd.Options,
-				}
-				newCmd.Args = cmd.Args
-				conn.Commands = append(conn.Commands, newCmd)
-				conn.WriteString("QUEUED")
-				return
-			}
-		}
 		func() {
 			defer func() {
 				if r := recover(); r != nil {

@@ -52,8 +52,9 @@ func (tx *Tx) newKey(meta *metadata, key string, newFn func() ds.DataStruct) *me
 		tx.store.values.Set(key, d)
 		meta.set(k, d)
 		meta.key.changed = true
+		return meta
 	}
-	return meta
+	return meta.empty()
 }
 
 func (tx *Tx) writeKey(key string, newFn func() ds.DataStruct) *metadata {
@@ -87,8 +88,7 @@ func (tx *Tx) readKey(key string) *metadata {
 	k, ok := tx.store.keys.Get(key)
 	if ok {
 		if k.expired(time.Now().UnixMilli()) {
-			meta.ok = false
-			return meta
+			return meta.empty()
 		}
 		d, ok := tx.store.values.Get(key)
 		if !ok {
@@ -96,8 +96,9 @@ func (tx *Tx) readKey(key string) *metadata {
 			return tx.store.fromStorage(k, meta)
 		}
 		meta.set(k, d)
+		return meta
 	}
-	return meta
+	return meta.empty()
 }
 
 func (tx *Tx) commit() {

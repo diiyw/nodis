@@ -68,6 +68,7 @@ message Operation {
   repeated string keys = 22;
   repeated double weights = 23;
   string aggregate = 24;
+  int64 Mode = 25;
 }
 
 message KeyScore {

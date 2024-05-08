@@ -22,7 +22,10 @@ func TestSortedSet_ZAdd(t *testing.T) {
 	}
 
 	// Test if the scores are correct
-	if ss.ZScore("member1") != 1.5 || ss.ZScore("member2") != 2.5 || ss.ZScore("member3") != 0.6 {
+	v1, _ := ss.ZScore("member1")
+	v2, _ := ss.ZScore("member2")
+	v3, _ := ss.ZScore("member3")
+	if v1 != 1.5 || v2 != 2.5 || v3 != 0.6 {
 		t.Errorf("Score error")
 	}
 }
@@ -55,14 +58,17 @@ func TestSortedSet_ZScore(t *testing.T) {
 	ss.ZAdd("member2", 2.5)
 	ss.ZAdd("member3", 0.5)
 
-	if ss.ZScore("member1") != 1.5 {
-		t.Errorf("Score error expected 1.5 got %f", ss.ZScore("member1"))
+	v1, _ := ss.ZScore("member1")
+	v2, _ := ss.ZScore("member2")
+	v3, _ := ss.ZScore("member3")
+	if v1 != 1.5 {
+		t.Errorf("Score error expected 1.5 got %f", v1)
 	}
-	if ss.ZScore("member2") != 2.5 {
-		t.Errorf("Score error expected 2.5 got %f", ss.ZScore("member2"))
+	if v2 != 2.5 {
+		t.Errorf("Score error expected 2.5 got %f", v2)
 	}
-	if ss.ZScore("member3") != 0.5 {
-		t.Errorf("Score error expected 0.5 got %f", ss.ZScore("member3"))
+	if v3 != 0.5 {
+		t.Errorf("Score error expected 0.5 got %f", v3)
 	}
 }
 
@@ -96,16 +102,18 @@ func TestSortedSet_ZRank(t *testing.T) {
 	ss.ZAdd("member1", 1.5)
 	ss.ZAdd("member2", 2.5)
 	ss.ZAdd("member3", 0.5)
-
+	v1, _ := ss.ZRank("member1")
+	v2, _ := ss.ZRank("member2")
+	v3, _ := ss.ZRank("member3")
 	// Test if the rank is correct
-	if ss.ZRank("member1") != 2 {
-		t.Errorf("Rank error expected 2 got %d", ss.ZRank("member1"))
+	if v1 != 1 {
+		t.Errorf("Rank error expected 1 got %d", v1)
 	}
-	if ss.ZRank("member2") != 3 {
-		t.Errorf("Rank error expected 3 got %d", ss.ZRank("member2"))
+	if v2 != 2 {
+		t.Errorf("Rank error expected 2 got %d", v2)
 	}
-	if ss.ZRank("member3") != 1 {
-		t.Errorf("Rank error expected 1 got %d", ss.ZRank("member3"))
+	if v3 != 0 {
+		t.Errorf("Rank error expected 0 got %d", v3)
 	}
 }
 
@@ -140,8 +148,8 @@ func TestSortedSet_ZRemRangeByRank(t *testing.T) {
 
 	// Test if the elements are removed correctly
 	ss.ZRemRangeByRank(0, 1)
-	if ss.ZCard() != 2 {
-		t.Errorf("Removal error")
+	if ss.ZCard() != 1 {
+		t.Errorf("Removal error expected 2 got %d", ss.ZCard())
 	}
 }
 
@@ -157,7 +165,7 @@ func TestSortedSet_ZRemRangeByScore(t *testing.T) {
 	}
 
 	// Test if the elements are removed correctly
-	removed := ss.ZRemRangeByScore(1, 2)
+	removed := ss.ZRemRangeByScore(1, 2, 0)
 	if ss.ZCard() != 2 {
 		t.Errorf("Removal error expected 2 got %d removed %d", ss.ZCard(), removed)
 	}
@@ -200,11 +208,13 @@ func TestSortedSet_ZRevRank(t *testing.T) {
 	ss.ZAdd("member3", 0.5)
 
 	// Test if the rank is correct
-	if ss.ZRevRank("member2") != 1 {
-		t.Errorf("Rank error expected 1 got %d", ss.ZRevRank("member2"))
+	v1, _ := ss.ZRevRank("member2")
+	if v1 != 0 {
+		t.Errorf("Rank error expected 1 got %d", v1)
 	}
-	if ss.ZRank("member2") != 3 {
-		t.Errorf("Rank error expected 3 got %d", ss.ZRevRank("member2"))
+	v2, _ := ss.ZRank("member2")
+	if v2 != 2 {
+		t.Errorf("Rank error expected 3 got %d", v2)
 	}
 }
 

@@ -24,6 +24,18 @@ func (n *Nodis) Set(key string, value []byte) {
 	})
 }
 
+// GetSet
+func (n *Nodis) GetSet(key string, value []byte) []byte {
+	var v []byte
+	_ = n.exec(func(tx *Tx) error {
+		meta := tx.writeKey(key, n.newStr)
+		v = meta.ds.(*str.String).GetSet(value)
+		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value))
+		return nil
+	})
+	return v
+}
+
 // SetEX set a key with specified expire time, in seconds (a positive integer).
 func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
 	_ = n.exec(func(tx *Tx) error {
