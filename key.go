@@ -18,6 +18,7 @@ type Key struct {
 	size       uint32
 	fileId     uint16
 	changed    bool
+	dataType   ds.DataType
 }
 
 func newKey() *Key {
@@ -35,11 +36,12 @@ func (k *Key) expired(now int64) bool {
 
 // marshal index to bytes
 func (k *Key) marshal() []byte {
-	var b [22]byte
+	var b [23]byte
 	binary.LittleEndian.PutUint64(b[0:8], uint64(k.offset))
 	binary.LittleEndian.PutUint64(b[8:16], uint64(k.expiration))
 	binary.LittleEndian.PutUint32(b[16:20], k.size)
 	binary.LittleEndian.PutUint16(b[20:22], k.fileId)
+	b[22] = uint8(k.dataType)
 	return b[:]
 }
 
@@ -49,6 +51,7 @@ func (k *Key) unmarshal(b []byte) {
 	k.expiration = int64(binary.LittleEndian.Uint64(b[8:16]))
 	k.size = binary.LittleEndian.Uint32(b[16:20])
 	k.fileId = binary.LittleEndian.Uint16(b[20:22])
+	k.dataType = ds.DataType(b[22])
 }
 
 // Del a key
@@ -329,6 +332,27 @@ func (n *Nodis) Keys(pattern string) []string {
 	return keys
 }
 
+// Keys gets the keys
+func (n *Nodis) Keyspace() (keys int64, expires int64, avgTTL int64) {
+	n.store.mu.Lock()
+	keys = int64(n.store.keys.Len())
+	now := time.Now().UnixMilli()
+	n.store.keys.Scan(func(key string, k *Key) bool {
+		if k.expired(now) {
+			expires++
+		}
+		if k.expiration != 0 {
+			avgTTL += k.expiration - now
+		}
+		return true
+	})
+	if keys > 0 {
+		avgTTL = avgTTL / keys / 1000
+	}
+	n.store.mu.Unlock()
+	return
+}
+
 // TTL gets the TTL
 func (n *Nodis) TTL(key string) time.Duration {
 	var v time.Duration
@@ -399,43 +423,48 @@ func (n *Nodis) Type(key string) string {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
-			v = "none"
+			v = "NONE"
 			return nil
 		}
-		v = ds.DataTypeMap[meta.ds.Type()]
+		v = meta.ds.Type().String()
 		return nil
 	})
 	return v
 }
 
 // Scan the keys
-func (n *Nodis) Scan(cursor int64, match string, count int64) (int64, []string) {
+func (n *Nodis) Scan(cursor int64, match string, count int64, typ ds.DataType) (int64, []string) {
+	keyLen := int64(n.store.keys.Len())
+	if keyLen == 0 {
+		return 0, nil
+	}
+	if cursor >= keyLen {
+		return 0, nil
+	}
+	if cursor+count > keyLen {
+		count = keyLen - cursor
+	}
 	keys := make([]string, 0)
 	now := time.Now().UnixMilli()
+	tx := newTx(n.store)
+	var readCount int64 = 0
 	n.store.keys.Scan(func(key string, k *Key) bool {
+		if readCount == count {
+			return false
+		}
+		_ = tx.rLockKey(key)
+		defer tx.commit()
 		matched, _ := filepath.Match(match, key)
 		if matched && !k.expired(now) {
+			if typ != 0 && k.dataType != typ {
+				return true
+			}
+			readCount++
 			keys = append(keys, key)
 		}
 		return true
 	})
-	if len(keys) == 0 {
-		return 0, nil
-	}
-	lk := int64(len(keys))
-	if cursor >= lk {
-		return 0, nil
-	}
-	if count > lk {
-		count = lk
-	}
-	if cursor+count > lk {
-		count = lk - cursor
-	}
-	if count == 0 {
-		count = lk
-	}
-	return cursor + count, keys[cursor : cursor+count]
+	return cursor + readCount, keys
 }
 
 // RandomKey gets a random key

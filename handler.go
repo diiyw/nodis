@@ -1,22 +1,33 @@
 package nodis
 
 import (
+	"log"
 	"os"
 	"runtime"
 	"strconv"
 	"time"
 
+	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/zset"
 	"github.com/diiyw/nodis/redis"
 	"github.com/diiyw/nodis/utils"
 )
 
 func execCommand(conn *redis.Conn, fn func()) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("Recovered error: ", r)
+			conn.WriteError("Err " + r.(error).Error())
+			return
+		}
+	}()
 	if conn.State == redis.MultiNone || conn.State == redis.MultiCommit {
 		fn()
 		return
 	}
-	conn.Commands = append(conn.Commands, fn)
+	if conn.State&redis.MultiPrepare == redis.MultiPrepare {
+		conn.Commands = append(conn.Commands, fn)
+	}
 	conn.WriteString("QUEUED")
 }
 
@@ -297,12 +308,18 @@ func info(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		runtime.ReadMemStats(&memStats)
 		usedMemory := strconv.FormatUint(memStats.HeapInuse+memStats.StackInuse, 10)
 		pid := strconv.Itoa(os.Getpid())
+		keys, expires, avgTTL := n.Keyspace()
+		var keyspace = ""
+		if keys > 0 {
+			keyspace = "\ndb0:keys=" + strconv.FormatInt(keys, 10) + ",expires=" + strconv.FormatInt(expires, 10) + ",avg_ttl=" + strconv.FormatInt(avgTTL, 10)
+		}
 		conn.WriteBulk(`# Server
-redis_version:1.6.0
+redis_version:6.0.0
 os:` + runtime.GOOS + `
 process_id:` + pid + `
 # Memory
 used_memory:` + usedMemory + `
+# Keyspace` + keyspace + `
 `)
 	})
 }
@@ -342,11 +359,11 @@ func flushDB(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 }
 
 func multi(n *Nodis, conn *redis.Conn, cmd redis.Command) {
-	if conn.State == redis.MultiPrepare {
+	if conn.State&redis.MultiPrepare == redis.MultiPrepare {
 		conn.WriteError("ERR MULTI calls can not be nested")
 		return
 	}
-	conn.State = redis.MultiPrepare
+	conn.State |= redis.MultiPrepare
 	conn.WriteOK()
 }
 
@@ -357,23 +374,36 @@ func discard(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 }
 
 func exec(n *Nodis, conn *redis.Conn, cmd redis.Command) {
-	if conn.State != redis.MultiPrepare {
+	defer func() {
+		conn.State = redis.MultiNone
+		conn.Commands = nil
+	}()
+	if conn.State&redis.MultiPrepare != redis.MultiPrepare {
 		conn.WriteError("ERR EXEC without MULTI")
 		return
 	}
-	defer func() {
-		conn.State = redis.MultiNone
-	}()
+	if conn.State&redis.MultiError == redis.MultiError {
+		conn.WriteError("EXECABORT Transaction discarded because of previous errors.")
+		return
+	}
 	if len(conn.Commands) == 0 {
 		conn.WriteArray(0)
 		return
 	}
-	conn.State = redis.MultiCommit
+	conn.State |= redis.MultiCommit
 	conn.WriteArray(len(conn.Commands))
 	for _, command := range conn.Commands {
-		command()
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Println("Recovered error: ", r)
+					conn.WriteError("WRONGTYPE " + r.(error).Error())
+					return
+				}
+			}()
+			command()
+		}()
 	}
-	conn.Commands = nil
 }
 
 func del(n *Nodis, conn *redis.Conn, cmd redis.Command) {
@@ -565,6 +595,7 @@ func scan(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	var match = "*"
 	var count int64
+	var typ ds.DataType
 	if cmd.Options.MATCH > 0 {
 		match = cmd.Args[cmd.Options.MATCH]
 	}
@@ -575,8 +606,12 @@ func scan(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			return
 		}
 	}
+	if cmd.Options.TYPE > 0 {
+		typ = ds.StringToDataType(utils.ToUpper(cmd.Args[cmd.Options.TYPE]))
+		return
+	}
 	execCommand(conn, func() {
-		nextCursor, keys := n.Scan(cursor, match, count)
+		nextCursor, keys := n.Scan(cursor, match, count, typ)
 		conn.WriteArray(2)
 		conn.WriteBulk(strconv.FormatInt(nextCursor, 10))
 		conn.WriteArray(len(keys))
@@ -1180,6 +1215,7 @@ func sRandMember(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	key := cmd.Args[0]
 	var count int64 = 1
+	var hasCount bool
 	if len(cmd.Args) > 1 {
 		var err error
 		count, err = strconv.ParseInt(cmd.Args[1], 10, 64)
@@ -1187,21 +1223,26 @@ func sRandMember(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			conn.WriteError("ERR value is not an integer or out of range")
 			return
 		}
+		hasCount = true
 	}
 	execCommand(conn, func() {
 		results := n.SRandMember(key, count)
 		if len(results) == 0 {
+			if hasCount {
+				conn.WriteArray(0)
+				return
+			}
 			conn.WriteNull()
 			return
 		}
-		if count == 1 {
-			conn.WriteBulk(results[0])
+		if hasCount {
+			conn.WriteArray(len(results))
+			for _, v := range results {
+				conn.WriteBulk(v)
+			}
 			return
 		}
-		conn.WriteArray(len(results))
-		for _, v := range results {
-			conn.WriteBulk(v)
-		}
+		conn.WriteBulk(results[0])
 	})
 }
 

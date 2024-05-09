@@ -193,6 +193,7 @@ func (r *Reader) readOptions(v string, i int) {
 			case "COUNT":
 				r.cmd.Options.COUNT = i + 1
 			case "TYPE":
+				r.cmd.Options.TYPE = i + 1
 			}
 		}
 	case "SET":
@@ -382,6 +383,7 @@ type Writer struct {
 	writer io.Writer
 	buf    []byte
 	w      int
+	err    bool
 }
 
 func NewWriter(w io.Writer) *Writer {
@@ -407,7 +409,12 @@ func (w *Writer) Flush() error {
 		return err
 	}
 	w.w = 0
+	w.err = false
 	return nil
+}
+
+func (w *Writer) HasError() bool {
+	return w.err
 }
 
 func (w *Writer) writeByte(b byte) {
@@ -449,6 +456,7 @@ func (w *Writer) WriteArray(l int) {
 }
 
 func (w *Writer) WriteError(err string) {
+	w.err = true
 	w.writeByte(ErrType)
 	w.writeBytes(utils.String2Bytes(err)...)
 	w.writeBytes('\r', '\n')

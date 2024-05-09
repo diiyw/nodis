@@ -5,9 +5,10 @@ import (
 )
 
 const (
-	MultiNone uint8 = iota
-	MultiPrepare
-	MultiCommit
+	MultiNone    uint8 = 0
+	MultiPrepare uint8 = 1
+	MultiCommit  uint8 = 2
+	MultiError   uint8 = 4
 )
 
 type HandlerFunc func(c *Conn, cmd Command)

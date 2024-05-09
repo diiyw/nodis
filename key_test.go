@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/fs"
 )
 
@@ -267,19 +268,19 @@ func TestKey_Scan(t *testing.T) {
 	n.Set("test29", []byte("test29"))
 	n.Set("test30", []byte("test30"))
 	n.Set("test31", []byte("test31"))
-	_, result := n.Scan(0, "test*", 10)
+	_, result := n.Scan(0, "test*", 10, ds.String)
 	if len(result) != 10 {
 		t.Errorf("Scan() = %v, want %v", len(result), 10)
 	}
-	_, result = n.Scan(32, "test*", 10)
+	_, result = n.Scan(32, "test*", 10, ds.String)
 	if len(result) != 0 {
 		t.Errorf("Scan() = %v, want %v", len(result), 0)
 	}
-	_, result = n.Scan(0, "test*", 32)
+	_, result = n.Scan(0, "test*", 32, ds.String)
 	if len(result) != 31 {
 		t.Errorf("Scan() = %v, want %v", len(result), 31)
 	}
-	_, result = n.Scan(23, "test*", 10)
+	_, result = n.Scan(23, "test*", 10, ds.String)
 	if len(result) != 8 {
 		t.Errorf("Scan() = %v, want %v", len(result), 8)
 	}

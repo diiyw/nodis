@@ -17,6 +17,9 @@ type metadata struct {
 func (m *metadata) set(key *Key, d ds.DataStruct) *metadata {
 	m.key = key
 	m.ds = d
+	if m.key.dataType == 0 {
+		m.key.dataType = m.ds.Type()
+	}
 	m.ok = true
 	return m
 }

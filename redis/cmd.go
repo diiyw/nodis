@@ -31,6 +31,7 @@ type Options struct {
 	WEIGHTS    int
 	AGGREGATE  int
 	REV        int
+	TYPE       int
 }
 
 const (

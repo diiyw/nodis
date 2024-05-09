@@ -182,14 +182,13 @@ func (s *Set) SRandMember(count int64) []string {
 	}
 	var unique = true
 	if count < 0 {
-		count = -count
 		unique = false
 	}
-	if count > int64(s.data.Len()) {
-		count = int64(s.data.Len())
+	var kl = s.data.Len()
+	if count > 0 && count > int64(kl) {
+		count = int64(kl)
 	}
-	kl := s.data.Len()
-	members := make([]string, 0, count)
+	members := make([]string, 0)
 	if unique {
 		var keys = make(map[string]bool)
 		s.data.Scan(func(key string, value struct{}) bool {
@@ -204,13 +203,14 @@ func (s *Set) SRandMember(count int64) []string {
 			count--
 		}
 	} else {
-		keys := s.data.Keys()
-		for count > 0 {
+		for count < 0 {
 			index := rand.Intn(kl)
-			members = append(members, keys[index])
-			count--
+			key, _, ok := s.data.GetAt(index)
+			if ok {
+				members = append(members, key)
+				count++
+			}
 		}
-
 	}
 	return members
 }

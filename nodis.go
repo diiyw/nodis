@@ -248,16 +248,10 @@ func (n *Nodis) Serve(addr string) error {
 	}()
 	return redis.Serve(addr, func(conn *redis.Conn, cmd redis.Command) {
 		c := getCommand(cmd.Name)
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					log.Println("Recovered from ", r)
-					conn.WriteError("ERR " + cmd.Name + " error" + r.(error).Error())
-					return
-				}
-			}()
-			c(n, conn, cmd)
-		}()
+		c(n, conn, cmd)
+		if conn.HasError() && conn.State != 0 {
+			conn.State |= redis.MultiError
+		}
 	})
 }
 
