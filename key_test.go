@@ -280,9 +280,13 @@ func TestKey_Scan(t *testing.T) {
 	if len(result) != 31 {
 		t.Errorf("Scan() = %v, want %v", len(result), 31)
 	}
+	_, result = n.Scan(0, "test*", 31, ds.String)
+	if len(result) != 31 {
+		t.Errorf("Scan() = %v, want %v", len(result), 31)
+	}
 	_, result = n.Scan(23, "test*", 10, ds.String)
-	if len(result) != 8 {
-		t.Errorf("Scan() = %v, want %v", len(result), 8)
+	if len(result) != 9 {
+		t.Errorf("Scan() = %v, want %v", len(result), 9)
 	}
 }
 

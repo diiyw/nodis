@@ -282,12 +282,12 @@ func config(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	execCommand(conn, func() {
-		if cmd.Args[1] == "GET" {
+		if cmd.Args[0] == "GET" {
 			if len(cmd.Args) < 2 {
 				conn.WriteError("CONFIG GET requires at least one argument")
 				return
 			}
-			if utils.ToUpper(cmd.Args[2]) == "DATABASES" {
+			if utils.ToUpper(cmd.Args[1]) == "DATABASES" {
 				conn.WriteArray(2)
 				conn.WriteBulk("databases")
 				conn.WriteBulk("0")
@@ -2045,13 +2045,13 @@ func zRange(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	key := cmd.Args[0]
 	var mode int
-	if cmd.Options.BYSCORE > 1 {
+	if cmd.Options.BYSCORE > 2 {
 		if cmd.Args[1][0] == '(' {
 			mode = zset.MinOpen
 		}
 		var min, max float64
 		var err error
-		if cmd.Options.REV > 1 {
+		if cmd.Options.REV > 2 {
 			min, err = redis.FormatFloat64(cmd.Args[2])
 		} else {
 			min, err = redis.FormatFloat64(cmd.Args[1])
@@ -2063,7 +2063,7 @@ func zRange(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		if cmd.Args[2][0] == '(' {
 			mode |= zset.MaxOpen
 		}
-		if cmd.Options.REV > 1 {
+		if cmd.Options.REV > 2 {
 			max, err = redis.FormatFloat64(cmd.Args[1])
 		} else {
 			max, err = redis.FormatFloat64(cmd.Args[2])
@@ -2073,7 +2073,7 @@ func zRange(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			return
 		}
 		var offset, count int64 = 0, -1
-		if cmd.Options.LIMIT > 1 {
+		if cmd.Options.LIMIT > 2 {
 			offset, err = strconv.ParseInt(cmd.Args[cmd.Options.LIMIT], 10, 64)
 			if err != nil {
 				conn.WriteError("ERR offset value is not an integer or out of range")
@@ -2086,8 +2086,8 @@ func zRange(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			}
 		}
 		execCommand(conn, func() {
-			if cmd.Options.WITHSCORES > 1 {
-				if cmd.Options.REV > 1 {
+			if cmd.Options.WITHSCORES > 2 {
+				if cmd.Options.REV > 2 {
 					results := n.ZRevRangeByScoreWithScores(key, min, max, offset, count, mode)
 					conn.WriteArray(len(results) * 2)
 					for _, v := range results {
@@ -2104,7 +2104,7 @@ func zRange(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 				}
 				return
 			}
-			if cmd.Options.REV > 1 {
+			if cmd.Options.REV > 2 {
 				results := n.ZRevRangeByScore(key, min, max, offset, count, mode)
 				conn.WriteArray(len(results))
 				for _, v := range results {
@@ -2131,8 +2131,8 @@ func zRange(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	execCommand(conn, func() {
-		if cmd.Options.WITHSCORES > 1 {
-			if cmd.Options.REV > 1 {
+		if cmd.Options.WITHSCORES > 2 {
+			if cmd.Options.REV > 2 {
 				results := n.ZRevRangeWithScores(key, start, stop)
 				conn.WriteArray(len(results) * 2)
 				for _, v := range results {
@@ -2149,7 +2149,7 @@ func zRange(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			}
 			return
 		}
-		if cmd.Options.REV > 1 {
+		if cmd.Options.REV > 2 {
 			results := n.ZRevRange(key, start, stop)
 			conn.WriteArray(len(results))
 			for _, v := range results {
@@ -2182,7 +2182,7 @@ func zRevRange(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	execCommand(conn, func() {
-		if cmd.Options.WITHSCORES > 1 {
+		if cmd.Options.WITHSCORES > 2 {
 			results := n.ZRevRangeWithScores(key, start, stop)
 			conn.WriteArray(len(results) * 2)
 			for _, v := range results {
@@ -2407,7 +2407,7 @@ func zUnionStore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	keys := cmd.Args[2 : 2+numKeys]
 	var weights []float64
 	var aggregate string
-	if cmd.Options.WEIGHTS > 1 {
+	if cmd.Options.WEIGHTS > 2 {
 		if len(cmd.Args) < cmd.Options.WEIGHTS+int(numKeys) {
 			conn.WriteError("ERR syntax error")
 			return
@@ -2421,7 +2421,7 @@ func zUnionStore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			}
 		}
 	}
-	if cmd.Options.AGGREGATE > 1 {
+	if cmd.Options.AGGREGATE > 2 {
 		aggregate = cmd.Args[cmd.Options.AGGREGATE]
 	}
 	execCommand(conn, func() {
@@ -2444,7 +2444,7 @@ func zInterStore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	keys := cmd.Args[2 : 2+numKeys]
 	var weights []float64
 	var aggregate string
-	if cmd.Options.WEIGHTS > 1 {
+	if cmd.Options.WEIGHTS > 2 {
 		if len(cmd.Args) < cmd.Options.WEIGHTS+int(numKeys) {
 			conn.WriteError("ERR syntax error")
 			return
@@ -2458,7 +2458,7 @@ func zInterStore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			}
 		}
 	}
-	if cmd.Options.AGGREGATE > 1 {
+	if cmd.Options.AGGREGATE > 2 {
 		aggregate = cmd.Args[cmd.Options.AGGREGATE]
 	}
 	execCommand(conn, func() {

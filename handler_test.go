@@ -43,9 +43,6 @@ func TestClient_Config(t *testing.T) {
 	cmd := redis.Command{
 		Name: "CONFIG",
 		Args: []string{"GET", "DATABASES"},
-		Options: redis.Options{
-			GET: 1,
-		},
 	}
 
 	config(n, &redis.Conn{Writer: w}, cmd)
