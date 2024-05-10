@@ -280,12 +280,12 @@ func config(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	execCommand(conn, func() {
-		if cmd.Options.GET > 0 {
-			if cmd.Options.GET > len(cmd.Args) {
+		if cmd.Args[1] == "GET" {
+			if len(cmd.Args) < 2 {
 				conn.WriteError("CONFIG GET requires at least one argument")
 				return
 			}
-			if utils.ToUpper(cmd.Args[cmd.Options.GET]) == "DATABASES" {
+			if utils.ToUpper(cmd.Args[2]) == "DATABASES" {
 				conn.WriteArray(2)
 				conn.WriteBulk("databases")
 				conn.WriteBulk("0")
@@ -434,19 +434,19 @@ func expire(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	execCommand(conn, func() {
 		seconds, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
-		if cmd.Options.NX > 0 {
+		if cmd.Options.NX > 1 {
 			conn.WriteInteger(n.ExpireNX(cmd.Args[0], seconds))
 			return
 		}
-		if cmd.Options.XX > 0 {
+		if cmd.Options.XX > 1 {
 			conn.WriteInteger(n.ExpireXX(cmd.Args[0], seconds))
 			return
 		}
-		if cmd.Options.LT > 0 {
+		if cmd.Options.LT > 1 {
 			conn.WriteInteger(n.ExpireLT(cmd.Args[0], seconds))
 			return
 		}
-		if cmd.Options.GT > 0 {
+		if cmd.Options.GT > 1 {
 			conn.WriteInteger(n.ExpireGT(cmd.Args[0], seconds))
 			return
 		}
@@ -467,19 +467,19 @@ func expireAt(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	execCommand(conn, func() {
 		e := time.Unix(timestamp, 0)
-		if cmd.Options.NX > 0 {
+		if cmd.Options.NX > 1 {
 			conn.WriteInteger(n.ExpireAtNX(cmd.Args[0], e))
 			return
 		}
-		if cmd.Options.XX > 0 {
+		if cmd.Options.XX > 1 {
 			conn.WriteInteger(n.ExpireAtXX(cmd.Args[0], e))
 			return
 		}
-		if cmd.Options.LT > 0 {
+		if cmd.Options.LT > 1 {
 			conn.WriteInteger(n.ExpireAtLT(cmd.Args[0], e))
 			return
 		}
-		if cmd.Options.GT > 0 {
+		if cmd.Options.GT > 1 {
 			conn.WriteInteger(n.ExpireAtGT(cmd.Args[0], e))
 			return
 		}
@@ -594,7 +594,7 @@ func scan(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	var match = "*"
-	var count int64
+	var count int64 = 10
 	var typ ds.DataType
 	if cmd.Options.MATCH > 0 {
 		match = cmd.Args[cmd.Options.MATCH]
@@ -605,10 +605,13 @@ func scan(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			conn.WriteError("ERR count value is not an integer or out of range")
 			return
 		}
+		if count == 0 {
+			conn.WriteError("ERR syntax error")
+			return
+		}
 	}
 	if cmd.Options.TYPE > 0 {
 		typ = ds.StringToDataType(utils.ToUpper(cmd.Args[cmd.Options.TYPE]))
-		return
 	}
 	execCommand(conn, func() {
 		nextCursor, keys := n.Scan(cursor, match, count, typ)
@@ -631,35 +634,35 @@ func setString(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		key := cmd.Args[0]
 		value := []byte(cmd.Args[1])
 		var get []byte
-		if cmd.Options.GET > 0 {
+		if cmd.Options.GET > 1 {
 			get = n.Get(key)
 		}
-		if cmd.Options.NX > 0 {
+		if cmd.Options.NX > 1 {
 			n.SetNX(key, value)
-		} else if cmd.Options.XX > 0 {
+		} else if cmd.Options.XX > 1 {
 			n.SetXX(key, value)
 		} else {
 			n.Set(key, value)
 		}
-		if cmd.Options.EX > 0 {
+		if cmd.Options.EX > 1 {
 			seconds, _ := strconv.ParseInt(cmd.Args[cmd.Options.EX], 10, 64)
 			n.Expire(key, seconds)
 			conn.WriteOK()
 			return
 		}
-		if cmd.Options.PX > 0 {
+		if cmd.Options.PX > 1 {
 			milliseconds, _ := strconv.ParseInt(cmd.Args[cmd.Options.PX], 10, 64)
 			n.ExpirePX(key, milliseconds)
 			conn.WriteOK()
 			return
 		}
-		if cmd.Options.EXAT > 0 {
+		if cmd.Options.EXAT > 1 {
 			seconds, _ := strconv.ParseInt(cmd.Args[cmd.Options.EXAT], 10, 64)
 			n.ExpireAt(key, time.Unix(seconds, 0))
 			conn.WriteOK()
 			return
 		}
-		if cmd.Options.PXAT > 0 {
+		if cmd.Options.PXAT > 1 {
 			milliseconds, _ := strconv.ParseInt(cmd.Args[cmd.Options.PXAT], 10, 64)
 			seconds := milliseconds / 1000
 			ns := (milliseconds - seconds*1000) * 1000 * 1000
@@ -969,7 +972,7 @@ func bitCount(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		}
 	}
 	execCommand(conn, func() {
-		conn.WriteInteger(n.BitCount(key, start, end, cmd.Options.BIT > 0))
+		conn.WriteInteger(n.BitCount(key, start, end, cmd.Options.BIT > 2))
 	})
 }
 
@@ -1015,10 +1018,10 @@ func sScan(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	var match = "*"
 	var count int64
-	if cmd.Options.MATCH > 0 {
+	if cmd.Options.MATCH > 1 {
 		match = cmd.Args[cmd.Options.MATCH]
 	}
-	if cmd.Options.COUNT > 0 {
+	if cmd.Options.COUNT > 1 {
 		count, err = strconv.ParseInt(cmd.Args[cmd.Options.COUNT], 10, 64)
 		if err != nil {
 			conn.WriteError("ERR count value is not an integer or out of range")
@@ -1487,10 +1490,10 @@ func hScan(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	cursor, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
 	var match = "*"
 	var count int64
-	if cmd.Options.MATCH > 0 {
+	if cmd.Options.MATCH > 1 {
 		match = cmd.Args[cmd.Options.MATCH]
 	}
-	if cmd.Options.COUNT > 0 {
+	if cmd.Options.COUNT > 1 {
 		count, err = strconv.ParseInt(cmd.Args[cmd.Options.COUNT], 10, 64)
 		if err != nil {
 			conn.WriteError("ERR value is not an integer or out of range")
@@ -1933,7 +1936,7 @@ func zRank(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		key := cmd.Args[0]
 		member := cmd.Args[1]
-		if cmd.Options.WITHSCORES > 0 {
+		if cmd.Options.WITHSCORES > 1 {
 			rank, el := n.ZRankWithScore(key, member)
 			if el != nil {
 				conn.WriteArray(2)
@@ -1961,7 +1964,7 @@ func zRevRank(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		key := cmd.Args[0]
 		member := cmd.Args[1]
-		if cmd.Options.WITHSCORES > 0 {
+		if cmd.Options.WITHSCORES > 1 {
 			rank, el := n.ZRevRankWithScore(key, member)
 			if el != nil {
 				conn.WriteArray(2)
@@ -2023,13 +2026,13 @@ func zRange(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	key := cmd.Args[0]
 	var mode int
-	if cmd.Options.BYSCORE > 0 {
+	if cmd.Options.BYSCORE > 1 {
 		if cmd.Args[1][0] == '(' {
 			mode = zset.MinOpen
 		}
 		var min, max float64
 		var err error
-		if cmd.Options.REV > 0 {
+		if cmd.Options.REV > 1 {
 			min, err = redis.FormatFloat64(cmd.Args[2])
 		} else {
 			min, err = redis.FormatFloat64(cmd.Args[1])
@@ -2041,7 +2044,7 @@ func zRange(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		if cmd.Args[2][0] == '(' {
 			mode |= zset.MaxOpen
 		}
-		if cmd.Options.REV > 0 {
+		if cmd.Options.REV > 1 {
 			max, err = redis.FormatFloat64(cmd.Args[1])
 		} else {
 			max, err = redis.FormatFloat64(cmd.Args[2])
@@ -2051,7 +2054,7 @@ func zRange(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			return
 		}
 		var offset, count int64 = 0, -1
-		if cmd.Options.LIMIT > 0 {
+		if cmd.Options.LIMIT > 1 {
 			offset, err = strconv.ParseInt(cmd.Args[cmd.Options.LIMIT], 10, 64)
 			if err != nil {
 				conn.WriteError("ERR offset value is not an integer or out of range")
@@ -2064,8 +2067,8 @@ func zRange(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			}
 		}
 		execCommand(conn, func() {
-			if cmd.Options.WITHSCORES > 0 {
-				if cmd.Options.REV > 0 {
+			if cmd.Options.WITHSCORES > 1 {
+				if cmd.Options.REV > 1 {
 					results := n.ZRevRangeByScoreWithScores(key, min, max, offset, count, mode)
 					conn.WriteArray(len(results) * 2)
 					for _, v := range results {
@@ -2082,7 +2085,7 @@ func zRange(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 				}
 				return
 			}
-			if cmd.Options.REV > 0 {
+			if cmd.Options.REV > 1 {
 				results := n.ZRevRangeByScore(key, min, max, offset, count, mode)
 				conn.WriteArray(len(results))
 				for _, v := range results {
@@ -2109,8 +2112,8 @@ func zRange(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	execCommand(conn, func() {
-		if cmd.Options.WITHSCORES > 0 {
-			if cmd.Options.REV > 0 {
+		if cmd.Options.WITHSCORES > 1 {
+			if cmd.Options.REV > 1 {
 				results := n.ZRevRangeWithScores(key, start, stop)
 				conn.WriteArray(len(results) * 2)
 				for _, v := range results {
@@ -2127,7 +2130,7 @@ func zRange(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			}
 			return
 		}
-		if cmd.Options.REV > 0 {
+		if cmd.Options.REV > 1 {
 			results := n.ZRevRange(key, start, stop)
 			conn.WriteArray(len(results))
 			for _, v := range results {
@@ -2160,7 +2163,7 @@ func zRevRange(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	execCommand(conn, func() {
-		if cmd.Options.WITHSCORES > 0 {
+		if cmd.Options.WITHSCORES > 1 {
 			results := n.ZRevRangeWithScores(key, start, stop)
 			conn.WriteArray(len(results) * 2)
 			for _, v := range results {
@@ -2202,7 +2205,7 @@ func zRangeByScore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	var offset, count int64 = 0, -1
-	if cmd.Options.LIMIT > 0 {
+	if cmd.Options.LIMIT > 2 {
 		offset, err = strconv.ParseInt(cmd.Args[cmd.Options.LIMIT], 10, 64)
 		if err != nil {
 			conn.WriteError("ERR offset value is not an integer or out of range")
@@ -2215,7 +2218,7 @@ func zRangeByScore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		}
 	}
 	execCommand(conn, func() {
-		if cmd.Options.WITHSCORES > 0 {
+		if cmd.Options.WITHSCORES > 2 {
 			results := n.ZRangeByScoreWithScores(key, min, max, offset, count, mode)
 			conn.WriteArray(len(results) * 2)
 			for _, v := range results {
@@ -2256,7 +2259,7 @@ func zRevRangeByScore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	var offset, count int64 = 0, -1
-	if cmd.Options.LIMIT > 0 {
+	if cmd.Options.LIMIT > 2 {
 		offset, err = strconv.ParseInt(cmd.Args[cmd.Options.LIMIT], 10, 64)
 		if err != nil {
 			conn.WriteError("ERR offset value is not an integer or out of range")
@@ -2269,7 +2272,7 @@ func zRevRangeByScore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		}
 	}
 	execCommand(conn, func() {
-		if cmd.Options.WITHSCORES > 0 {
+		if cmd.Options.WITHSCORES > 2 {
 			results := n.ZRevRangeByScoreWithScores(key, min, max, offset, count, mode)
 			conn.WriteArray(len(results) * 2)
 			for _, v := range results {
@@ -2385,7 +2388,7 @@ func zUnionStore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	keys := cmd.Args[2 : 2+numKeys]
 	var weights []float64
 	var aggregate string
-	if cmd.Options.WEIGHTS > 0 {
+	if cmd.Options.WEIGHTS > 1 {
 		if len(cmd.Args) < cmd.Options.WEIGHTS+int(numKeys) {
 			conn.WriteError("ERR syntax error")
 			return
@@ -2399,7 +2402,7 @@ func zUnionStore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			}
 		}
 	}
-	if cmd.Options.AGGREGATE > 0 {
+	if cmd.Options.AGGREGATE > 1 {
 		aggregate = cmd.Args[cmd.Options.AGGREGATE]
 	}
 	execCommand(conn, func() {
@@ -2422,7 +2425,7 @@ func zInterStore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	keys := cmd.Args[2 : 2+numKeys]
 	var weights []float64
 	var aggregate string
-	if cmd.Options.WEIGHTS > 0 {
+	if cmd.Options.WEIGHTS > 1 {
 		if len(cmd.Args) < cmd.Options.WEIGHTS+int(numKeys) {
 			conn.WriteError("ERR syntax error")
 			return
@@ -2436,7 +2439,7 @@ func zInterStore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			}
 		}
 	}
-	if cmd.Options.AGGREGATE > 0 {
+	if cmd.Options.AGGREGATE > 1 {
 		aggregate = cmd.Args[cmd.Options.AGGREGATE]
 	}
 	execCommand(conn, func() {

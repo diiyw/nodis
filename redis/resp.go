@@ -169,118 +169,56 @@ func (r *Reader) ReadCommand() error {
 }
 
 func (r *Reader) readOptions(v string, i int) {
-	switch r.cmd.Name {
-	case "EXPIRE", "EXPIREAT":
-		if i > 1 {
-			opt := utils.ToUpper(v)
-			switch opt {
-			case "NX":
-				r.cmd.Options.NX = i
-			case "XX":
-				r.cmd.Options.XX = i
-			case "LT":
-				r.cmd.Options.LT = i
-			case "GT":
-				r.cmd.Options.GT = i
-			}
-		}
-	case "SCAN", "SSCAN", "HSCAN", "ZSCAN", "SPOP":
-		if i > 1 {
-			opt := utils.ToUpper(v)
-			switch opt {
-			case "MATCH":
-				r.cmd.Options.MATCH = i + 1
-			case "COUNT":
-				r.cmd.Options.COUNT = i + 1
-			case "TYPE":
-				r.cmd.Options.TYPE = i + 1
-			}
-		}
-	case "SET":
-		if i > 1 {
-			opt := utils.ToUpper(v)
-			switch opt {
-			case "NX":
-				r.cmd.Options.NX = i
-			case "XX":
-				r.cmd.Options.XX = i
-			case "EX":
-				r.cmd.Options.EX = i + 1
-			case "EXAT":
-				r.cmd.Options.EXAT = i + 1
-			case "PX":
-				r.cmd.Options.PX = i + 1
-			case "PXAT":
-				r.cmd.Options.PXAT = i + 1
-			case "GET":
-				r.cmd.Options.GET = i
-			case "KEEPTTL":
-				r.cmd.Options.KEEPTTL = i
-			}
-		}
-	case "ZADD":
-		if i > 0 {
-			opt := utils.ToUpper(v)
-			switch opt {
-			case "NX":
-				r.cmd.Options.NX = i
-			case "XX":
-				r.cmd.Options.XX = i
-			case "CH":
-				r.cmd.Options.CH = i
-			case "INCR":
-				r.cmd.Options.INCR = i
-			case "GT":
-				r.cmd.Options.GT = i
-			case "LT":
-				r.cmd.Options.LT = i
-			}
-		}
-	case "ZRANK", "ZREVRANK", "ZRANGE", "ZREVRANGE", "ZRANGEBYSCORE", "ZREVRANGEBYSCORE":
-		if r.cmd.Name == "ZRANK" && i < 1 {
-			return
-		} else if i < 2 {
-			return
-		}
-		opt := utils.ToUpper(v)
-		switch opt {
-		case "WITHSCORES":
-			r.cmd.Options.WITHSCORES = i
-		case "LIMIT":
-			r.cmd.Options.LIMIT = i + 1
-		case "BYSCORE":
-			r.cmd.Options.BYSCORE = i
-		case "BYLEX":
-			r.cmd.Options.BYLEX = i
-		case "REV":
-			r.cmd.Options.REV = i
-		}
-	case "ZUNIONSTORE", "ZINTERSTORE":
-		if i > 2 {
-			opt := utils.ToUpper(v)
-			switch opt {
-			case "WEIGHTS":
-				r.cmd.Options.WEIGHTS = i + 1
-			case "AGGREGATE":
-				r.cmd.Options.AGGREGATE = i + 1
-			}
-		}
-	case "CONFIG":
-		opt := utils.ToUpper(v)
-		switch opt {
-		case "GET":
-			r.cmd.Options.GET = i + 1
-		}
-	case "BITCOUNT":
-		if i > 2 {
-			opt := utils.ToUpper(v)
-			switch opt {
-			case "BYTE":
-				r.cmd.Options.BYTE = i
-			case "BIT":
-				r.cmd.Options.BIT = i
-			}
-		}
+	opt := utils.ToUpper(v)
+	switch opt {
+	case "NX":
+		r.cmd.Options.NX = i
+	case "XX":
+		r.cmd.Options.XX = i
+	case "LT":
+		r.cmd.Options.LT = i
+	case "GT":
+		r.cmd.Options.GT = i
+	case "MATCH":
+		r.cmd.Options.MATCH = i + 1
+	case "COUNT":
+		r.cmd.Options.COUNT = i + 1
+	case "TYPE":
+		r.cmd.Options.TYPE = i + 1
+	case "EX":
+		r.cmd.Options.EX = i + 1
+	case "EXAT":
+		r.cmd.Options.EXAT = i + 1
+	case "PX":
+		r.cmd.Options.PX = i + 1
+	case "PXAT":
+		r.cmd.Options.PXAT = i + 1
+	case "GET":
+		r.cmd.Options.GET = i
+	case "KEEPTTL":
+		r.cmd.Options.KEEPTTL = i
+	case "CH":
+		r.cmd.Options.CH = i
+	case "INCR":
+		r.cmd.Options.INCR = i
+	case "WITHSCORES":
+		r.cmd.Options.WITHSCORES = i
+	case "LIMIT":
+		r.cmd.Options.LIMIT = i + 1
+	case "BYSCORE":
+		r.cmd.Options.BYSCORE = i
+	case "BYLEX":
+		r.cmd.Options.BYLEX = i
+	case "REV":
+		r.cmd.Options.REV = i
+	case "WEIGHTS":
+		r.cmd.Options.WEIGHTS = i + 1
+	case "AGGREGATE":
+		r.cmd.Options.AGGREGATE = i + 1
+	case "BYTE":
+		r.cmd.Options.BYTE = i
+	case "BIT":
+		r.cmd.Options.BIT = i
 	}
 }
 

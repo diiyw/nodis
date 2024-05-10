@@ -25,19 +25,19 @@ const (
 func (d DataType) String() string {
 	switch d {
 	case None:
-		return "NONE"
+		return "none"
 	case String:
-		return "STRING"
+		return "string"
 	case List:
-		return "LIST"
+		return "list"
 	case Hash:
-		return "HASH"
+		return "hash"
 	case Set:
-		return "SET"
+		return "set"
 	case ZSet:
-		return "ZSET"
+		return "zset"
 	default:
-		return "NONE"
+		return "none"
 	}
 }
 

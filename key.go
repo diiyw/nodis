@@ -423,7 +423,7 @@ func (n *Nodis) Type(key string) string {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
-			v = "NONE"
+			v = "none"
 			return nil
 		}
 		v = meta.ds.Type().String()
@@ -441,17 +441,23 @@ func (n *Nodis) Scan(cursor int64, match string, count int64, typ ds.DataType) (
 	if cursor >= keyLen {
 		return 0, nil
 	}
-	if cursor+count > keyLen {
-		count = keyLen - cursor
-	}
 	keys := make([]string, 0)
 	now := time.Now().UnixMilli()
 	tx := newTx(n.store)
-	var readCount int64 = 0
+	var iterCursor int64 = 0
 	n.store.keys.Scan(func(key string, k *Key) bool {
-		if readCount == count {
+		iterCursor++
+		if cursor--; cursor > 0 {
+			return true
+		}
+		if iterCursor > keyLen {
+			iterCursor = 0
 			return false
 		}
+		if count == 0 {
+			return false
+		}
+		count--
 		_ = tx.rLockKey(key)
 		defer tx.commit()
 		matched, _ := filepath.Match(match, key)
@@ -459,12 +465,11 @@ func (n *Nodis) Scan(cursor int64, match string, count int64, typ ds.DataType) (
 			if typ != 0 && k.dataType != typ {
 				return true
 			}
-			readCount++
 			keys = append(keys, key)
 		}
 		return true
 	})
-	return cursor + readCount, keys
+	return iterCursor, keys
 }
 
 // RandomKey gets a random key
