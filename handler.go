@@ -99,6 +99,8 @@ func getCommand(name string) func(n *Nodis, conn *redis.Conn, cmd redis.Command)
 		return getSet
 	case "MGET":
 		return mGet
+	case "SETRANGE":
+		return setRange
 	case "GETRANGE":
 		return getRange
 	case "STRLEN":
@@ -876,6 +878,23 @@ func mGet(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			}
 			conn.WriteBulk(string(value))
 		}
+	})
+}
+
+func setRange(n *Nodis, conn *redis.Conn, cmd redis.Command) {
+	if len(cmd.Args) < 3 {
+		conn.WriteError("SETRANGE requires at least three arguments")
+		return
+	}
+	key := cmd.Args[0]
+	offset, err := strconv.ParseInt(cmd.Args[1], 10, 64)
+	if err != nil {
+		conn.WriteError("ERR offset value is not an integer or out of range")
+		return
+	}
+	value := []byte(cmd.Args[2])
+	execCommand(conn, func() {
+		conn.WriteInteger(n.SetRange(key, offset, value))
 	})
 }
 

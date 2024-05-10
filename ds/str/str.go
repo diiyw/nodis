@@ -25,7 +25,7 @@ func (s *String) Set(v []byte) {
 	s.V = v
 }
 
-// GetSet
+// GetSet set the value and return the old value
 func (s *String) GetSet(v []byte) []byte {
 	old := s.V
 	s.V = v
@@ -214,6 +214,22 @@ func (s *String) GetRange(start, end int64) []byte {
 
 // Strlen returns the length of the value
 func (s *String) Strlen() int64 {
+	return int64(len(s.V))
+}
+
+// SetRange sets the value at the offset
+func (s *String) SetRange(offset int64, data []byte) int64 {
+	if offset < 0 {
+		return 0
+	}
+	vLen := int64(len(s.V))
+	if offset > vLen {
+		s.V = append(s.V, make([]byte, offset-vLen...)...)
+	}
+	if offset+vLen > vLen {
+		s.V = append(s.V, make([]byte, offset+vLen-vLen...)...)
+	}
+	copy(s.V[offset:], data)
 	return int64(len(s.V))
 }
 

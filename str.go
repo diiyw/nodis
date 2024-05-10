@@ -284,6 +284,19 @@ func (n *Nodis) StrLen(key string) int64 {
 	return v
 }
 
+// SetRange overwrite part of a string at key starting at the specified offset
+func (n *Nodis) SetRange(key string, offset int64, value []byte) int64 {
+	var v int64
+	_ = n.exec(func(tx *Tx) error {
+		meta := tx.writeKey(key, n.newStr)
+		k := meta.ds.(*str.String)
+		v = k.SetRange(offset, value)
+		n.notify(pb.NewOp(pb.OpType_Set, key).Value(k.Get()))
+		return nil
+	})
+	return v
+}
+
 // MSet sets the given keys to their respective values
 func (n *Nodis) MSet(pairs ...string) {
 	if len(pairs)%2 != 0 {
