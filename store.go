@@ -158,8 +158,9 @@ func (s *store) save() {
 	tx := newTx(s)
 	defer tx.commit()
 	s.keys.Scan(func(key string, k *Key) bool {
-		_ = tx.rLockKey(key)
-		if !k.changed || k.expired(now) {
+		meta := tx.rLockKey(key)
+		defer meta.commit()
+		if !k.modified() || k.expired(now) {
 			return true
 		}
 		d, ok := s.values.Get(key)
@@ -185,18 +186,18 @@ func (s *store) tidy(ms int64) {
 	now := time.Now().UnixMilli()
 	recycleTime := now - ms
 	tx := newTx(s)
-	defer tx.commit()
 	s.keys.Scan(func(key string, k *Key) bool {
-		_ = tx.rLockKey(key)
+		meta := tx.lockKey(key)
+		defer meta.commit()
 		if k.expired(now) {
 			s.keys.Delete(key)
 			s.values.Delete(key)
 			return true
 		}
-		if k.lastUse != 0 && k.lastUse <= recycleTime {
+		if k.modified() && k.modifiedTime != 0 && k.modifiedTime <= recycleTime {
 			d, ok := s.values.Get(key)
 			if ok {
-				k.changed = false
+				k.resetModified()
 				// save to disk
 				err := s.putKv(key, k, d)
 				if err != nil {
@@ -394,13 +395,13 @@ func (s *store) close() error {
 		Items: make([]*pb.Index_Item, 0, s.keys.Len()),
 	}
 	tx := newTx(s)
-	defer tx.commit()
 	s.keys.Scan(func(key string, k *Key) bool {
-		_ = tx.rLockKey(key)
+		meta := tx.rLockKey(key)
 		indexData.Items = append(indexData.Items, &pb.Index_Item{
 			Key:  key,
 			Data: k.marshal(),
 		})
+		meta.commit()
 		return true
 	})
 	data, err := proto.Marshal(indexData)

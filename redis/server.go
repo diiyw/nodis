@@ -16,9 +16,10 @@ type HandlerFunc func(c *Conn, cmd Command)
 type Conn struct {
 	*Reader
 	*Writer
-	Network  net.Conn
-	Commands []func()
-	State    uint8
+	Network   net.Conn
+	Commands  []func()
+	State     uint8
+	WatchKeys []string
 }
 
 func Serve(addr string, handler HandlerFunc) error {
@@ -39,10 +40,11 @@ func Serve(addr string, handler HandlerFunc) error {
 
 func handleConn(conn net.Conn, handler HandlerFunc) {
 	c := &Conn{
-		Reader:   NewReader(conn),
-		Writer:   NewWriter(conn),
-		Network:  conn,
-		Commands: make([]func(), 0),
+		Reader:    NewReader(conn),
+		Writer:    NewWriter(conn),
+		Network:   conn,
+		Commands:  make([]func(), 0),
+		WatchKeys: make([]string, 0),
 	}
 	for {
 		err := c.Reader.ReadCommand()

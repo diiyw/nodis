@@ -164,6 +164,15 @@ func (s *HashMap) HScan(cursor int64, match string, count int64) (int64, map[str
 	return i, values
 }
 
+// HStrLen gets the length of a hash
+func (s *HashMap) HStrLen(field string) int64 {
+	v, ok := s.data.Get(field)
+	if !ok {
+		return 0
+	}
+	return int64(len(*(*string)(unsafe.Pointer(&v))))
+}
+
 func (s *HashMap) GetValue() []*pb.MemberBytes {
 	values := make([]*pb.MemberBytes, 0, s.data.Len())
 	s.data.Scan(func(key string, value []byte) bool {

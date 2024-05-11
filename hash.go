@@ -1,8 +1,6 @@
 package nodis
 
 import (
-	"time"
-
 	"github.com/diiyw/nodis/pb"
 
 	"github.com/diiyw/nodis/ds"
@@ -18,6 +16,7 @@ func (n *Nodis) HSet(key string, field string, value []byte) int64 {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newHash)
 		v = meta.ds.(*hash.HashMap).HSet(field, value)
+		meta.signalModifiedKey()
 		n.notify(pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
 		return nil
 	})
@@ -48,6 +47,7 @@ func (n *Nodis) HDel(key string, fields ...string) int64 {
 		if meta.ds.(*hash.HashMap).HLen() == 0 {
 			tx.delKey(key)
 		}
+		meta.signalModifiedKey()
 		n.notify(pb.NewOp(pb.OpType_HDel, key).Fields(fields...))
 		return nil
 	})
@@ -113,6 +113,7 @@ func (n *Nodis) HIncrBy(key string, field string, value int64) (int64, error) {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newHash)
 		v, err = meta.ds.(*hash.HashMap).HIncrBy(field, value)
+		meta.signalModifiedKey()
 		n.notify(pb.NewOp(pb.OpType_HIncrBy, key).Fields(field).IncrInt(value))
 		return nil
 	})
@@ -125,6 +126,7 @@ func (n *Nodis) HIncrByFloat(key string, field string, value float64) (float64, 
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newHash)
 		v, err = meta.ds.(*hash.HashMap).HIncrByFloat(field, value)
+		meta.signalModifiedKey()
 		n.notify(pb.NewOp(pb.OpType_HIncrByFloat, key).Fields(field).IncrFloat(value))
 		return err
 	})
@@ -146,10 +148,11 @@ func (n *Nodis) HSetNX(key string, field string, value []byte) int64 {
 			meta.ok = true
 			n.store.values.Set(key, meta.ds)
 			k := newKey()
-			k.lastUse = time.Now().Unix()
 			n.store.keys.Set(key, k)
+			meta.key = k
 		}
 		v = meta.ds.(*hash.HashMap).HSet(field, value)
+		meta.signalModifiedKey()
 		n.notify(pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
 		return nil
 	})
@@ -166,6 +169,7 @@ func (n *Nodis) HMSet(key string, fields map[string][]byte) int64 {
 			v += meta.ds.(*hash.HashMap).HSet(field, value)
 			ops = append(ops, pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
 		}
+		meta.signalModifiedKey()
 		n.notify(ops...)
 		meta.ds.(*hash.HashMap).HMSet(fields)
 		return nil
@@ -213,6 +217,19 @@ func (n *Nodis) HVals(key string) [][]byte {
 			return nil
 		}
 		v = meta.ds.(*hash.HashMap).HVals()
+		return nil
+	})
+	return v
+}
+
+func (n *Nodis) HStrLen(key, field string) int64 {
+	var v int64
+	_ = n.exec(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		v = meta.ds.(*hash.HashMap).HStrLen(field)
 		return nil
 	})
 	return v

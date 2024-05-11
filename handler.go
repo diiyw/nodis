@@ -15,11 +15,11 @@ import (
 
 func execCommand(conn *redis.Conn, fn func()) {
 	defer func() {
-		if r := recover(); r != nil {
-			log.Println("Recovered error: ", r)
-			conn.WriteError("Err " + r.(error).Error())
-			return
-		}
+		// if r := recover(); r != nil {
+		// 	log.Println("Recovered error: ", r)
+		// 	conn.WriteError("Err " + r.(error).Error())
+		// 	return
+		// }
 	}()
 	if conn.State == redis.MultiNone || conn.State == redis.MultiCommit {
 		fn()
@@ -47,6 +47,10 @@ func getCommand(name string) func(n *Nodis, conn *redis.Conn, cmd redis.Command)
 		return quit
 	case "FLUSHDB":
 		return flushDB
+	case "WATCH":
+		return watchKey
+	case "UNWATCH":
+		return unwatchKey
 	case "MULTI":
 		return multi
 	case "DISCARD":
@@ -177,6 +181,8 @@ func getCommand(name string) func(n *Nodis, conn *redis.Conn, cmd redis.Command)
 		return hMSet
 	case "HCLEAR":
 		return hClear
+	case "HSTRLEN":
+		return hStrLen
 	case "HSCAN":
 		return hScan
 	case "HVALS":
@@ -360,6 +366,22 @@ func flushDB(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	})
 }
 
+func watchKey(n *Nodis, conn *redis.Conn, cmd redis.Command) {
+	if conn.State&redis.MultiPrepare == redis.MultiPrepare {
+		conn.WriteError("ERR WATCH inside MULTI is not allowed")
+		return
+	}
+	if len(cmd.Args) == 0 {
+		conn.WriteError("WATCH requires at least one argument")
+		return
+	}
+	if conn.WatchKeys == nil {
+		conn.WatchKeys = make([]string, 0)
+	}
+	conn.WatchKeys = cmd.Args[:]
+	conn.WriteOK()
+}
+
 func multi(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	if conn.State&redis.MultiPrepare == redis.MultiPrepare {
 		conn.WriteError("ERR MULTI calls can not be nested")
@@ -372,6 +394,7 @@ func multi(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 func discard(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	conn.State = redis.MultiNone
 	conn.Commands = nil
+	conn.WatchKeys = nil
 	conn.WriteOK()
 }
 
@@ -379,6 +402,7 @@ func exec(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	defer func() {
 		conn.State = redis.MultiNone
 		conn.Commands = nil
+		conn.WatchKeys = nil
 	}()
 	if conn.State&redis.MultiPrepare != redis.MultiPrepare {
 		conn.WriteError("ERR EXEC without MULTI")
@@ -390,6 +414,20 @@ func exec(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	if len(conn.Commands) == 0 {
 		conn.WriteArray(0)
+		return
+	}
+	var watchKeysNoChanged = true
+	tx := newTx(n.store)
+	defer tx.commit()
+	for _, key := range conn.WatchKeys {
+		meta := tx.readKey(key)
+		if meta.watchModified() {
+			watchKeysNoChanged = false
+			break
+		}
+	}
+	if !watchKeysNoChanged {
+		conn.WriteNull()
 		return
 	}
 	conn.State |= redis.MultiCommit
@@ -406,6 +444,13 @@ func exec(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			command()
 		}()
 	}
+}
+
+func unwatchKey(n *Nodis, conn *redis.Conn, cmd redis.Command) {
+	execCommand(conn, func() {
+		conn.WatchKeys = conn.WatchKeys[:0]
+		conn.WriteOK()
+	})
 }
 
 func del(n *Nodis, conn *redis.Conn, cmd redis.Command) {
@@ -1496,6 +1541,18 @@ func hClear(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		key := cmd.Args[0]
 		n.HClear(key)
 		conn.WriteString("OK")
+	})
+}
+
+func hStrLen(n *Nodis, conn *redis.Conn, cmd redis.Command) {
+	if len(cmd.Args) < 2 {
+		conn.WriteError("HSTRLEN requires at least two arguments")
+		return
+	}
+	execCommand(conn, func() {
+		key := cmd.Args[0]
+		field := cmd.Args[1]
+		conn.WriteInteger(n.HStrLen(key, field))
 	})
 }
 

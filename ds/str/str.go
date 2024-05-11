@@ -222,12 +222,10 @@ func (s *String) SetRange(offset int64, data []byte) int64 {
 	if offset < 0 {
 		return 0
 	}
+	dLen := int64(len(data))
 	vLen := int64(len(s.V))
-	if offset > vLen {
-		s.V = append(s.V, make([]byte, offset-vLen)...)
-	}
-	if offset+vLen > vLen {
-		s.V = append(s.V, make([]byte, offset+vLen-vLen)...)
+	if offset+dLen > vLen {
+		s.V = append(s.V, make([]byte, offset+dLen-vLen)...)
 	}
 	copy(s.V[offset:], data)
 	return int64(len(s.V))
