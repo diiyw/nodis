@@ -15,11 +15,11 @@ import (
 
 func execCommand(conn *redis.Conn, fn func()) {
 	defer func() {
-		// if r := recover(); r != nil {
-		// 	log.Println("Recovered error: ", r)
-		// 	conn.WriteError("Err " + r.(error).Error())
-		// 	return
-		// }
+		if r := recover(); r != nil {
+			log.Println("Recovered error: ", r)
+			conn.WriteError("WRONGTYPE " + r.(error).Error())
+			return
+		}
 	}()
 	if conn.State == redis.MultiNone || conn.State == redis.MultiCommit {
 		fn()
@@ -1903,7 +1903,7 @@ func bLPop(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	execCommand(conn, func() {
-		k, v := n.BLPop(time.Duration(timeout)*time.Second, keys...)
+		k, v := n.BLPop(time.Duration(timeout*time.Second.Seconds()), keys...)
 		if k == "" {
 			conn.WriteNull()
 			return
