@@ -37,19 +37,12 @@ func (m *metadata) empty() *metadata {
 }
 
 func (m *metadata) signalModifiedKey() {
-	if m.key.state&KeyStateWatching == KeyStateWatching {
-		if m.key.state&KeyStateModified == KeyStateModified {
-			m.key.state |= KeyStateWatchAfterModified
-		} else {
-			m.key.state |= KeyStateWatchBeforeModified
-		}
-	}
 	m.key.state |= KeyStateModified
 	m.key.modifiedTime = time.Now().Unix()
 }
 
 func (m *metadata) keyModified() bool {
-	return m.key.state&KeyStateWatchBeforeModified == KeyStateWatchBeforeModified || m.key.state&KeyStateWatchAfterModified == KeyStateWatchAfterModified
+	return m.key.state&KeyStateModified == KeyStateModified
 }
 
 func (m *metadata) commit() {

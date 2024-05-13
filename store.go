@@ -40,7 +40,7 @@ type store struct {
 	filesystem   fs.Fs
 	metaPoolSize int
 	closed       bool
-	watcheMu     sync.RWMutex
+	watchMu      sync.RWMutex
 	watchedKeys  btree.Map[string, *cList.List]
 }
 

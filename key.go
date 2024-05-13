@@ -15,12 +15,9 @@ import (
 )
 
 const (
-	KeyStateEmpty               uint8 = 0
-	KeyStateNormal              uint8 = 1
-	KeyStateModified            uint8 = 2
-	KeyStateWatching            uint8 = 4
-	KeyStateWatchBeforeModified uint8 = 8
-	KeyStateWatchAfterModified  uint8 = 16
+	KeyStateEmpty    uint8 = 0
+	KeyStateNormal   uint8 = 1
+	KeyStateModified uint8 = 2
 )
 
 type Key struct {
@@ -368,7 +365,7 @@ func (n *Nodis) Keys(pattern string) []string {
 }
 
 func (n *Nodis) Watch(rn *redis.Conn, keys ...string) {
-	n.store.watcheMu.Lock()
+	n.store.watchMu.Lock()
 	for _, key := range keys {
 		clients, ok := n.store.watchedKeys.Get(key)
 		if !ok {
@@ -387,11 +384,11 @@ func (n *Nodis) Watch(rn *redis.Conn, keys ...string) {
 			clients.PushFront(rn)
 		}
 	}
-	n.store.watcheMu.Unlock()
+	n.store.watchMu.Unlock()
 }
 
 func (n *Nodis) UnWatch(rn *redis.Conn, keys ...string) {
-	n.store.watcheMu.Lock()
+	n.store.watchMu.Lock()
 	for _, key := range keys {
 		clients, ok := n.store.watchedKeys.Get(key)
 		if !ok {
@@ -404,10 +401,10 @@ func (n *Nodis) UnWatch(rn *redis.Conn, keys ...string) {
 			}
 		}
 	}
-	n.store.watcheMu.Unlock()
+	n.store.watchMu.Unlock()
 }
 
-// Keys gets the keys
+// Keyspace gets the keyspace
 func (n *Nodis) Keyspace() (keys int64, expires int64, avgTTL int64) {
 	n.store.mu.Lock()
 	keys = int64(n.store.keys.Len())

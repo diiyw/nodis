@@ -111,7 +111,6 @@ func (n *Nodis) GetEntry(key string) (data []byte) {
 	return
 }
 
-// parseDs the data
 func (n *Nodis) notify(ops ...*pb.Op) {
 	if len(n.notifiers) == 0 {
 		return
