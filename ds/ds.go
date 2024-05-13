@@ -1,10 +1,10 @@
 package ds
 
-type DataStruct interface {
-	Type() DataType
+type Value interface {
+	Type() ValueType
 }
 
-type DataType uint8
+type ValueType uint8
 
 const (
 	// 0 => none, (key didn't exist)
@@ -14,7 +14,7 @@ const (
 	// 4 => zset,
 	// 5 => hash
 	// 6 => stream
-	None DataType = iota
+	None ValueType = iota
 	String
 	Set
 	List
@@ -22,7 +22,7 @@ const (
 	Hash
 )
 
-func (d DataType) String() string {
+func (d ValueType) String() string {
 	switch d {
 	case None:
 		return "none"
@@ -41,7 +41,7 @@ func (d DataType) String() string {
 	}
 }
 
-func StringToDataType(s string) DataType {
+func StringToDataType(s string) ValueType {
 	switch s {
 	case "STRING":
 		return String

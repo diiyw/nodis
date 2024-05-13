@@ -7,16 +7,20 @@ import (
 	"path/filepath"
 	"time"
 
+	"container/list"
+
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/pb"
+	"github.com/diiyw/nodis/redis"
 )
 
 const (
-	KeyStateNone                uint8 = 0
-	KeyStateModified            uint8 = 1
-	KeyStateWatching            uint8 = 2
-	KeyStateWatchBeforeModified uint8 = 4
-	KeyStateWatchAfterModified  uint8 = 8
+	KeyStateEmpty               uint8 = 0
+	KeyStateNormal              uint8 = 1
+	KeyStateModified            uint8 = 2
+	KeyStateWatching            uint8 = 4
+	KeyStateWatchBeforeModified uint8 = 8
+	KeyStateWatchAfterModified  uint8 = 16
 )
 
 type Key struct {
@@ -25,7 +29,7 @@ type Key struct {
 	offset       int64
 	size         uint32
 	fileId       uint16
-	dataType     ds.DataType
+	valueType    ds.ValueType
 	state        uint8
 }
 
@@ -47,7 +51,7 @@ func (k *Key) modified() bool {
 	return k.state&KeyStateModified == KeyStateModified
 }
 
-func (k *Key) resetModified() {
+func (k *Key) reset() {
 	if k.state&KeyStateModified == KeyStateModified {
 		k.state ^= KeyStateModified
 		k.modifiedTime = 0
@@ -61,7 +65,7 @@ func (k *Key) marshal() []byte {
 	binary.LittleEndian.PutUint64(b[8:16], uint64(k.expiration))
 	binary.LittleEndian.PutUint32(b[16:20], k.size)
 	binary.LittleEndian.PutUint16(b[20:22], k.fileId)
-	b[22] = uint8(k.dataType)
+	b[22] = uint8(k.valueType)
 	return b[:]
 }
 
@@ -71,7 +75,7 @@ func (k *Key) unmarshal(b []byte) {
 	k.expiration = int64(binary.LittleEndian.Uint64(b[8:16]))
 	k.size = binary.LittleEndian.Uint32(b[16:20])
 	k.fileId = binary.LittleEndian.Uint16(b[20:22])
-	k.dataType = ds.DataType(b[22])
+	k.valueType = ds.ValueType(b[22])
 }
 
 // Del a key
@@ -351,7 +355,7 @@ func (n *Nodis) ExpireAtGT(key string, timestamp time.Time) int64 {
 func (n *Nodis) Keys(pattern string) []string {
 	var keys []string
 	now := time.Now().UnixMilli()
-	n.store.mu.Lock()
+	n.store.mu.RLock()
 	n.store.keys.Scan(func(key string, k *Key) bool {
 		matched, _ := filepath.Match(pattern, key)
 		if matched && !k.expired(now) {
@@ -359,8 +363,48 @@ func (n *Nodis) Keys(pattern string) []string {
 		}
 		return true
 	})
-	n.store.mu.Unlock()
+	n.store.mu.RUnlock()
 	return keys
+}
+
+func (n *Nodis) Watch(rn *redis.Conn, keys ...string) {
+	n.store.watcheMu.Lock()
+	for _, key := range keys {
+		clients, ok := n.store.watchedKeys.Get(key)
+		if !ok {
+			clients = list.New()
+			clients.PushFront(rn)
+			continue
+		}
+		var found = false
+		for element := clients.Front(); element != nil; element = element.Next() {
+			if element.Value.(*redis.Conn) == rn {
+				found = true
+				break
+			}
+		}
+		if !found {
+			clients.PushFront(rn)
+		}
+	}
+	n.store.watcheMu.Unlock()
+}
+
+func (n *Nodis) UnWatch(rn *redis.Conn, keys ...string) {
+	n.store.watcheMu.Lock()
+	for _, key := range keys {
+		clients, ok := n.store.watchedKeys.Get(key)
+		if !ok {
+			continue
+		}
+		for element := clients.Front(); element != nil; element = element.Next() {
+			if element.Value.(*redis.Conn) == rn {
+				clients.Remove(element)
+				break
+			}
+		}
+	}
+	n.store.watcheMu.Unlock()
 }
 
 // Keys gets the keys
@@ -459,14 +503,14 @@ func (n *Nodis) Type(key string) string {
 			v = "none"
 			return nil
 		}
-		v = meta.ds.Type().String()
+		v = meta.value.Type().String()
 		return nil
 	})
 	return v
 }
 
 // Scan the keys
-func (n *Nodis) Scan(cursor int64, match string, count int64, typ ds.DataType) (int64, []string) {
+func (n *Nodis) Scan(cursor int64, match string, count int64, typ ds.ValueType) (int64, []string) {
 	keyLen := int64(n.store.keys.Len())
 	if keyLen == 0 {
 		return 0, nil
@@ -495,7 +539,7 @@ func (n *Nodis) Scan(cursor int64, match string, count int64, typ ds.DataType) (
 		defer meta.commit()
 		matched, _ := filepath.Match(match, key)
 		if matched && !k.expired(now) {
-			if typ != 0 && k.dataType != typ {
+			if typ != 0 && k.valueType != typ {
 				return true
 			}
 			keys = append(keys, key)

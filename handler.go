@@ -378,6 +378,7 @@ func watchKey(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	if conn.WatchKeys == nil {
 		conn.WatchKeys = make([]string, 0)
 	}
+	n.Watch(conn, cmd.Args...)
 	conn.WatchKeys = cmd.Args[:]
 	conn.WriteOK()
 }
@@ -421,7 +422,7 @@ func exec(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	defer tx.commit()
 	for _, key := range conn.WatchKeys {
 		meta := tx.readKey(key)
-		if meta.watchModified() {
+		if meta.keyModified() {
 			watchKeysNoChanged = false
 			break
 		}
@@ -448,6 +449,7 @@ func exec(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 
 func unwatchKey(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
+		n.UnWatch(conn, conn.WatchKeys...)
 		conn.WatchKeys = conn.WatchKeys[:0]
 		conn.WriteOK()
 	})
@@ -642,7 +644,7 @@ func scan(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	var match = "*"
 	var count int64 = 10
-	var typ ds.DataType
+	var typ ds.ValueType
 	if cmd.Options.MATCH > 0 {
 		match = cmd.Args[cmd.Options.MATCH]
 	}
@@ -1903,7 +1905,7 @@ func bLPop(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	execCommand(conn, func() {
-		k, v := n.BLPop(time.Duration(timeout*time.Second.Seconds()), keys...)
+		k, v := n.BLPop(time.Duration(timeout*time.Second.Seconds())*time.Second, keys...)
 		if k == "" {
 			conn.WriteNull()
 			return
@@ -1923,13 +1925,13 @@ func bRPop(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	for i := 0; i < len(cmd.Args)-1; i++ {
 		keys = append(keys, cmd.Args[i])
 	}
-	timeout, err := strconv.ParseInt(cmd.Args[len(cmd.Args)-1], 10, 64)
+	timeout, err := strconv.ParseFloat(cmd.Args[len(cmd.Args)-1], 64)
 	if err != nil {
 		conn.WriteError("ERR timeout value is not an integer or out of range")
 		return
 	}
 	execCommand(conn, func() {
-		k, v := n.BRPop(time.Duration(timeout)*time.Second, keys...)
+		k, v := n.BRPop(time.Duration(timeout*time.Second.Seconds())*time.Second, keys...)
 		if k == "" {
 			conn.WriteNull()
 			return

@@ -6,7 +6,7 @@ import (
 	"github.com/diiyw/nodis/pb"
 )
 
-func (n *Nodis) newSet() ds.DataStruct {
+func (n *Nodis) newSet() ds.Value {
 	return set.NewSet()
 }
 
@@ -15,7 +15,7 @@ func (n *Nodis) SAdd(key string, members ...string) int64 {
 	var v int64
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newSet)
-		v = meta.ds.(*set.Set).SAdd(members...)
+		v = meta.value.(*set.Set).SAdd(members...)
 		meta.signalModifiedKey()
 		n.notify(pb.NewOp(pb.OpType_SAdd, key).Members(members))
 		return nil
@@ -31,7 +31,7 @@ func (n *Nodis) SCard(key string) int64 {
 		if !meta.isOk() {
 			return nil
 		}
-		v = meta.ds.(*set.Set).SCard()
+		v = meta.value.(*set.Set).SCard()
 		return nil
 	})
 	return v
@@ -54,9 +54,9 @@ func (n *Nodis) SDiff(keys ...string) []string {
 			if !meta.isOk() {
 				continue
 			}
-			otherSets[i] = metaX.ds.(*set.Set)
+			otherSets[i] = metaX.value.(*set.Set)
 		}
-		v = meta.ds.(*set.Set).SDiff(otherSets...)
+		v = meta.value.(*set.Set).SDiff(otherSets...)
 		return nil
 	})
 	return v
@@ -89,9 +89,9 @@ func (n *Nodis) SInter(keys ...string) []string {
 			if !setDs.isOk() {
 				continue
 			}
-			otherSets = append(otherSets, setDs.ds.(*set.Set))
+			otherSets = append(otherSets, setDs.value.(*set.Set))
 		}
-		v = meta.ds.(*set.Set).SInter(otherSets...)
+		v = meta.value.(*set.Set).SInter(otherSets...)
 		return nil
 	})
 	return v
@@ -122,7 +122,7 @@ func (n *Nodis) SUnion(keys ...string) []string {
 			if !setDs.isOk() {
 				continue
 			}
-			otherSets = append(otherSets, setDs.ds.(*set.Set))
+			otherSets = append(otherSets, setDs.value.(*set.Set))
 		}
 		v = otherSets[0].SUnion(otherSets[1:]...)
 		return nil
@@ -147,7 +147,7 @@ func (n *Nodis) SIsMember(key, member string) bool {
 		if !meta.isOk() {
 			return nil
 		}
-		v = meta.ds.(*set.Set).SIsMember(member)
+		v = meta.value.(*set.Set).SIsMember(member)
 		return nil
 	})
 	return v
@@ -161,7 +161,7 @@ func (n *Nodis) SMembers(key string) []string {
 		if !meta.isOk() {
 			return nil
 		}
-		v = meta.ds.(*set.Set).SMembers()
+		v = meta.value.(*set.Set).SMembers()
 		return nil
 	})
 	return v
@@ -175,7 +175,7 @@ func (n *Nodis) SRem(key string, members ...string) int64 {
 		if !meta.isOk() {
 			return nil
 		}
-		v = meta.ds.(*set.Set).SRem(members...)
+		v = meta.value.(*set.Set).SRem(members...)
 		meta.signalModifiedKey()
 		n.notify(pb.NewOp(pb.OpType_SRem, key).Members(members))
 		return nil
@@ -192,7 +192,7 @@ func (n *Nodis) SScan(key string, cursor int64, match string, count int64) (int6
 		if !meta.isOk() {
 			return nil
 		}
-		c, v = meta.ds.(*set.Set).SScan(cursor, match, count)
+		c, v = meta.value.(*set.Set).SScan(cursor, match, count)
 		return nil
 	})
 	return c, v
@@ -209,7 +209,7 @@ func (n *Nodis) SPop(key string, count int64) []string {
 		if count == 0 {
 			count = 1
 		}
-		v = meta.ds.(*set.Set).SPop(count)
+		v = meta.value.(*set.Set).SPop(count)
 		meta.signalModifiedKey()
 		n.notify(pb.NewOp(pb.OpType_SRem, key).Members(v))
 		return nil
@@ -225,12 +225,12 @@ func (n *Nodis) SMove(source, destination, member string) bool {
 		if !meta.isOk() {
 			return nil
 		}
-		m := meta.ds.(*set.Set).SRem(member)
+		m := meta.value.(*set.Set).SRem(member)
 		if m == 0 {
 			return nil
 		}
 		meta = tx.writeKey(destination, n.newSet)
-		m = meta.ds.(*set.Set).SAdd(member)
+		m = meta.value.(*set.Set).SAdd(member)
 		meta.signalModifiedKey()
 		n.notify(pb.NewOp(pb.OpType_SAdd, destination).Members([]string{member}))
 		v = m > 0
@@ -247,7 +247,7 @@ func (n *Nodis) SRandMember(key string, count int64) []string {
 		if !meta.isOk() {
 			return nil
 		}
-		v = meta.ds.(*set.Set).SRandMember(count)
+		v = meta.value.(*set.Set).SRandMember(count)
 		return nil
 	})
 	return v

@@ -230,35 +230,35 @@ func TestNodis_SetEntity(t *testing.T) {
 	}
 }
 
-func TestNodis_Watch(t *testing.T) {
+func TestNodis_Stick(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	opt := &Options{
 		Path: "testdata",
 	}
 	n := Open(opt)
 	n.Set("test", []byte("test"))
-	n.Watch([]string{"test"}, func(op *pb.Operation) {
+	n.Stick([]string{"test"}, func(op *pb.Operation) {
 		if op == nil || string(op.Value) != "test_new" {
-			t.Errorf("Watch() = %v, want %v", op, "test_new")
+			t.Errorf("Stick() = %v, want %v", op, "test_new")
 		}
 	})
 	n.Set("test", []byte("test_new"))
 	time.Sleep(time.Second)
 }
 
-func TestNodis_UnWatch(t *testing.T) {
+func TestNodis_UnStick(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	opt := &Options{
 		Path: "testdata",
 	}
 	n := Open(opt)
 	n.Set("test", []byte("test"))
-	id := n.Watch([]string{"test"}, func(op *pb.Operation) {
+	id := n.Stick([]string{"test"}, func(op *pb.Operation) {
 		if op == nil || string(op.Value) != "test_new" {
-			t.Errorf("Watch() = %v, want %v", op, "test_new")
+			t.Errorf("Stick() = %v, want %v", op, "test_new")
 		}
 	})
-	n.UnWatch(id)
+	n.UnStick(id)
 	n.Set("test", []byte("test_new"))
 	time.Sleep(time.Second)
 }

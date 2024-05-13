@@ -13,6 +13,8 @@ import (
 
 	"encoding/binary"
 
+	cList "container/list"
+
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/hash"
 	"github.com/diiyw/nodis/ds/list"
@@ -28,7 +30,7 @@ type store struct {
 	mu           sync.RWMutex
 	metaPool     []*metadata
 	keys         btree.Map[string, *Key]
-	values       btree.Map[string, ds.DataStruct]
+	values       btree.Map[string, ds.Value]
 	fileSize     int64
 	fileId       uint16
 	path         string
@@ -38,6 +40,8 @@ type store struct {
 	filesystem   fs.Fs
 	metaPoolSize int
 	closed       bool
+	watcheMu     sync.RWMutex
+	watchedKeys  btree.Map[string, *cList.List]
 }
 
 func newStore(path string, fileSize int64, metaPoolSize int, filesystem fs.Fs) *store {
@@ -94,9 +98,9 @@ func (s *store) fromStorage(k *Key, meta *metadata) *metadata {
 	// try get from storage
 	v, err := s.getEntryRaw(k)
 	if err == nil && len(v) > 0 {
-		key, value, err := s.parseDs(v)
+		key, value, err := s.parseValue(v)
 		if err != nil {
-			log.Println("Parse DataStruct:", err)
+			log.Println("Parse Value:", err)
 			return meta
 		}
 		if value != nil {
@@ -120,36 +124,36 @@ func (s *store) parseEntry(data []byte) (*pb.Entry, error) {
 	return &entry, nil
 }
 
-// parseDs the data
-func (s *store) parseDs(data []byte) (string, ds.DataStruct, error) {
+// parseValue the data
+func (s *store) parseValue(data []byte) (string, ds.Value, error) {
 	var entry, err = s.parseEntry(data)
 	if err != nil {
 		return "", nil, err
 	}
-	var dataStruct ds.DataStruct
-	switch ds.DataType(entry.Type) {
+	var value ds.Value
+	switch ds.ValueType(entry.Type) {
 	case ds.String:
 		v := str.NewString()
 		v.SetValue(entry.GetStringValue().Value)
-		dataStruct = v
+		value = v
 	case ds.ZSet:
 		z := zset.NewSortedSet()
 		z.SetValue(entry.GetZSetValue().Values)
-		dataStruct = z
+		value = z
 	case ds.List:
 		l := list.NewDoublyLinkedList()
 		l.SetValue(entry.GetListValue().Values)
-		dataStruct = l
+		value = l
 	case ds.Hash:
 		h := hash.NewHashMap()
 		h.SetValue(entry.GetHashValue().Values)
-		dataStruct = h
+		value = h
 	case ds.Set:
 		v := set.NewSet()
 		v.SetValue(entry.GetSetValue().Values)
-		dataStruct = v
+		value = v
 	}
-	return entry.Key, dataStruct, nil
+	return entry.Key, value, nil
 }
 
 // save flush changed keys to disk
@@ -197,7 +201,7 @@ func (s *store) tidy(ms int64) {
 		if k.modified() && k.modifiedTime != 0 && k.modifiedTime <= recycleTime {
 			d, ok := s.values.Get(key)
 			if ok {
-				k.resetModified()
+				k.reset()
 				// save to disk
 				err := s.putKv(key, k, d)
 				if err != nil {
@@ -248,7 +252,7 @@ func (s *store) check() (int64, error) {
 	return offset, nil
 }
 
-func (s *store) putKv(name string, key *Key, value ds.DataStruct) error {
+func (s *store) putKv(name string, key *Key, value ds.Value) error {
 	offset, err := s.check()
 	if err != nil {
 		return err

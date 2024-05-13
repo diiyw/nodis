@@ -11,7 +11,7 @@ import (
 )
 
 // newList creates a new list
-func (n *Nodis) newList() ds.DataStruct {
+func (n *Nodis) newList() ds.Value {
 	return list.NewDoublyLinkedList()
 }
 
@@ -19,8 +19,8 @@ func (n *Nodis) LPush(key string, values ...[]byte) int64 {
 	var v int64
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newList)
-		meta.ds.(*list.DoublyLinkedList).LPush(values...)
-		v = meta.ds.(*list.DoublyLinkedList).LLen()
+		meta.value.(*list.DoublyLinkedList).LPush(values...)
+		v = meta.value.(*list.DoublyLinkedList).LLen()
 		meta.signalModifiedKey()
 		n.notify(pb.NewOp(pb.OpType_LPush, key).Values(values))
 		return nil
@@ -32,8 +32,8 @@ func (n *Nodis) RPush(key string, values ...[]byte) int64 {
 	var v int64
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newList)
-		meta.ds.(*list.DoublyLinkedList).RPush(values...)
-		v = meta.ds.(*list.DoublyLinkedList).LLen()
+		meta.value.(*list.DoublyLinkedList).RPush(values...)
+		v = meta.value.(*list.DoublyLinkedList).LLen()
 		meta.signalModifiedKey()
 		n.notify(pb.NewOp(pb.OpType_RPush, key).Values(values))
 		return nil
@@ -48,8 +48,8 @@ func (n *Nodis) LPop(key string, count int64) [][]byte {
 		if !meta.isOk() {
 			return nil
 		}
-		v = meta.ds.(*list.DoublyLinkedList).LPop(count)
-		if meta.ds.(*list.DoublyLinkedList).LLen() == 0 {
+		v = meta.value.(*list.DoublyLinkedList).LPop(count)
+		if meta.value.(*list.DoublyLinkedList).LLen() == 0 {
 			tx.delKey(key)
 		}
 		meta.signalModifiedKey()
@@ -66,8 +66,8 @@ func (n *Nodis) RPop(key string, count int64) [][]byte {
 		if !meta.isOk() {
 			return nil
 		}
-		v = meta.ds.(*list.DoublyLinkedList).RPop(count)
-		if meta.ds.(*list.DoublyLinkedList).LLen() == 0 {
+		v = meta.value.(*list.DoublyLinkedList).RPop(count)
+		if meta.value.(*list.DoublyLinkedList).LLen() == 0 {
 			tx.delKey(key)
 		}
 		meta.signalModifiedKey()
@@ -84,7 +84,7 @@ func (n *Nodis) LLen(key string) int64 {
 		if !meta.isOk() {
 			return nil
 		}
-		d, ok := meta.ds.(*list.DoublyLinkedList)
+		d, ok := meta.value.(*list.DoublyLinkedList)
 		if !ok {
 			v = -1
 			return nil
@@ -102,7 +102,7 @@ func (n *Nodis) LIndex(key string, index int64) []byte {
 		if !meta.isOk() {
 			return nil
 		}
-		v = meta.ds.(*list.DoublyLinkedList).LIndex(index)
+		v = meta.value.(*list.DoublyLinkedList).LIndex(index)
 		return nil
 	})
 	return v
@@ -115,7 +115,7 @@ func (n *Nodis) LInsert(key string, pivot, data []byte, before bool) int64 {
 		if !meta.isOk() {
 			return nil
 		}
-		v = meta.ds.(*list.DoublyLinkedList).LInsert(pivot, data, before)
+		v = meta.value.(*list.DoublyLinkedList).LInsert(pivot, data, before)
 		meta.signalModifiedKey()
 		n.notify(pb.NewOp(pb.OpType_LInsert, key).Value(data).Pivot(pivot).Before(before))
 		return nil
@@ -130,7 +130,7 @@ func (n *Nodis) LPushX(key string, data []byte) int64 {
 		if !meta.isOk() {
 			return nil
 		}
-		v = meta.ds.(*list.DoublyLinkedList).LPushX(data)
+		v = meta.value.(*list.DoublyLinkedList).LPushX(data)
 		meta.signalModifiedKey()
 		n.notify(pb.NewOp(pb.OpType_LPushX, key).Value(data))
 		return nil
@@ -145,7 +145,7 @@ func (n *Nodis) RPushX(key string, data []byte) int64 {
 		if !meta.isOk() {
 			return nil
 		}
-		v = meta.ds.(*list.DoublyLinkedList).RPushX(data)
+		v = meta.value.(*list.DoublyLinkedList).RPushX(data)
 		meta.signalModifiedKey()
 		n.notify(pb.NewOp(pb.OpType_RPushX, key).Value(data))
 		return nil
@@ -160,7 +160,7 @@ func (n *Nodis) LRem(key string, data []byte, count int64) int64 {
 		if !meta.isOk() {
 			return nil
 		}
-		ds := meta.ds.(*list.DoublyLinkedList)
+		ds := meta.value.(*list.DoublyLinkedList)
 		v = ds.LRem(count, data)
 		if ds.LLen() == 0 {
 			tx.delKey(key)
@@ -178,7 +178,7 @@ func (n *Nodis) LSet(key string, index int64, data []byte) bool {
 		meta := tx.writeKey(key, n.newList)
 		meta.signalModifiedKey()
 		n.notify(pb.NewOp(pb.OpType_LSet, key).Value(data).Index(index))
-		v = meta.ds.(*list.DoublyLinkedList).LSet(index, data)
+		v = meta.value.(*list.DoublyLinkedList).LSet(index, data)
 		return nil
 	})
 	return v
@@ -190,7 +190,7 @@ func (n *Nodis) LTrim(key string, start, stop int64) {
 		if !meta.isOk() {
 			return nil
 		}
-		meta.ds.(*list.DoublyLinkedList).LTrim(start, stop)
+		meta.value.(*list.DoublyLinkedList).LTrim(start, stop)
 		meta.signalModifiedKey()
 		n.notify(pb.NewOp(pb.OpType_LTrim, key).Start(start).Stop(stop))
 		return nil
@@ -204,7 +204,7 @@ func (n *Nodis) LRange(key string, start, stop int64) [][]byte {
 		if !meta.isOk() {
 			return nil
 		}
-		v = meta.ds.(*list.DoublyLinkedList).LRange(start, stop)
+		v = meta.value.(*list.DoublyLinkedList).LRange(start, stop)
 		return nil
 	})
 	return v
@@ -218,15 +218,15 @@ func (n *Nodis) LPopRPush(source, destination string) []byte {
 
 			return nil
 		}
-		v = meta.ds.(*list.DoublyLinkedList).LPop(1)
+		v = meta.value.(*list.DoublyLinkedList).LPop(1)
 		if v == nil {
 			return nil
 		}
-		if meta.ds.(*list.DoublyLinkedList).LLen() == 0 {
+		if meta.value.(*list.DoublyLinkedList).LLen() == 0 {
 			tx.delKey(source)
 		}
 		dst := tx.writeKey(destination, n.newList)
-		dst.ds.(*list.DoublyLinkedList).RPush(v...)
+		dst.value.(*list.DoublyLinkedList).RPush(v...)
 		meta.signalModifiedKey()
 		n.notify(pb.NewOp(pb.OpType_LPopRPush, source).DstKey(destination))
 		return nil
@@ -241,15 +241,15 @@ func (n *Nodis) RPopLPush(source, destination string) []byte {
 		if !meta.isOk() {
 			return nil
 		}
-		v = meta.ds.(*list.DoublyLinkedList).RPop(1)
+		v = meta.value.(*list.DoublyLinkedList).RPop(1)
 		if v == nil {
 			return nil
 		}
-		if meta.ds.(*list.DoublyLinkedList).LLen() == 0 {
+		if meta.value.(*list.DoublyLinkedList).LLen() == 0 {
 			tx.delKey(source)
 		}
 		dst := tx.writeKey(destination, n.newList)
-		dst.ds.(*list.DoublyLinkedList).LPush(v...)
+		dst.value.(*list.DoublyLinkedList).LPush(v...)
 		meta.signalModifiedKey()
 		n.notify(pb.NewOp(pb.OpType_RPopLPush, source).DstKey(destination))
 		return nil

@@ -16,7 +16,7 @@ func NewString() *String {
 }
 
 // Type returns the type of the data structure
-func (s *String) Type() ds.DataType {
+func (s *String) Type() ds.ValueType {
 	return ds.String
 }
 

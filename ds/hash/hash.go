@@ -21,7 +21,7 @@ func NewHashMap() *HashMap {
 }
 
 // Type returns the type of the data structure
-func (s *HashMap) Type() ds.DataType {
+func (s *HashMap) Type() ds.ValueType {
 	return ds.Hash
 }
 

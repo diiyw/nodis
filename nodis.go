@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/diiyw/nodis/fs"
+	"github.com/diiyw/nodis/notifier"
 	"github.com/diiyw/nodis/pb"
 	"github.com/diiyw/nodis/redis"
 	nSync "github.com/diiyw/nodis/sync"
-	"github.com/diiyw/nodis/watch"
 )
 
 var (
@@ -20,9 +20,9 @@ var (
 )
 
 type Nodis struct {
-	options  *Options
-	store    *store
-	watchers []*watch.Watcher
+	options   *Options
+	store     *store
+	notifiers []*notifier.Notifier
 }
 
 func Open(opt *Options) *Nodis {
@@ -104,7 +104,7 @@ func (n *Nodis) GetEntry(key string) (data []byte) {
 		if !meta.isOk() {
 			return nil
 		}
-		var entity = newEntry(key, meta.ds, meta.key.expiration)
+		var entity = newEntry(key, meta.value, meta.key.expiration)
 		data, _ = entity.Marshal()
 		return nil
 	})
@@ -113,11 +113,11 @@ func (n *Nodis) GetEntry(key string) (data []byte) {
 
 // parseDs the data
 func (n *Nodis) notify(ops ...*pb.Op) {
-	if len(n.watchers) == 0 {
+	if len(n.notifiers) == 0 {
 		return
 	}
 	go func() {
-		for _, w := range n.watchers {
+		for _, w := range n.notifiers {
 			for _, op := range ops {
 				if w.Matched(op.Key) {
 					w.Push(op.Operation)
@@ -128,14 +128,14 @@ func (n *Nodis) notify(ops ...*pb.Op) {
 	}()
 }
 
-func (n *Nodis) Watch(pattern []string, fn func(op *pb.Operation)) int {
-	w := watch.NewWatcher(pattern, fn)
-	n.watchers = append(n.watchers, w)
-	return len(n.watchers) - 1
+func (n *Nodis) Stick(pattern []string, fn func(op *pb.Operation)) int {
+	w := notifier.New(pattern, fn)
+	n.notifiers = append(n.notifiers, w)
+	return len(n.notifiers) - 1
 }
 
-func (n *Nodis) UnWatch(id int) {
-	n.watchers = append(n.watchers[:id], n.watchers[id+1:]...)
+func (n *Nodis) UnStick(id int) {
+	n.notifiers = append(n.notifiers[:id], n.notifiers[id+1:]...)
 }
 
 func (n *Nodis) Patch(ops ...*pb.Op) error {
@@ -220,14 +220,14 @@ func (n *Nodis) patch(op *pb.Op) error {
 
 func (n *Nodis) Publish(addr string, pattern []string) error {
 	return n.options.Synchronizer.Publish(addr, func(s nSync.Conn) {
-		id := n.Watch(pattern, func(op *pb.Operation) {
+		id := n.Stick(pattern, func(op *pb.Operation) {
 			err := s.Send(&pb.Op{Operation: op})
 			if err != nil {
 				log.Println("Publish: ", err)
 			}
 		})
 		s.Wait()
-		n.UnWatch(id)
+		n.UnStick(id)
 	})
 }
 

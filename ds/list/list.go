@@ -19,7 +19,7 @@ type DoublyLinkedList struct {
 }
 
 // Type returns the type of the data structure
-func (l *DoublyLinkedList) Type() ds.DataType {
+func (l *DoublyLinkedList) Type() ds.ValueType {
 	return ds.List
 }
 

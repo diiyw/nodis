@@ -10,29 +10,29 @@ import (
 type metadata struct {
 	*sync.RWMutex
 	key       *Key
-	ds        ds.DataStruct
-	ok        bool
+	value     ds.Value
 	writeable bool
 }
 
-func (m *metadata) set(key *Key, d ds.DataStruct) *metadata {
+func (m *metadata) set(key *Key, d ds.Value) *metadata {
 	m.key = key
-	m.ds = d
-	if m.key.dataType == 0 {
-		m.key.dataType = m.ds.Type()
+	m.value = d
+	if m.key.valueType == 0 {
+		m.key.valueType = m.value.Type()
 	}
-	m.ok = true
+	m.key.state |= KeyStateNormal
 	return m
 }
 
 func (m *metadata) isOk() bool {
-	return m.ok
+	return m.key.state&KeyStateNormal == KeyStateNormal
 }
 
 func (m *metadata) empty() *metadata {
-	m.ds = nil
-	m.key = nil
-	m.ok = false
+	m.key = &Key{
+		state: KeyStateEmpty,
+	}
+	m.value = nil
 	return m
 }
 
@@ -48,7 +48,7 @@ func (m *metadata) signalModifiedKey() {
 	m.key.modifiedTime = time.Now().Unix()
 }
 
-func (m *metadata) watchModified() bool {
+func (m *metadata) keyModified() bool {
 	return m.key.state&KeyStateWatchBeforeModified == KeyStateWatchBeforeModified || m.key.state&KeyStateWatchAfterModified == KeyStateWatchAfterModified
 }
 

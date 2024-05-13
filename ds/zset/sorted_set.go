@@ -28,7 +28,7 @@ func NewSortedSet() *SortedSet {
 }
 
 // Type returns the type of the data structure
-func (sortedSet *SortedSet) Type() ds.DataType {
+func (sortedSet *SortedSet) Type() ds.ValueType {
 	return ds.ZSet
 }
 

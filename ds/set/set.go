@@ -228,7 +228,7 @@ func (s *Set) Iter(fn func(member string) bool) {
 }
 
 // Type returns the type of the data structure
-func (s *Set) Type() ds.DataType {
+func (s *Set) Type() ds.ValueType {
 	return ds.Set
 }
 

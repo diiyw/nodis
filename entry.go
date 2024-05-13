@@ -17,41 +17,41 @@ var (
 )
 
 // newEntry creates a new entity
-func newEntry(key string, dataStruct ds.DataStruct, expiration int64) *pb.Entry {
+func newEntry(key string, value ds.Value, expiration int64) *pb.Entry {
 	e := &pb.Entry{
 		Key:        key,
 		Expiration: expiration,
-		Type:       uint32(dataStruct.Type()),
+		Type:       uint32(value.Type()),
 	}
-	switch dataStruct.Type() {
+	switch value.Type() {
 	case ds.String:
 		e.Value = &pb.Entry_StringValue{
 			StringValue: &pb.StringValue{
-				Value: dataStruct.(*str.String).GetValue(),
+				Value: value.(*str.String).GetValue(),
 			},
 		}
 	case ds.ZSet:
 		e.Value = &pb.Entry_ZSetValue{
 			ZSetValue: &pb.ZSetValue{
-				Values: dataStruct.(*zset.SortedSet).GetValue(),
+				Values: value.(*zset.SortedSet).GetValue(),
 			},
 		}
 	case ds.List:
 		e.Value = &pb.Entry_ListValue{
 			ListValue: &pb.ListValue{
-				Values: dataStruct.(*list.DoublyLinkedList).GetValue(),
+				Values: value.(*list.DoublyLinkedList).GetValue(),
 			},
 		}
 	case ds.Hash:
 		e.Value = &pb.Entry_HashValue{
 			HashValue: &pb.HashValue{
-				Values: dataStruct.(*hash.HashMap).GetValue(),
+				Values: value.(*hash.HashMap).GetValue(),
 			},
 		}
 	case ds.Set:
 		e.Value = &pb.Entry_SetValue{
 			SetValue: &pb.SetValue{
-				Values: dataStruct.(*set.Set).GetValue(),
+				Values: value.(*set.Set).GetValue(),
 			},
 		}
 	}

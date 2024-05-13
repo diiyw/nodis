@@ -1,4 +1,4 @@
-package watch
+package notifier
 
 import (
 	"path/filepath"
@@ -6,20 +6,20 @@ import (
 	"github.com/diiyw/nodis/pb"
 )
 
-type Watcher struct {
+type Notifier struct {
 	pattern []string
 	fn      func(op *pb.Operation)
 }
 
-func NewWatcher(pattern []string, fn func(op *pb.Operation)) *Watcher {
-	return &Watcher{
+func New(pattern []string, fn func(op *pb.Operation)) *Notifier {
+	return &Notifier{
 		pattern: pattern,
 		fn:      fn,
 	}
 }
 
 // Matched checks if the key matches the pattern
-func (w *Watcher) Matched(key string) bool {
+func (w *Notifier) Matched(key string) bool {
 	for _, p := range w.pattern {
 		matched, err := filepath.Match(p, key)
 		if err != nil {
@@ -33,6 +33,6 @@ func (w *Watcher) Matched(key string) bool {
 }
 
 // Push sends the operation to the watcher
-func (w *Watcher) Push(op *pb.Operation) {
+func (w *Notifier) Push(op *pb.Operation) {
 	w.fn(op)
 }

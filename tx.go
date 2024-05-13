@@ -38,7 +38,7 @@ func (tx *Tx) rLockKey(key string) *metadata {
 	return meta
 }
 
-func (tx *Tx) newKey(meta *metadata, key string, newFn func() ds.DataStruct) *metadata {
+func (tx *Tx) newKey(meta *metadata, key string, newFn func() ds.Value) *metadata {
 	if newFn != nil {
 		tx.store.mu.Lock()
 		defer tx.store.mu.Unlock()
@@ -63,7 +63,7 @@ func (tx *Tx) delKey(key string) {
 	tx.store.mu.Unlock()
 }
 
-func (tx *Tx) writeKey(key string, newFn func() ds.DataStruct) *metadata {
+func (tx *Tx) writeKey(key string, newFn func() ds.Value) *metadata {
 	meta := tx.lockKey(key)
 	tx.lockedMetas = append(tx.lockedMetas, meta)
 	tx.store.mu.RLock()
@@ -76,12 +76,13 @@ func (tx *Tx) writeKey(key string, newFn func() ds.DataStruct) *metadata {
 			tx.store.mu.RUnlock()
 			return meta
 		}
+		// if not found in memory, read from storage
 		meta = tx.store.fromStorage(k, meta)
 		tx.store.mu.RUnlock()
 		return meta
 	}
 	tx.store.mu.RUnlock()
-	meta.ok = false
+	meta.empty()
 	return tx.newKey(meta, key, newFn)
 }
 
