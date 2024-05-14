@@ -10,7 +10,8 @@
 English | [简体中文](https://github.com/diiyw/nodis/blob/main/README_zh-cn.md)
 
 Redis re-implemented using golang. 
-Simple way to embed in your application.
+Simple way to embed in your application or as a standalone server.
+Supported commands are compatible with Redis. testing code using [phpredis](https://github.com/phpredis/phpredis/tree/develop/tests).
 
 ## Supported Data Types
 
@@ -212,6 +213,22 @@ BenchmarkHSet-4       	  735676	      1971 ns/op	     742 B/op	      11 allocs/o
 BenchmarkHGet-4       	 4442625	       243.4 ns/op	       7 B/op	       0 allocs/op
 ```
 
+</details>
+<details>
+	<summary>Redis benchmark tool</summary>
+
+```bash
+redis-benchmark -p 6380 -t set,get,lpush,lpop,sadd,smembers,zadd,zrank,hset,hget -n 100000 -q   
+```
+
+```
+SET: 89126.56 requests per second
+GET: 90415.91 requests per second
+LPUSH: 91491.30 requests per second
+LPOP: 92165.90 requests per second
+SADD: 91911.76 requests per second
+HSET: 93023.25 requests per second
+```
 </details>
 
 ## Note

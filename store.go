@@ -357,7 +357,7 @@ func (s *store) snapshot(path string) {
 	}
 	s.save()
 	ns := newStore(snapshotDir, s.fileSize, 0, s.filesystem)
-	s.keys.Scan(func(name string, key *Key) bool {
+	s.keys.Copy().Scan(func(name string, key *Key) bool {
 		if _, ok := ns.keys.Get(name); !ok {
 			return true
 		}
