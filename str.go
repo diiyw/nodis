@@ -19,7 +19,7 @@ func (n *Nodis) Set(key string, value []byte) {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newStr)
 		meta.value.(*str.String).Set(value)
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value))
 		return nil
 	})
@@ -31,7 +31,7 @@ func (n *Nodis) GetSet(key string, value []byte) []byte {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newStr)
 		v = meta.value.(*str.String).GetSet(value)
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value))
 		return nil
 	})
@@ -45,7 +45,7 @@ func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
 		meta.key.expiration = time.Now().UnixMilli()
 		meta.key.expiration += seconds * 1000
 		meta.value.(*str.String).Set(value)
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value).Expiration(meta.key.expiration))
 		return nil
 	})
@@ -57,7 +57,7 @@ func (n *Nodis) SetPX(key string, value []byte, milliseconds int64) {
 		meta := tx.writeKey(key, n.newStr)
 		meta.key.expiration = time.Now().UnixMilli()
 		meta.key.expiration += milliseconds
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value).Expiration(meta.key.expiration))
 		meta.value.(*str.String).Set(value)
 		return nil
@@ -73,7 +73,7 @@ func (n *Nodis) SetNX(key string, value []byte) bool {
 			return nil
 		}
 		meta = tx.newKey(meta, key, n.newStr)
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value))
 		meta.value.(*str.String).Set(value)
 		ok = true
@@ -90,7 +90,7 @@ func (n *Nodis) SetXX(key string, value []byte) bool {
 		if !meta.isOk() {
 			return nil
 		}
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value))
 		meta.value.(*str.String).Set(value)
 		ok = true
@@ -126,7 +126,7 @@ func (n *Nodis) Incr(key string) (int64, error) {
 		}
 		vv := strconv.FormatInt(v, 10)
 		m := unsafe.Slice(unsafe.StringData(vv), len(vv))
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Set, key).Value(m))
 		return nil
 	})
@@ -144,7 +144,7 @@ func (n *Nodis) IncrBy(key string, increment int64) (int64, error) {
 		}
 		vv := strconv.FormatInt(v, 10)
 		m := unsafe.Slice(unsafe.StringData(vv), len(vv))
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Set, key).Value(m))
 		return nil
 	})
@@ -164,7 +164,7 @@ func (n *Nodis) Decr(key string) (int64, error) {
 		}
 		vv := strconv.FormatInt(v, 10)
 		m := unsafe.Slice(unsafe.StringData(vv), len(vv))
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Set, key).Value(m))
 		return nil
 	})
@@ -183,7 +183,7 @@ func (n *Nodis) DecrBy(key string, decrement int64) (int64, error) {
 		}
 		vv := strconv.FormatInt(v, 10)
 		m := unsafe.Slice(unsafe.StringData(vv), len(vv))
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Set, key).Value(m))
 		return nil
 	})
@@ -201,7 +201,7 @@ func (n *Nodis) IncrByFloat(key string, increment float64) (float64, error) {
 		}
 		vv := strconv.FormatFloat(v, 'f', -1, 64)
 		m := unsafe.Slice(unsafe.StringData(vv), len(vv))
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Set, key).Value(m))
 		return nil
 	})
@@ -215,7 +215,7 @@ func (n *Nodis) SetBit(key string, offset int64, value bool) int64 {
 		meta := tx.writeKey(key, n.newStr)
 		k := meta.value.(*str.String)
 		v = k.SetBit(offset, value)
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Set, key).Value(k.Get()))
 		return nil
 	})
@@ -261,7 +261,7 @@ func (n *Nodis) Append(key string, value []byte) int64 {
 		meta := tx.writeKey(key, n.newStr)
 		k := meta.value.(*str.String)
 		v = k.Append(value)
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Set, key).Value(k.Get()))
 		return nil
 	})
@@ -304,7 +304,7 @@ func (n *Nodis) SetRange(key string, offset int64, value []byte) int64 {
 		meta := tx.writeKey(key, n.newStr)
 		k := meta.value.(*str.String)
 		v = k.SetRange(offset, value)
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Set, key).Value(k.Get()))
 		return nil
 	})

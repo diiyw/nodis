@@ -400,8 +400,12 @@ func (w *Writer) WriteError(err string) {
 	w.writeBytes('\r', '\n')
 }
 
-func (w *Writer) WriteNull() {
+func (w *Writer) WriteBulkNull() {
 	w.writeBytes([]byte("$-1\r\n")...)
+}
+
+func (w *Writer) WriteArrayNull() {
+	w.writeBytes([]byte("*-1\r\n")...)
 }
 
 func (w *Writer) WriteInteger(v int64) {

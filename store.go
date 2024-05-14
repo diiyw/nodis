@@ -13,8 +13,6 @@ import (
 
 	"encoding/binary"
 
-	cList "container/list"
-
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/hash"
 	"github.com/diiyw/nodis/ds/list"
@@ -23,6 +21,7 @@ import (
 	"github.com/diiyw/nodis/ds/zset"
 	"github.com/diiyw/nodis/fs"
 	"github.com/diiyw/nodis/pb"
+	"github.com/diiyw/nodis/redis"
 	"github.com/tidwall/btree"
 )
 
@@ -41,7 +40,7 @@ type store struct {
 	metaPoolSize int
 	closed       bool
 	watchMu      sync.RWMutex
-	watchedKeys  btree.Map[string, *cList.List]
+	watchedKeys  btree.Map[string, *list.LinkedListG[*redis.Conn]]
 }
 
 func newStore(path string, fileSize int64, metaPoolSize int, filesystem fs.Fs) *store {
@@ -141,7 +140,7 @@ func (s *store) parseValue(data []byte) (string, ds.Value, error) {
 		z.SetValue(entry.GetZSetValue().Values)
 		value = z
 	case ds.List:
-		l := list.NewDoublyLinkedList()
+		l := list.NewLinkedList()
 		l.SetValue(entry.GetListValue().Values)
 		value = l
 	case ds.Hash:
@@ -198,15 +197,20 @@ func (s *store) tidy(ms int64) {
 			s.values.Delete(key)
 			return true
 		}
-		if k.modified() && k.modifiedTime != 0 && k.modifiedTime <= recycleTime {
+		if k.modifiedTime <= recycleTime {
 			d, ok := s.values.Get(key)
 			if ok {
-				k.reset()
-				// save to disk
-				err := s.putKv(key, k, d)
-				if err != nil {
-					log.Println("Recycle: ", err)
+				if k.modified() {
+					// save to disk
+					err := s.putKv(key, k, d)
+					if err != nil {
+						log.Println("Recycle: ", err)
+					}
+				} else {
+					// remove from memory
+					s.values.Delete(key)
 				}
+				k.reset()
 			}
 		}
 		return true

@@ -16,7 +16,7 @@ func (n *Nodis) SAdd(key string, members ...string) int64 {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newSet)
 		v = meta.value.(*set.Set).SAdd(members...)
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_SAdd, key).Members(members))
 		return nil
 	})
@@ -176,7 +176,7 @@ func (n *Nodis) SRem(key string, members ...string) int64 {
 			return nil
 		}
 		v = meta.value.(*set.Set).SRem(members...)
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_SRem, key).Members(members))
 		return nil
 	})
@@ -210,7 +210,7 @@ func (n *Nodis) SPop(key string, count int64) []string {
 			count = 1
 		}
 		v = meta.value.(*set.Set).SPop(count)
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_SRem, key).Members(v))
 		return nil
 	})
@@ -229,9 +229,10 @@ func (n *Nodis) SMove(source, destination, member string) bool {
 		if m == 0 {
 			return nil
 		}
+		n.signalModifiedKey(source, meta)
 		meta = tx.writeKey(destination, n.newSet)
 		m = meta.value.(*set.Set).SAdd(member)
-		meta.signalModifiedKey()
+		n.signalModifiedKey(destination, meta)
 		n.notify(pb.NewOp(pb.OpType_SAdd, destination).Members([]string{member}))
 		v = m > 0
 		return nil

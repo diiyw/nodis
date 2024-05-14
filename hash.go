@@ -16,7 +16,7 @@ func (n *Nodis) HSet(key string, field string, value []byte) int64 {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newHash)
 		v = meta.value.(*hash.HashMap).HSet(field, value)
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
 		return nil
 	})
@@ -47,7 +47,7 @@ func (n *Nodis) HDel(key string, fields ...string) int64 {
 		if meta.value.(*hash.HashMap).HLen() == 0 {
 			tx.delKey(key)
 		}
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_HDel, key).Fields(fields...))
 		return nil
 	})
@@ -113,7 +113,7 @@ func (n *Nodis) HIncrBy(key string, field string, value int64) (int64, error) {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newHash)
 		v, err = meta.value.(*hash.HashMap).HIncrBy(field, value)
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_HIncrBy, key).Fields(field).IncrInt(value))
 		return nil
 	})
@@ -126,7 +126,7 @@ func (n *Nodis) HIncrByFloat(key string, field string, value float64) (float64, 
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newHash)
 		v, err = meta.value.(*hash.HashMap).HIncrByFloat(field, value)
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_HIncrByFloat, key).Fields(field).IncrFloat(value))
 		return err
 	})
@@ -151,7 +151,7 @@ func (n *Nodis) HSetNX(key string, field string, value []byte) int64 {
 			meta.set(k, h)
 		}
 		v = meta.value.(*hash.HashMap).HSet(field, value)
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
 		return nil
 	})
@@ -168,7 +168,7 @@ func (n *Nodis) HMSet(key string, fields map[string][]byte) int64 {
 			v += meta.value.(*hash.HashMap).HSet(field, value)
 			ops = append(ops, pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
 		}
-		meta.signalModifiedKey()
+		n.signalModifiedKey(key, meta)
 		n.notify(ops...)
 		meta.value.(*hash.HashMap).HMSet(fields)
 		return nil

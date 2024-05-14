@@ -39,7 +39,7 @@ func newEntry(key string, value ds.Value, expiration int64) *pb.Entry {
 	case ds.List:
 		e.Value = &pb.Entry_ListValue{
 			ListValue: &pb.ListValue{
-				Values: value.(*list.DoublyLinkedList).GetValue(),
+				Values: value.(*list.LinkedList).GetValue(),
 			},
 		}
 	case ds.Hash:

@@ -300,7 +300,7 @@ func config(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 				return
 			}
 		}
-		conn.WriteNull()
+		conn.WriteBulkNull()
 	})
 }
 
@@ -345,7 +345,7 @@ func ping(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 func echo(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		if len(cmd.Args) == 0 {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		conn.WriteBulk(cmd.Args[0])
@@ -375,11 +375,7 @@ func watchKey(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		conn.WriteError("WATCH requires at least one argument")
 		return
 	}
-	if conn.WatchKeys == nil {
-		conn.WatchKeys = make([]string, 0)
-	}
 	n.Watch(conn, cmd.Args...)
-	conn.WatchKeys = cmd.Args[:]
 	conn.WriteOK()
 }
 
@@ -395,7 +391,7 @@ func multi(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 func discard(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	conn.State = redis.MultiNone
 	conn.Commands = nil
-	conn.WatchKeys = nil
+	conn.WatchKeys.Clear()
 	conn.WriteOK()
 }
 
@@ -403,7 +399,7 @@ func exec(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	defer func() {
 		conn.State = redis.MultiNone
 		conn.Commands = nil
-		conn.WatchKeys = nil
+		conn.WatchKeys.Clear()
 	}()
 	if conn.State&redis.MultiPrepare != redis.MultiPrepare {
 		conn.WriteError("ERR EXEC without MULTI")
@@ -420,15 +416,15 @@ func exec(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	var watchKeysNoChanged = true
 	tx := newTx(n.store)
 	defer tx.commit()
-	for _, key := range conn.WatchKeys {
-		meta := tx.readKey(key)
-		if meta.keyModified() {
+	conn.WatchKeys.Scan(func(key string, modified bool) bool {
+		if modified {
 			watchKeysNoChanged = false
-			break
+			return false
 		}
-	}
+		return true
+	})
 	if !watchKeysNoChanged {
-		conn.WriteNull()
+		conn.WriteBulkNull()
 		return
 	}
 	conn.State |= redis.MultiCommit
@@ -449,8 +445,7 @@ func exec(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 
 func unwatchKey(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
-		n.UnWatch(conn, conn.WatchKeys...)
-		conn.WatchKeys = conn.WatchKeys[:0]
+		n.UnWatch(conn)
 		conn.WriteOK()
 	})
 }
@@ -583,7 +578,7 @@ func randomKey(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		key := n.RandomKey()
 		if key == "" {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		conn.WriteBulk(key)
@@ -791,7 +786,7 @@ func incr(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		key := cmd.Args[0]
 		v, err := n.Incr(key)
 		if err != nil {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		conn.WriteInteger(v)
@@ -812,7 +807,7 @@ func incrBy(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		v, err := n.IncrBy(key, value)
 		if err != nil {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		conn.WriteInteger(v)
@@ -828,7 +823,7 @@ func decr(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		key := cmd.Args[0]
 		v, err := n.Decr(key)
 		if err != nil {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		conn.WriteInteger(v)
@@ -849,7 +844,7 @@ func decrBy(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		v, err := n.DecrBy(key, value)
 		if err != nil {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		conn.WriteInteger(v)
@@ -870,7 +865,7 @@ func incrByFloat(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		v, err := n.IncrByFloat(key, value)
 		if err != nil {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		conn.WriteBulk(strconv.FormatFloat(v, 'f', -1, 64))
@@ -885,7 +880,7 @@ func getString(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		v := n.Get(cmd.Args[0])
 		if v == nil {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		conn.WriteBulk(string(v))
@@ -902,7 +897,7 @@ func getSet(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		value := []byte(cmd.Args[1])
 		v := n.GetSet(key, value)
 		if v == nil {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		conn.WriteBulk(string(v))
@@ -920,7 +915,7 @@ func mGet(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		for _, v := range cmd.Args {
 			value := n.Get(v)
 			if value == nil {
-				conn.WriteNull()
+				conn.WriteBulkNull()
 				continue
 			}
 			conn.WriteBulk(string(value))
@@ -1123,11 +1118,11 @@ func sPop(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		results := n.SPop(key, count)
 		if results == nil {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		if len(results) == 0 {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		if len(cmd.Args) <= 1 {
@@ -1301,7 +1296,7 @@ func sRandMember(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 				conn.WriteArray(0)
 				return
 			}
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		if hasCount {
@@ -1360,7 +1355,7 @@ func hGet(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		field := cmd.Args[1]
 		v := string(n.HGet(key, field))
 		if v == "" {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		conn.WriteBulk(v)
@@ -1507,7 +1502,7 @@ func hMGet(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		conn.WriteArray(len(results))
 		for _, v := range results {
 			if v == nil {
-				conn.WriteNull()
+				conn.WriteBulkNull()
 			} else {
 				conn.WriteBulk(string(v))
 			}
@@ -1653,7 +1648,7 @@ func lPop(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		v := n.LPop(key, count)
 		if v == nil {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		if count == 1 {
@@ -1685,7 +1680,7 @@ func rPop(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		v := n.RPop(key, count)
 		if v == nil {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		if count == 1 {
@@ -1708,7 +1703,7 @@ func llen(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		key := cmd.Args[0]
 		v := n.LLen(key)
 		if v == -1 {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		conn.WriteInteger(v)
@@ -1725,7 +1720,7 @@ func lIndex(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		index, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
 		v := n.LIndex(key, index)
 		if v == nil {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		conn.WriteBulk(string(v))
@@ -1866,7 +1861,7 @@ func lPopRPush(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		destination := cmd.Args[1]
 		v := n.LPopRPush(source, destination)
 		if v == nil {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		conn.WriteBulk(string(v))
@@ -1883,7 +1878,7 @@ func rPopLPush(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		destination := cmd.Args[1]
 		v := n.RPopLPush(source, destination)
 		if v == nil {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		conn.WriteBulk(string(v))
@@ -1907,7 +1902,7 @@ func bLPop(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		k, v := n.BLPop(time.Duration(timeout*time.Second.Seconds())*time.Second, keys...)
 		if k == "" {
-			conn.WriteNull()
+			conn.WriteArrayNull()
 			return
 		}
 		conn.WriteArray(2)
@@ -1933,7 +1928,7 @@ func bRPop(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		k, v := n.BRPop(time.Duration(timeout*time.Second.Seconds())*time.Second, keys...)
 		if k == "" {
-			conn.WriteNull()
+			conn.WriteArrayNull()
 			return
 		}
 		conn.WriteArray(2)
@@ -2022,12 +2017,12 @@ func zRank(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 				conn.WriteBulk(el.Member)
 				return
 			}
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		v, err := n.ZRank(key, member)
 		if err != nil {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		conn.WriteInteger(v)
@@ -2050,12 +2045,12 @@ func zRevRank(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 				conn.WriteBulk(el.Member)
 				return
 			}
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		v, err := n.ZRevRank(key, member)
 		if err != nil {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		conn.WriteInteger(v)
@@ -2072,7 +2067,7 @@ func zScore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		member := cmd.Args[1]
 		score, err := n.ZScore(key, member)
 		if err != nil {
-			conn.WriteNull()
+			conn.WriteBulkNull()
 			return
 		}
 		conn.WriteBulk(strconv.FormatFloat(score, 'f', -1, 64))

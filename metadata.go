@@ -2,7 +2,6 @@ package nodis
 
 import (
 	"sync"
-	"time"
 
 	"github.com/diiyw/nodis/ds"
 )
@@ -34,15 +33,6 @@ func (m *metadata) empty() *metadata {
 	}
 	m.value = nil
 	return m
-}
-
-func (m *metadata) signalModifiedKey() {
-	m.key.state |= KeyStateModified
-	m.key.modifiedTime = time.Now().Unix()
-}
-
-func (m *metadata) keyModified() bool {
-	return m.key.state&KeyStateModified == KeyStateModified
 }
 
 func (m *metadata) commit() {

@@ -6,7 +6,7 @@ import (
 )
 
 func TestList_LPush(t *testing.T) {
-	l := NewDoublyLinkedList()
+	l := NewLinkedList()
 	for i := 0; i < 100; i++ {
 		is := strconv.Itoa(i)
 		l.LPush([]byte(is))
@@ -17,7 +17,7 @@ func TestList_LPush(t *testing.T) {
 }
 
 func TestList_RPush(t *testing.T) {
-	l := NewDoublyLinkedList()
+	l := NewLinkedList()
 	for i := 0; i < 100; i++ {
 		is := strconv.Itoa(i)
 		l.LPush([]byte(is))
@@ -28,7 +28,7 @@ func TestList_RPush(t *testing.T) {
 }
 
 func TestList_LPop(t *testing.T) {
-	l := NewDoublyLinkedList()
+	l := NewLinkedList()
 	for i := 0; i < 100; i++ {
 		is := strconv.Itoa(i)
 		l.LPush([]byte(is))
@@ -48,7 +48,7 @@ func TestList_LPop(t *testing.T) {
 }
 
 func TestList_RPop(t *testing.T) {
-	l := NewDoublyLinkedList()
+	l := NewLinkedList()
 	for i := 0; i < 10; i++ {
 		is := strconv.Itoa(i)
 		l.LPush([]byte(is))
@@ -60,7 +60,7 @@ func TestList_RPop(t *testing.T) {
 }
 
 func TestList_LLen(t *testing.T) {
-	l := NewDoublyLinkedList()
+	l := NewLinkedList()
 	for i := 0; i < 10; i++ {
 		is := strconv.Itoa(i)
 		l.LPush([]byte(is))
@@ -71,7 +71,7 @@ func TestList_LLen(t *testing.T) {
 }
 
 func TestList_LIndex(t *testing.T) {
-	l := NewDoublyLinkedList()
+	l := NewLinkedList()
 	for i := 0; i < 10; i++ {
 		is := strconv.Itoa(i)
 		l.LPush([]byte(is))
@@ -83,7 +83,7 @@ func TestList_LIndex(t *testing.T) {
 }
 
 func TestList_LRange(t *testing.T) {
-	l := NewDoublyLinkedList()
+	l := NewLinkedList()
 	for i := 0; i < 10; i++ {
 		is := strconv.Itoa(i)
 		l.LPush([]byte(is))
@@ -95,7 +95,7 @@ func TestList_LRange(t *testing.T) {
 }
 
 func TestList_LInsert(t *testing.T) {
-	l := NewDoublyLinkedList()
+	l := NewLinkedList()
 	for i := 0; i < 10; i++ {
 		is := strconv.Itoa(i)
 		l.LPush([]byte(is))
@@ -107,24 +107,8 @@ func TestList_LInsert(t *testing.T) {
 	}
 }
 
-func TestList_LPushx(t *testing.T) {
-	l := NewDoublyLinkedList()
-	l.LPushX([]byte("100"))
-	if l.LLen() != 0 {
-		t.Errorf("pushx error")
-	}
-}
-
-func TestList_RPushx(t *testing.T) {
-	l := NewDoublyLinkedList()
-	l.RPushX([]byte("100"))
-	if l.LLen() != 0 {
-		t.Errorf("pushx error")
-	}
-}
-
 func TestList_LRem(t *testing.T) {
-	l := NewDoublyLinkedList()
+	l := NewLinkedList()
 	for i := 0; i < 10; i++ {
 		is := strconv.Itoa(i)
 		l.LPush([]byte(is))
@@ -140,7 +124,7 @@ func TestList_LRem(t *testing.T) {
 }
 
 func TestList_LSet(t *testing.T) {
-	l := NewDoublyLinkedList()
+	l := NewLinkedList()
 	for i := 0; i < 10; i++ {
 		is := strconv.Itoa(i)
 		l.LPush([]byte(is))
@@ -153,7 +137,7 @@ func TestList_LSet(t *testing.T) {
 }
 
 func TestList_LTrim(t *testing.T) {
-	l := NewDoublyLinkedList()
+	l := NewLinkedList()
 	for i := 0; i < 10; i++ {
 		is := strconv.Itoa(i)
 		l.LPush([]byte(is))
@@ -165,7 +149,7 @@ func TestList_LTrim(t *testing.T) {
 }
 
 func BenchmarkDoublyLinkedList_LPush(b *testing.B) {
-	l := NewDoublyLinkedList()
+	l := NewLinkedList()
 	for i := 0; i < b.N; i++ {
 		is := strconv.Itoa(i)
 		l.LPush([]byte(is))
@@ -173,7 +157,7 @@ func BenchmarkDoublyLinkedList_LPush(b *testing.B) {
 }
 
 func BenchmarkDoublyLinkedList_LPop(b *testing.B) {
-	l := NewDoublyLinkedList()
+	l := NewLinkedList()
 	for i := 0; i < b.N; i++ {
 		is := strconv.Itoa(i)
 		l.LPush([]byte(is))

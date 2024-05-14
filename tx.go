@@ -50,6 +50,8 @@ func (tx *Tx) newKey(meta *metadata, key string, newFn func() ds.Value) *metadat
 		tx.store.keys.Set(key, k)
 		tx.store.values.Set(key, d)
 		meta.set(k, d)
+		meta.key.state |= KeyStateModified
+		meta.key.modifiedTime = time.Now().UnixMilli()
 		return meta
 	}
 	return meta.empty()

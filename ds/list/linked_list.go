@@ -12,28 +12,25 @@ type Node struct {
 	prev *Node
 }
 
-type DoublyLinkedList struct {
+// LinkedList is a doubly linked list
+type LinkedList struct {
 	head   *Node
 	tail   *Node
 	length int64
 }
 
 // Type returns the type of the data structure
-func (l *DoublyLinkedList) Type() ds.ValueType {
+func (l *LinkedList) Type() ds.ValueType {
 	return ds.List
 }
 
-// NewDoublyLinkedList returns a new doubly linked list
-func NewDoublyLinkedList() *DoublyLinkedList {
-	return &DoublyLinkedList{}
+// NewLinkedList returns a new doubly linked list
+func NewLinkedList() *LinkedList {
+	return &LinkedList{}
 }
 
 // LPush adds an element to the head of the list
-func (l *DoublyLinkedList) LPush(data ...[]byte) {
-	l.lPush(data...)
-}
-
-func (l *DoublyLinkedList) lPush(data ...[]byte) {
+func (l *LinkedList) LPush(data ...[]byte) {
 	for _, datum := range data {
 		newNode := &Node{data: datum}
 		if l.head == nil {
@@ -49,11 +46,7 @@ func (l *DoublyLinkedList) lPush(data ...[]byte) {
 }
 
 // RPush adds an element to the end of the list
-func (l *DoublyLinkedList) RPush(data ...[]byte) {
-	l.rPush(data...)
-}
-
-func (l *DoublyLinkedList) rPush(data ...[]byte) {
+func (l *LinkedList) RPush(data ...[]byte) {
 	for _, datum := range data {
 		newNode := &Node{data: datum}
 		if l.head == nil {
@@ -69,7 +62,7 @@ func (l *DoublyLinkedList) rPush(data ...[]byte) {
 }
 
 // LPop returns the first element of the list
-func (l *DoublyLinkedList) LPop(count int64) [][]byte {
+func (l *LinkedList) LPop(count int64) [][]byte {
 	if l.head == nil {
 		return nil // 链表为空
 	}
@@ -91,7 +84,7 @@ func (l *DoublyLinkedList) LPop(count int64) [][]byte {
 }
 
 // RPop returns the last element of the list
-func (l *DoublyLinkedList) RPop(count int64) [][]byte {
+func (l *LinkedList) RPop(count int64) [][]byte {
 	if l.tail == nil {
 		return nil
 	}
@@ -113,7 +106,7 @@ func (l *DoublyLinkedList) RPop(count int64) [][]byte {
 }
 
 // LRange returns a range of elements from the list
-func (l *DoublyLinkedList) LRange(start, end int64) [][]byte {
+func (l *LinkedList) LRange(start, end int64) [][]byte {
 	var result [][]byte
 	currentNode := l.head
 	var index int64 = 0
@@ -139,7 +132,7 @@ func (l *DoublyLinkedList) LRange(start, end int64) [][]byte {
 	return result
 }
 
-func (l *DoublyLinkedList) size() int64 {
+func (l *LinkedList) size() int64 {
 	currentNode := l.head
 	var length int64 = 0
 	for currentNode != nil {
@@ -150,12 +143,12 @@ func (l *DoublyLinkedList) size() int64 {
 }
 
 // LLen returns the length of the list
-func (l *DoublyLinkedList) LLen() int64 {
+func (l *LinkedList) LLen() int64 {
 	return l.length
 }
 
 // LIndex returns the element at index in the list
-func (l *DoublyLinkedList) LIndex(index int64) []byte {
+func (l *LinkedList) LIndex(index int64) []byte {
 	if index < 0 {
 		index = l.length + index
 	}
@@ -175,7 +168,7 @@ func (l *DoublyLinkedList) LIndex(index int64) []byte {
 // the list length after a successful insert operation.
 // 0 when the key doesn't exist.
 // -1 when the pivot wasn't found.
-func (l *DoublyLinkedList) LInsert(pivot, data []byte, before bool) int64 {
+func (l *LinkedList) LInsert(pivot, data []byte, before bool) int64 {
 	currentNode := l.head
 	for currentNode != nil {
 		if bytes.Equal(currentNode.data, pivot) {
@@ -207,30 +200,12 @@ func (l *DoublyLinkedList) LInsert(pivot, data []byte, before bool) int64 {
 	return -1
 }
 
-// LPushX adds an element to the head of the list if the list exists
-func (l *DoublyLinkedList) LPushX(data []byte) int64 {
-	if l.head == nil {
-		return 0
-	}
-	l.lPush(data)
-	return l.length
-}
-
-// RPushX adds an element to the end of the list if the list exists
-func (l *DoublyLinkedList) RPushX(data []byte) int64 {
-	if l.tail == nil {
-		return 0
-	}
-	l.rPush(data)
-	return l.length
-}
-
 // LRem removes the first count occurrences of elements equal to value from the list
 // Removes the first count occurrences of elements equal to element from the list stored at key. The count argument influences the operation in the following ways:
 // count > 0: Remove elements equal to element moving from head to tail.
 // count < 0: Remove elements equal to element moving from tail to head.
 // count = 0: Remove all elements equal to element.
-func (l *DoublyLinkedList) LRem(count int64, value []byte) int64 {
+func (l *LinkedList) LRem(count int64, value []byte) int64 {
 	var removed int64
 	if count > 0 {
 		removed = l.lRem(count, value)
@@ -243,7 +218,7 @@ func (l *DoublyLinkedList) LRem(count int64, value []byte) int64 {
 }
 
 // lRemAll removes all elements equal to value from the list
-func (l *DoublyLinkedList) lRemAll(value []byte) int64 {
+func (l *LinkedList) lRemAll(value []byte) int64 {
 	var removed int64
 	currentNode := l.head
 	for currentNode != nil {
@@ -266,7 +241,7 @@ func (l *DoublyLinkedList) lRemAll(value []byte) int64 {
 	return removed
 }
 
-func (l *DoublyLinkedList) lRem(count int64, value []byte) int64 {
+func (l *LinkedList) lRem(count int64, value []byte) int64 {
 	var removed int64
 	currentNode := l.head
 	for currentNode != nil {
@@ -291,7 +266,7 @@ func (l *DoublyLinkedList) lRem(count int64, value []byte) int64 {
 	return removed
 }
 
-func (l *DoublyLinkedList) lRevRem(count int64, value []byte) int64 {
+func (l *LinkedList) lRevRem(count int64, value []byte) int64 {
 	var removed int64
 	currentNode := l.tail
 	for currentNode != nil {
@@ -317,7 +292,7 @@ func (l *DoublyLinkedList) lRevRem(count int64, value []byte) int64 {
 }
 
 // LSet sets the list element at index to value
-func (l *DoublyLinkedList) LSet(index int64, value []byte) bool {
+func (l *LinkedList) LSet(index int64, value []byte) bool {
 	currentNode := l.head
 	var currentIndex int64 = 0
 	for currentNode != nil {
@@ -335,7 +310,7 @@ func (l *DoublyLinkedList) LSet(index int64, value []byte) bool {
 // For example: LTRIM foobar 0 2 will modify the list stored at foobar so that only the first three elements of the list will remain.
 // start and end can also be negative numbers indicating offsets from the end of the list, where -1 is the last element of the list, -2 the penultimate element and so on.
 // Out of range indexes will not produce an error: if start is larger than the end of the list, or start > end, the result will be an empty list (which causes key to be removed). If end is larger than the end of the list, Redis will treat it like the last element of the list.
-func (l *DoublyLinkedList) LTrim(start, end int64) {
+func (l *LinkedList) LTrim(start, end int64) {
 	currentNode := l.head
 	var currentIndex int64 = 0
 	if end < 0 {
@@ -361,12 +336,12 @@ func (l *DoublyLinkedList) LTrim(start, end int64) {
 }
 
 // GetValue returns the byte slice of the list
-func (l *DoublyLinkedList) GetValue() [][]byte {
+func (l *LinkedList) GetValue() [][]byte {
 	return l.LRange(0, -1)
 }
 
 // SetValue restores the list from the byte slice
-func (l *DoublyLinkedList) SetValue(list [][]byte) {
+func (l *LinkedList) SetValue(list [][]byte) {
 	for _, item := range list {
 		l.RPush(item)
 	}

@@ -98,7 +98,9 @@ func (s *String) SetBit(offset int64, value bool) int64 {
 	}
 	i := offset / 8
 	if i > int64(len(s.V))-1 {
-		s.V = append(s.V, make([]byte, i-int64(len(s.V))+1)...)
+		newV := make([]byte, i+1)
+		copy(newV, s.V)
+		s.V = newV
 	}
 	by := s.V[i]
 	bit := byte(1 << (7 - uint(offset%8)))
