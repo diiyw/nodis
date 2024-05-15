@@ -8,18 +8,22 @@ import (
 
 type metadata struct {
 	*sync.RWMutex
-	key       *Key
-	value     ds.Value
-	writeable bool
+	key        *Key
+	value      ds.Value
+	writeable  bool
+	expiration int64
+	useTimes   uint64
+	state      uint8
 }
 
-func (m *metadata) set(key *Key, d ds.Value) *metadata {
+func (m *metadata) set(key *Key, value ds.Value) *metadata {
 	m.key = key
-	m.value = d
+	m.value = value
 	if m.key.valueType == 0 {
 		m.key.valueType = m.value.Type()
 	}
 	m.key.state |= KeyStateNormal
+	m.key.useTimes++
 	return m
 }
 

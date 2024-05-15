@@ -54,7 +54,7 @@ func Open(opt *Options) *Nodis {
 		if opt.TidyDuration != 0 {
 			for {
 				time.Sleep(opt.TidyDuration)
-				n.store.tidy(opt.TidyDuration.Milliseconds())
+				n.store.tidy(opt.MaxKeyUseTimes)
 			}
 		}
 	}()

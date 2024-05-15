@@ -20,13 +20,13 @@ const (
 )
 
 type Key struct {
-	expiration   int64
-	modifiedTime int64
-	offset       int64
-	size         uint32
-	fileId       uint16
-	valueType    ds.ValueType
-	state        uint8
+	expiration int64
+	useTimes   uint64
+	offset     int64
+	size       uint32
+	fileId     uint16
+	valueType  ds.ValueType
+	state      uint8
 }
 
 func newKey() *Key {
@@ -44,13 +44,13 @@ func (k *Key) expired(now int64) bool {
 
 // modified return if the key is modified
 func (k *Key) modified() bool {
-	return k.modifiedTime != 0 && k.state&KeyStateModified == KeyStateModified
+	return k.state&KeyStateModified == KeyStateModified
 }
 
 func (k *Key) reset() {
 	if k.state&KeyStateModified == KeyStateModified {
 		k.state ^= KeyStateModified
-		k.modifiedTime = 0
+		k.useTimes = 0
 	}
 }
 
@@ -592,7 +592,6 @@ func (n *Nodis) Persist(key string) int64 {
 
 func (n *Nodis) signalModifiedKey(key string, meta *metadata) {
 	meta.key.state |= KeyStateModified
-	meta.key.modifiedTime = time.Now().Unix()
 	n.store.watchMu.RLock()
 	clients, ok := n.store.watchedKeys.Get(key)
 	if ok {

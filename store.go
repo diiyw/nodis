@@ -30,6 +30,7 @@ type store struct {
 	metaPool     []*metadata
 	keys         btree.Map[string, *Key]
 	values       btree.Map[string, ds.Value]
+	metadatas    btree.Map[string, *metadata]
 	fileSize     int64
 	fileId       uint16
 	path         string
@@ -180,14 +181,13 @@ func (s *store) save() {
 }
 
 // tidy removes expired and unused keys
-func (s *store) tidy(ms int64) {
+func (s *store) tidy(keyMaxUseTimes uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
 		return
 	}
 	now := time.Now().UnixMilli()
-	recycleTime := now - ms
 	tx := newTx(s)
 	s.keys.Scan(func(key string, k *Key) bool {
 		meta := tx.lockKey(key)
@@ -197,7 +197,7 @@ func (s *store) tidy(ms int64) {
 			s.values.Delete(key)
 			return true
 		}
-		if k.modifiedTime <= recycleTime {
+		if k.useTimes < keyMaxUseTimes {
 			d, ok := s.values.Get(key)
 			if ok {
 				if k.modified() {
@@ -403,8 +403,12 @@ func (s *store) close() error {
 		Items: make([]*pb.Index_Item, 0, s.keys.Len()),
 	}
 	tx := newTx(s)
-	s.keys.Scan(func(key string, k *Key) bool {
+	now := time.Now().UnixMilli()
+	s.keys.Copy().Scan(func(key string, k *Key) bool {
 		meta := tx.rLockKey(key)
+		if k.expired(now) {
+			return true
+		}
 		indexData.Items = append(indexData.Items, &pb.Index_Item{
 			Key:  key,
 			Data: k.marshal(),

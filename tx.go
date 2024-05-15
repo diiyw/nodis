@@ -51,7 +51,6 @@ func (tx *Tx) newKey(meta *metadata, key string, newFn func() ds.Value) *metadat
 		tx.store.values.Set(key, d)
 		meta.set(k, d)
 		meta.key.state |= KeyStateModified
-		meta.key.modifiedTime = time.Now().UnixMilli()
 		return meta
 	}
 	return meta.empty()
@@ -97,12 +96,12 @@ func (tx *Tx) readKey(key string) *metadata {
 		if k.expired(time.Now().UnixMilli()) {
 			return meta.empty()
 		}
-		d, ok := tx.store.values.Get(key)
+		value, ok := tx.store.values.Get(key)
 		if !ok {
 			// read from storage
 			return tx.store.fromStorage(k, meta)
 		}
-		meta.set(k, d)
+		meta.set(k, value)
 		return meta
 	}
 	return meta.empty()
