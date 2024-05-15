@@ -20,39 +20,39 @@ func TestStorePut(t *testing.T) {
 	tempDir := "testdata"
 	_ = driver.RemoveAll(tempDir)
 	// Create a new Store instance
-	store := newStore(tempDir, 1024, 1000, driver)
+	store := newStore(tempDir, 1024, driver)
 
 	// Generate a random key and value for testing
 	key := "testKey"
 	value := []byte("testValue")
-	ds := str.NewString()
-	ds.Set(value)
-	e := newEntry(key, ds, time.Now().Unix())
+	strVal := str.NewString()
+	strVal.Set(value)
+	e := newEntry(key, strVal, time.Now().Unix())
 	// Call the put method
-	err := store.putEntry(newEntry(key, ds, time.Now().Unix()))
+	err := store.putEntry(newEntry(key, strVal, time.Now().Unix()))
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
 
 	// Retrieve the value from the index
-	idx, _ := store.keys.Get(key)
-	if idx == nil {
+	m, _ := store.metadata.Get(key)
+	if m == nil {
 		t.Fatalf("Failed to retrieve index for key: %s", key)
 	}
 
 	// Verify the index values
-	if idx.fileId != 0 {
-		t.Errorf("Expected fileID to be 0, got %d", idx.fileId)
+	if m.key.fileId != 0 {
+		t.Errorf("Expected fileID to be 0, got %d", m.key.fileId)
 	}
-	if idx.offset != 0 {
-		t.Errorf("Expected offset to be 0, got %d", idx.offset)
+	if m.key.offset != 0 {
+		t.Errorf("Expected offset to be 0, got %d", m.key.offset)
 	}
 	v, _ := e.Marshal()
-	if idx.size != uint32(len(v)) {
-		t.Errorf("Expected size to be %d, got %d", len(v), idx.size)
+	if m.key.size != uint32(len(v)) {
+		t.Errorf("Expected size to be %d, got %d", len(v), m.key.size)
 	}
-	if idx.expiration <= 0 {
-		t.Errorf("Expected expiration to be greater than 0, got %d", idx.expiration)
+	if m.expiration <= 0 {
+		t.Errorf("Expected expiration to be greater than 0, got %d", m.expiration)
 	}
 
 	// Read the value from the aof file
@@ -76,24 +76,24 @@ func TestStoreGet(t *testing.T) {
 	tempDir := "testdata"
 
 	// Create a new Store instance
-	store := newStore(tempDir, 1024, 1000, driver)
+	store := newStore(tempDir, 1024, driver)
 
 	// Generate a random name and value for testing
 	name := "testKey"
 	value := []byte("testValue")
-	ds := str.NewString()
-	ds.Set(value)
+	strVal := str.NewString()
+	strVal.Set(value)
 	// Call the put method
-	err := store.putEntry(newEntry(name, ds, time.Now().Unix()))
+	err := store.putEntry(newEntry(name, strVal, time.Now().Unix()))
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
-	key, ok := store.keys.Get(name)
+	meta, ok := store.metadata.Get(name)
 	if !ok {
 		t.Fatalf("Failed to get value for key: %v", err)
 	}
 	// Call the get method
-	data, err := store.getEntryRaw(key)
+	data, err := store.getEntryRaw(meta.key)
 	if err != nil {
 		t.Fatalf("Failed to get value for key: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestStoreMultiPut(t *testing.T) {
 	tempDir := "testdata"
 	_ = driver.RemoveAll(tempDir)
 	// Create a new Store instance
-	store := newStore(tempDir, 1024, 1000, driver)
+	store := newStore(tempDir, 1024, driver)
 
 	var kv = map[string][]byte{
 		"testKey1": []byte("testValue1"),
@@ -117,10 +117,10 @@ func TestStoreMultiPut(t *testing.T) {
 	}
 	result := make(map[string][]byte)
 	for key, value := range kv {
-		ds := str.NewString()
-		ds.Set(value)
+		strVal := str.NewString()
+		strVal.Set(value)
 		// Call the put method
-		e := newEntry(key, ds, time.Now().Unix()+3600)
+		e := newEntry(key, strVal, time.Now().Unix()+3600)
 		data, _ := e.Marshal()
 		result[key] = data
 		err := store.putEntry(e)
@@ -129,15 +129,15 @@ func TestStoreMultiPut(t *testing.T) {
 		}
 	}
 
-	if store.keys.Len() != 5 {
-		t.Fatalf("Expected index count to be 5, got %d", store.keys.Len())
+	if store.metadata.Len() != 5 {
+		t.Fatalf("Expected index count to be 5, got %d", store.metadata.Len())
 	}
 	for name, value := range kv {
-		key, ok := store.keys.Get(name)
+		meta, ok := store.metadata.Get(name)
 		if !ok {
 			t.Fatalf("Failed to get value for key: %v", name)
 		}
-		v, err := store.getEntryRaw(key)
+		v, err := store.getEntryRaw(meta.key)
 		if err != nil {
 			t.Fatalf("Failed to get value for key: %v", err)
 		}
@@ -154,9 +154,9 @@ func TestStoreMultiPut(t *testing.T) {
 func TestStoreMultiFilePut(t *testing.T) {
 	tempDir := "testdata"
 	_ = driver.RemoveAll(tempDir)
-	os.Mkdir(tempDir, 0755)
+	_ = os.Mkdir(tempDir, 0755)
 	// Create a new Store instance
-	store := newStore(tempDir, 10, 1000, driver)
+	store := newStore(tempDir, 10, driver)
 	result := make(map[string][]byte)
 	var kv = []map[string][]byte{
 		{
@@ -193,11 +193,11 @@ func TestStoreMultiFilePut(t *testing.T) {
 
 	for _, m := range kv {
 		for name, value := range m {
-			key, ok := store.keys.Get(name)
+			meta, ok := store.metadata.Get(name)
 			if !ok {
 				t.Fatalf("Failed to get value for key: %v", name)
 			}
-			v, err := store.getEntryRaw(key)
+			v, err := store.getEntryRaw(meta.key)
 			if err != nil {
 				t.Fatalf("Failed to get value for key: %v , err %v ", name, err)
 			}
@@ -216,15 +216,15 @@ func TestStoreRemove(t *testing.T) {
 	tempDir := "testdata"
 	_ = driver.RemoveAll(tempDir)
 	// Create a new Store instance
-	store := newStore(tempDir, 1024, 1000, driver)
+	store := newStore(tempDir, 1024, driver)
 
 	// Generate a random key and value for testing
 	key := "testKey"
 	value := []byte("testValue")
-	ds := str.NewString()
-	ds.Set(value)
+	strVal := str.NewString()
+	strVal.Set(value)
 	// Call the put method
-	err := store.putEntry(newEntry(key, ds, time.Now().Unix()+3600))
+	err := store.putEntry(newEntry(key, strVal, time.Now().Unix()+3600))
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
@@ -234,33 +234,33 @@ func TestStorePutRaw(t *testing.T) {
 	tempDir := "testdata"
 
 	// Create a new Store instance
-	store := newStore(tempDir, 1024, 1000, driver)
+	store := newStore(tempDir, 1024, driver)
 
 	// Generate a random name and value for testing
 	name := "testKey"
 	value := []byte("testValue")
-	d := str.NewString()
-	d.Set(value)
+	strVal := str.NewString()
+	strVal.Set(value)
 	expiration := time.Now().Unix() + 3600
-	var e = newEntry(name, d, expiration)
+	var e = newEntry(name, strVal, expiration)
 	data, err := e.Marshal()
 	if err != nil {
 		t.Fatalf("Failed to marshal data: %v", err)
 	}
-	k := newKey()
-	k.expiration = expiration
+	m := newMetadata(&Key{}, nil, false)
+	m.expiration = expiration
 	// Call the putRaw method
-	err = store.putRaw(name, k, data)
+	err = store.putRaw(name, m, data)
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
 
 	// Retrieve the value from the index
-	key, _ := store.keys.Get(name)
-	if key == nil {
+	meta, _ := store.metadata.Get(name)
+	if meta == nil {
 		t.Fatalf("Failed to retrieve index for key: %s", name)
 	}
-	nd, err := store.getEntryRaw(key)
+	nd, err := store.getEntryRaw(meta.key)
 	if err != nil {
 		t.Fatalf("Failed to get value for key: %v", err)
 	}
@@ -269,7 +269,7 @@ func TestStorePutRaw(t *testing.T) {
 	}
 }
 
-func TestStore_parseDs(t *testing.T) {
+func TestStore_parseValue(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	opt := &Options{
 		Path: "testdata",
@@ -277,15 +277,12 @@ func TestStore_parseDs(t *testing.T) {
 	n := Open(opt)
 	n.Set("test", []byte("test"))
 	data := n.GetEntry("test")
-	k, d, err := n.store.parseValue(data)
+	value, err := n.store.parseValue(data)
 	if err != nil {
-		t.Errorf("parseDs() = %v, want %v", err, nil)
+		t.Errorf("parseValue() = %v, want %v", err, nil)
 	}
-	if k != "test" {
-		t.Errorf("parseDs() = %v, want %v", k, "test")
-	}
-	if d.Type() != ds.String {
-		t.Errorf("parseDs() = %v, want %v", d.Type(), ds.String)
+	if value.Type() != ds.String {
+		t.Errorf("parseValue() = %v, want %v", value.Type(), ds.String)
 	}
 	_ = n.store.close()
 }

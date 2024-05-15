@@ -26,36 +26,25 @@ import (
 )
 
 type store struct {
-	mu           sync.RWMutex
-	metaPool     []*metadata
-	keys         btree.Map[string, *Key]
-	values       btree.Map[string, ds.Value]
-	metadatas    btree.Map[string, *metadata]
-	fileSize     int64
-	fileId       uint16
-	path         string
-	current      string
-	indexFile    string
-	aof          fs.File
-	filesystem   fs.Fs
-	metaPoolSize int
-	closed       bool
-	watchMu      sync.RWMutex
-	watchedKeys  btree.Map[string, *list.LinkedListG[*redis.Conn]]
+	mu          sync.RWMutex
+	metadata    btree.Map[string, *metadata]
+	fileSize    int64
+	fileId      uint16
+	path        string
+	current     string
+	indexFile   string
+	aof         fs.File
+	filesystem  fs.Fs
+	closed      bool
+	watchMu     sync.RWMutex
+	watchedKeys btree.Map[string, *list.LinkedListG[*redis.Conn]]
 }
 
-func newStore(path string, fileSize int64, metaPoolSize int, filesystem fs.Fs) *store {
+func newStore(path string, fileSize int64, filesystem fs.Fs) *store {
 	s := &store{
-		path:         path,
-		fileSize:     fileSize,
-		indexFile:    filepath.Join(path, "nodis.index"),
-		metaPoolSize: metaPoolSize,
-		metaPool:     make([]*metadata, metaPoolSize),
-	}
-	for i := 0; i < metaPoolSize; i++ {
-		s.metaPool[i] = &metadata{
-			RWMutex: &sync.RWMutex{},
-		}
+		path:      path,
+		fileSize:  fileSize,
+		indexFile: filepath.Join(path, "nodis.index"),
 	}
 	_ = filesystem.MkdirAll(path)
 	indexFile, err := filesystem.OpenFile(s.indexFile, os.O_RDWR|os.O_CREATE|os.O_APPEND)
@@ -78,9 +67,10 @@ func newStore(path string, fileSize int64, metaPoolSize int, filesystem fs.Fs) *
 				panic(err)
 			}
 			for _, v := range idx.Items {
-				var i = &Key{}
-				i.unmarshal(v.Data)
-				s.keys.Set(v.Key, i)
+				var m = newMetadata(&Key{}, nil, false)
+				m.unmarshal(v.Data)
+				m.state |= KeyStateNormal
+				s.metadata.Set(v.Key, m)
 			}
 		}
 		s.fileId = binary.LittleEndian.Uint16(data[:2])
@@ -94,22 +84,21 @@ func newStore(path string, fileSize int64, metaPoolSize int, filesystem fs.Fs) *
 	return s
 }
 
-func (s *store) fromStorage(k *Key, meta *metadata) *metadata {
+func (s *store) fromStorage(m *metadata) *metadata {
 	// try get from storage
-	v, err := s.getEntryRaw(k)
+	v, err := s.getEntryRaw(m.key)
 	if err == nil && len(v) > 0 {
-		key, value, err := s.parseValue(v)
+		value, err := s.parseValue(v)
 		if err != nil {
 			log.Println("Parse Value:", err)
-			return meta
+			return m
 		}
 		if value != nil {
-			s.values.Set(key, value)
-			meta.set(k, value)
-			return meta
+			m.setValue(value)
+			return m
 		}
 	}
-	return meta
+	return m
 }
 
 func (s *store) parseEntry(data []byte) (*pb.Entry, error) {
@@ -125,10 +114,10 @@ func (s *store) parseEntry(data []byte) (*pb.Entry, error) {
 }
 
 // parseValue the data
-func (s *store) parseValue(data []byte) (string, ds.Value, error) {
+func (s *store) parseValue(data []byte) (ds.Value, error) {
 	var entry, err = s.parseEntry(data)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 	var value ds.Value
 	switch ds.ValueType(entry.Type) {
@@ -152,8 +141,10 @@ func (s *store) parseValue(data []byte) (string, ds.Value, error) {
 		v := set.NewSet()
 		v.SetValue(entry.GetSetValue().Values)
 		value = v
+	default:
+		panic("unhandled default case")
 	}
-	return entry.Key, value, nil
+	return value, nil
 }
 
 // save flush changed keys to disk
@@ -161,18 +152,17 @@ func (s *store) save() {
 	now := time.Now().UnixMilli()
 	tx := newTx(s)
 	defer tx.commit()
-	s.keys.Scan(func(key string, k *Key) bool {
-		meta := tx.rLockKey(key)
-		defer meta.commit()
-		if !k.modified() || k.expired(now) {
+	s.metadata.Scan(func(key string, m *metadata) bool {
+		m.RLock()
+		defer m.RUnlock()
+		if !m.modified() || m.expired(now) {
 			return true
 		}
-		d, ok := s.values.Get(key)
-		if !ok {
+		if m.value == nil {
 			return true
 		}
 		// save to storage
-		err := s.putKv(key, k, d)
+		err := s.putMetadata(key, m)
 		if err != nil {
 			log.Println("Flush changes: ", err)
 		}
@@ -188,29 +178,20 @@ func (s *store) tidy(keyMaxUseTimes uint64) {
 		return
 	}
 	now := time.Now().UnixMilli()
-	tx := newTx(s)
-	s.keys.Scan(func(key string, k *Key) bool {
-		meta := tx.lockKey(key)
-		defer meta.commit()
-		if k.expired(now) {
-			s.keys.Delete(key)
-			s.values.Delete(key)
+	s.metadata.Scan(func(key string, m *metadata) bool {
+		m.Lock()
+		defer m.Unlock()
+		if m.expired(now) || !m.isOk() {
+			s.metadata.Delete(key)
 			return true
 		}
-		if k.useTimes < keyMaxUseTimes {
-			d, ok := s.values.Get(key)
-			if ok {
-				if k.modified() {
-					// save to disk
-					err := s.putKv(key, k, d)
-					if err != nil {
-						log.Println("Recycle: ", err)
-					}
-				} else {
-					// remove from memory
-					s.values.Delete(key)
+		if m.useTimes < keyMaxUseTimes {
+			if m.modified() {
+				// save to disk
+				err := s.putMetadata(key, m)
+				if err != nil {
+					log.Println("Tidy: ", err)
 				}
-				k.reset()
 			}
 		}
 		return true
@@ -256,19 +237,19 @@ func (s *store) check() (int64, error) {
 	return offset, nil
 }
 
-func (s *store) putKv(name string, key *Key, value ds.Value) error {
+func (s *store) putMetadata(name string, m *metadata) error {
 	offset, err := s.check()
 	if err != nil {
 		return err
 	}
-	key.fileId = s.fileId
-	key.offset = offset
-	entry := newEntry(name, value, key.expiration)
+	m.key.fileId = s.fileId
+	m.key.offset = offset
+	entry := newEntry(name, m.value, m.expiration)
 	data, err := entry.Marshal()
 	if err != nil {
 		return err
 	}
-	key.size = uint32(len(data))
+	m.key.size = uint32(len(data))
 	_, err = s.aof.Write(data)
 	if err != nil {
 		return err
@@ -278,7 +259,7 @@ func (s *store) putKv(name string, key *Key, value ds.Value) error {
 
 // putEntry a key-value pair into store
 func (s *store) putEntry(entry *pb.Entry) error {
-	var key = &Key{}
+	var m = newMetadata(&Key{}, nil, false)
 	offset, err := s.check()
 	if err != nil {
 		return err
@@ -287,11 +268,12 @@ func (s *store) putEntry(entry *pb.Entry) error {
 	if err != nil {
 		return err
 	}
-	key.fileId = s.fileId
-	key.offset = offset
-	key.size = uint32(len(data))
-	key.expiration = entry.Expiration
-	s.keys.Set(entry.Key, key)
+	m.key.fileId = s.fileId
+	m.key.offset = offset
+	m.key.size = uint32(len(data))
+	m.expiration = entry.Expiration
+	m.state |= KeyStateNormal
+	s.metadata.Set(entry.Key, m)
 	_, err = s.aof.Write(data)
 	if err != nil {
 		return err
@@ -299,15 +281,16 @@ func (s *store) putEntry(entry *pb.Entry) error {
 	return nil
 }
 
-func (s *store) putRaw(name string, key *Key, data []byte) error {
+func (s *store) putRaw(name string, m *metadata, data []byte) error {
 	offset, err := s.check()
 	if err != nil {
 		return err
 	}
-	key.fileId = s.fileId
-	key.offset = offset
-	key.size = uint32(len(data))
-	s.keys.Set(name, key)
+	m.key.fileId = s.fileId
+	m.key.offset = offset
+	m.key.size = uint32(len(data))
+	m.state |= KeyStateNormal
+	s.metadata.Set(name, m)
 	_, err = s.aof.Write(data)
 	if err != nil {
 		return err
@@ -356,17 +339,14 @@ func (s *store) snapshot(path string) {
 		return
 	}
 	s.save()
-	ns := newStore(snapshotDir, s.fileSize, 0, s.filesystem)
-	s.keys.Copy().Scan(func(name string, key *Key) bool {
-		if _, ok := ns.keys.Get(name); !ok {
-			return true
-		}
-		data, err := s.getEntryRaw(key)
+	ns := newStore(snapshotDir, s.fileSize, s.filesystem)
+	s.metadata.Copy().Scan(func(key string, meta *metadata) bool {
+		data, err := s.getEntryRaw(meta.key)
 		if err != nil {
 			log.Println("Snapshot get error: ", err)
 			return true
 		}
-		err = ns.putRaw(name, key, data)
+		err = ns.putRaw(key, meta, data)
 		if err != nil {
 			log.Println("Snapshot put error: ", err)
 			return true
@@ -400,20 +380,19 @@ func (s *store) close() error {
 		return err
 	}
 	indexData := &pb.Index{
-		Items: make([]*pb.Index_Item, 0, s.keys.Len()),
+		Items: make([]*pb.Index_Item, 0, s.metadata.Len()),
 	}
-	tx := newTx(s)
 	now := time.Now().UnixMilli()
-	s.keys.Copy().Scan(func(key string, k *Key) bool {
-		meta := tx.rLockKey(key)
-		if k.expired(now) {
+	s.metadata.Copy().Scan(func(key string, m *metadata) bool {
+		m.RLock()
+		defer m.RUnlock()
+		if m.expired(now) {
 			return true
 		}
 		indexData.Items = append(indexData.Items, &pb.Index_Item{
 			Key:  key,
-			Data: k.marshal(),
+			Data: m.marshal(),
 		})
-		meta.commit()
 		return true
 	})
 	data, err := proto.Marshal(indexData)
@@ -438,8 +417,7 @@ func (s *store) close() error {
 func (s *store) clear() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.keys.Clear()
-	s.values.Clear()
+	s.metadata.Clear()
 	err := s.aof.Truncate(0)
 	if err != nil {
 		return err

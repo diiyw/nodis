@@ -306,7 +306,7 @@ func config(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 
 func dbSize(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
-		conn.WriteInteger(int64(n.store.keys.Len()))
+		conn.WriteInteger(int64(n.store.metadata.Len()))
 	})
 }
 

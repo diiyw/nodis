@@ -144,11 +144,7 @@ func (n *Nodis) HSetNX(key string, field string, value []byte) int64 {
 			return nil
 		}
 		if !meta.isOk() {
-			h := n.newHash()
-			n.store.values.Set(key, h)
-			k := newKey()
-			n.store.keys.Set(key, k)
-			meta.set(k, h)
+			meta.setValue(n.newHash())
 		}
 		v = meta.value.(*hash.HashMap).HSet(field, value)
 		n.signalModifiedKey(key, meta)

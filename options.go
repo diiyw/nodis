@@ -31,7 +31,7 @@ type Options struct {
 	// FileSize is the size of each file. The default value is 1GB.
 	FileSize int64
 
-	// SnapshotDuration is the interval at which the database is snapshotted.
+	// SnapshotDuration is the interval at which the database is snapshot.
 	// Default 0 for disabling snapshot. and you can call Snapshot manually.
 	SnapshotDuration time.Duration
 
@@ -40,14 +40,10 @@ type Options struct {
 
 	// Synchronizer is the synchronizer to use. The default is nil and no synchronization is performed.
 	Synchronizer sync.Synchronizer
-
-	// MetaPoolSize is the key metadata pool size
-	MetaPoolSize int
 }
 
 var DefaultOptions = &Options{
 	Path:         "data",
 	FileSize:     FileSizeGB,
 	TidyDuration: 60 * time.Second,
-	MetaPoolSize: 10240,
 }

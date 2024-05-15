@@ -25,7 +25,7 @@ func (n *Nodis) Set(key string, value []byte) {
 	})
 }
 
-// GetSet
+// GetSet set a key with a value and return the old value
 func (n *Nodis) GetSet(key string, value []byte) []byte {
 	var v []byte
 	_ = n.exec(func(tx *Tx) error {
@@ -42,11 +42,11 @@ func (n *Nodis) GetSet(key string, value []byte) []byte {
 func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newStr)
-		meta.key.expiration = time.Now().UnixMilli()
-		meta.key.expiration += seconds * 1000
+		meta.expiration = time.Now().UnixMilli()
+		meta.expiration += seconds * 1000
 		meta.value.(*str.String).Set(value)
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value).Expiration(meta.key.expiration))
+		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value).Expiration(meta.expiration))
 		return nil
 	})
 }
@@ -55,10 +55,10 @@ func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
 func (n *Nodis) SetPX(key string, value []byte, milliseconds int64) {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newStr)
-		meta.key.expiration = time.Now().UnixMilli()
-		meta.key.expiration += milliseconds
+		meta.expiration = time.Now().UnixMilli()
+		meta.expiration += milliseconds
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value).Expiration(meta.key.expiration))
+		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value).Expiration(meta.expiration))
 		meta.value.(*str.String).Set(value)
 		return nil
 	})

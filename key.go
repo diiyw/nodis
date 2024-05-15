@@ -1,7 +1,6 @@
 package nodis
 
 import (
-	"encoding/binary"
 	"errors"
 	"math/rand"
 	"path/filepath"
@@ -13,65 +12,14 @@ import (
 	"github.com/diiyw/nodis/redis"
 )
 
-const (
-	KeyStateEmpty    uint8 = 0
-	KeyStateNormal   uint8 = 1
-	KeyStateModified uint8 = 2
-)
-
 type Key struct {
-	expiration int64
-	useTimes   uint64
-	offset     int64
-	size       uint32
-	fileId     uint16
-	valueType  ds.ValueType
-	state      uint8
+	offset int64
+	size   uint32
+	fileId uint16
 }
 
 func newKey() *Key {
-	k := &Key{}
-	k.state |= KeyStateModified
-	return k
-}
-
-func (k *Key) expired(now int64) bool {
-	if k == nil {
-		return false
-	}
-	return k.expiration != 0 && k.expiration <= now
-}
-
-// modified return if the key is modified
-func (k *Key) modified() bool {
-	return k.state&KeyStateModified == KeyStateModified
-}
-
-func (k *Key) reset() {
-	if k.state&KeyStateModified == KeyStateModified {
-		k.state ^= KeyStateModified
-		k.useTimes = 0
-	}
-}
-
-// marshal index to bytes
-func (k *Key) marshal() []byte {
-	var b [23]byte
-	binary.LittleEndian.PutUint64(b[0:8], uint64(k.offset))
-	binary.LittleEndian.PutUint64(b[8:16], uint64(k.expiration))
-	binary.LittleEndian.PutUint32(b[16:20], k.size)
-	binary.LittleEndian.PutUint16(b[20:22], k.fileId)
-	b[22] = uint8(k.valueType)
-	return b[:]
-}
-
-// unmarshal bytes to index
-func (k *Key) unmarshal(b []byte) {
-	k.offset = int64(binary.LittleEndian.Uint64(b[0:8]))
-	k.expiration = int64(binary.LittleEndian.Uint64(b[8:16]))
-	k.size = binary.LittleEndian.Uint32(b[16:20])
-	k.fileId = binary.LittleEndian.Uint16(b[20:22])
-	k.valueType = ds.ValueType(b[22])
+	return &Key{}
 }
 
 // Del a key
@@ -117,12 +65,12 @@ func (n *Nodis) Expire(key string, seconds int64) int64 {
 			v = 0
 			return nil
 		}
-		if meta.key.expiration == 0 {
-			meta.key.expiration = time.Now().UnixMilli()
+		if meta.expiration == 0 {
+			meta.expiration = time.Now().UnixMilli()
 		}
-		meta.key.expiration += seconds * 1000
+		meta.expiration += seconds * 1000
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
 		return nil
 	})
 	return v
@@ -140,12 +88,12 @@ func (n *Nodis) ExpirePX(key string, milliseconds int64) int64 {
 			v = 0
 			return nil
 		}
-		if meta.key.expiration == 0 {
-			meta.key.expiration = time.Now().UnixMilli()
+		if meta.expiration == 0 {
+			meta.expiration = time.Now().UnixMilli()
 		}
-		meta.key.expiration += milliseconds
+		meta.expiration += milliseconds
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
 		return nil
 	})
 	return v
@@ -160,13 +108,13 @@ func (n *Nodis) ExpireNX(key string, seconds int64) int64 {
 			v = 0
 			return nil
 		}
-		if meta.key.expiration != 0 {
+		if meta.expiration != 0 {
 			v = 0
 			return nil
 		}
-		meta.key.expiration = time.Now().UnixMilli() + seconds*1000
+		meta.expiration = time.Now().UnixMilli() + seconds*1000
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
 		return nil
 	})
 	return v
@@ -181,13 +129,13 @@ func (n *Nodis) ExpireXX(key string, seconds int64) int64 {
 			v = 0
 			return nil
 		}
-		if meta.key.expiration == 0 {
+		if meta.expiration == 0 {
 			v = 0
 			return nil
 		}
-		meta.key.expiration += seconds * 1000
+		meta.expiration += seconds * 1000
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
 		return nil
 	})
 	return v
@@ -202,15 +150,15 @@ func (n *Nodis) ExpireLT(key string, seconds int64) int64 {
 			v = 0
 			return nil
 		}
-		if meta.key.expiration == 0 {
+		if meta.expiration == 0 {
 			v = 0
 			return nil
 		}
 		ms := seconds * 1000
-		if meta.key.expiration > time.Now().UnixMilli()-ms {
-			meta.key.expiration -= ms
+		if meta.expiration > time.Now().UnixMilli()-ms {
+			meta.expiration -= ms
 			n.signalModifiedKey(key, meta)
-			n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+			n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
 		}
 		return nil
 	})
@@ -226,14 +174,14 @@ func (n *Nodis) ExpireGT(key string, seconds int64) int64 {
 			return nil
 		}
 		now := time.Now().UnixMilli()
-		if meta.key.expiration == 0 {
-			meta.key.expiration = now
+		if meta.expiration == 0 {
+			meta.expiration = now
 		}
 		ms := seconds * 1000
-		if meta.key.expiration < now+ms {
-			meta.key.expiration += ms
+		if meta.expiration < now+ms {
+			meta.expiration += ms
 			n.signalModifiedKey(key, meta)
-			n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+			n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
 			v = 1
 		}
 		return nil
@@ -250,9 +198,9 @@ func (n *Nodis) ExpireAt(key string, timestamp time.Time) int64 {
 			v = 0
 			return nil
 		}
-		meta.key.expiration = timestamp.UnixMilli()
+		meta.expiration = timestamp.UnixMilli()
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
 		return nil
 	})
 	return v
@@ -267,13 +215,13 @@ func (n *Nodis) ExpireAtNX(key string, timestamp time.Time) int64 {
 			v = 0
 			return nil
 		}
-		if meta.key.expiration != 0 {
+		if meta.expiration != 0 {
 			v = 0
 			return nil
 		}
-		meta.key.expiration = timestamp.UnixMilli()
+		meta.expiration = timestamp.UnixMilli()
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
 		return nil
 	})
 	return v
@@ -288,13 +236,13 @@ func (n *Nodis) ExpireAtXX(key string, timestamp time.Time) int64 {
 			v = 0
 			return nil
 		}
-		if meta.key.expiration != 0 {
+		if meta.expiration != 0 {
 			v = 0
 			return nil
 		}
-		meta.key.expiration = timestamp.UnixMilli()
+		meta.expiration = timestamp.UnixMilli()
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
 		return nil
 	})
 	return v
@@ -309,15 +257,15 @@ func (n *Nodis) ExpireAtLT(key string, timestamp time.Time) int64 {
 			v = 0
 			return nil
 		}
-		if meta.key.expiration != 0 {
+		if meta.expiration != 0 {
 			v = 0
 			return nil
 		}
 		unix := timestamp.UnixMilli()
-		if meta.key.expiration > unix {
-			meta.key.expiration = unix
+		if meta.expiration > unix {
+			meta.expiration = unix
 			n.signalModifiedKey(key, meta)
-			n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+			n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
 		}
 		return nil
 	})
@@ -334,13 +282,13 @@ func (n *Nodis) ExpireAtGT(key string, timestamp time.Time) int64 {
 			return nil
 		}
 		unix := timestamp.UnixMilli()
-		if meta.key.expiration == 0 {
-			meta.key.expiration = unix
+		if meta.expiration == 0 {
+			meta.expiration = unix
 		}
-		if meta.key.expiration < unix {
-			meta.key.expiration = unix
+		if meta.expiration < unix {
+			meta.expiration = unix
 			n.signalModifiedKey(key, meta)
-			n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.key.expiration))
+			n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
 		}
 		return nil
 	})
@@ -352,9 +300,9 @@ func (n *Nodis) Keys(pattern string) []string {
 	var keys []string
 	now := time.Now().UnixMilli()
 	n.store.mu.RLock()
-	n.store.keys.Scan(func(key string, k *Key) bool {
+	n.store.metadata.Scan(func(key string, m *metadata) bool {
 		matched, _ := filepath.Match(pattern, key)
-		if matched && !k.expired(now) {
+		if matched && !m.expired(now) {
 			keys = append(keys, key)
 		}
 		return true
@@ -413,15 +361,15 @@ func (n *Nodis) UnWatch(rn *redis.Conn, keys ...string) {
 // Keyspace gets the keyspace
 func (n *Nodis) Keyspace() (keys int64, expires int64, avgTTL int64) {
 	n.store.mu.Lock()
-	keys = int64(n.store.keys.Len())
 	now := time.Now().UnixMilli()
-	n.store.keys.Scan(func(key string, k *Key) bool {
+	n.store.metadata.Scan(func(key string, k *metadata) bool {
 		if k.expired(now) {
 			expires++
 		}
 		if k.expiration != 0 {
 			avgTTL += k.expiration - now
 		}
+		keys++
 		return true
 	})
 	if keys > 0 {
@@ -440,12 +388,12 @@ func (n *Nodis) TTL(key string) time.Duration {
 			v = -2
 			return nil
 		}
-		if meta.key.expiration == 0 {
+		if meta.expiration == 0 {
 			v = -1
 			return nil
 		}
-		s := meta.key.expiration / 1000
-		ns := (meta.key.expiration - s*1000) * 1000 * 1000
+		s := meta.expiration / 1000
+		ns := (meta.expiration - s*1000) * 1000 * 1000
 		v = time.Until(time.Unix(s, ns)).Round(time.Second)
 		return nil
 	})
@@ -459,15 +407,11 @@ func (n *Nodis) Rename(key, dstKey string) error {
 		if !meta.isOk() {
 			return errors.New("key not exists")
 		}
-		v, ok := n.store.values.Get(key)
-		if !ok {
-			return errors.New("key does not exist")
-		}
-		_ = tx.writeKey(dstKey, nil)
+		dstMeta := tx.writeKey(dstKey, nil)
 		tx.delKey(key)
-		n.store.values.Set(dstKey, v)
-		n.store.keys.Set(dstKey, newKey())
+		dstMeta.setValue(meta.value)
 		n.signalModifiedKey(key, meta)
+		n.signalModifiedKey(key, dstMeta)
 		n.notify(pb.NewOp(pb.OpType_Rename, key).DstKey(dstKey))
 		return nil
 	})
@@ -484,14 +428,10 @@ func (n *Nodis) RenameNX(key, dstKey string) error {
 		if !meta.isOk() {
 			return errors.New("key does not exist")
 		}
-		v, ok := n.store.values.Get(key)
-		if !ok {
-			return errors.New("key does not exist")
-		}
 		tx.delKey(key)
-		n.store.values.Set(dstKey, v)
-		n.store.keys.Set(dstKey, newKey())
+		dstMeta.setValue(meta.value)
 		n.signalModifiedKey(key, meta)
+		n.signalModifiedKey(key, dstMeta)
 		n.notify(pb.NewOp(pb.OpType_Rename, key).DstKey(dstKey))
 		return nil
 	})
@@ -514,7 +454,7 @@ func (n *Nodis) Type(key string) string {
 
 // Scan the keys
 func (n *Nodis) Scan(cursor int64, match string, count int64, typ ds.ValueType) (int64, []string) {
-	keyLen := int64(n.store.keys.Len())
+	keyLen := int64(n.store.metadata.Len())
 	if keyLen == 0 {
 		return 0, nil
 	}
@@ -525,7 +465,7 @@ func (n *Nodis) Scan(cursor int64, match string, count int64, typ ds.ValueType) 
 	now := time.Now().UnixMilli()
 	tx := newTx(n.store)
 	var iterCursor int64 = 0
-	n.store.keys.Scan(func(key string, k *Key) bool {
+	n.store.metadata.Scan(func(key string, m *metadata) bool {
 		iterCursor++
 		if cursor--; cursor > 0 {
 			return true
@@ -541,8 +481,8 @@ func (n *Nodis) Scan(cursor int64, match string, count int64, typ ds.ValueType) 
 		meta := tx.rLockKey(key)
 		defer meta.commit()
 		matched, _ := filepath.Match(match, key)
-		if matched && !k.expired(now) {
-			if typ != 0 && k.valueType != typ {
+		if matched && !m.expired(now) {
+			if typ != 0 && m.valueType != typ {
 				return true
 			}
 			keys = append(keys, key)
@@ -557,8 +497,8 @@ func (n *Nodis) RandomKey() string {
 	now := time.Now().UnixMilli()
 	var keys []string
 	n.store.mu.RLock()
-	n.store.keys.Scan(func(key string, k *Key) bool {
-		if !k.expired(now) {
+	n.store.metadata.Scan(func(key string, m *metadata) bool {
+		if !m.expired(now) {
 			keys = append(keys, key)
 		}
 		return true
@@ -578,11 +518,11 @@ func (n *Nodis) Persist(key string) int64 {
 		if !meta.isOk() {
 			return nil
 		}
-		if meta.key.expiration == 0 {
+		if meta.expiration == 0 {
 			return nil
 		}
 		v = 1
-		meta.key.expiration = 0
+		meta.expiration = 0
 		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Persist, key))
 		return nil
@@ -591,7 +531,7 @@ func (n *Nodis) Persist(key string) int64 {
 }
 
 func (n *Nodis) signalModifiedKey(key string, meta *metadata) {
-	meta.key.state |= KeyStateModified
+	meta.state |= KeyStateModified
 	n.store.watchMu.RLock()
 	clients, ok := n.store.watchedKeys.Get(key)
 	if ok {

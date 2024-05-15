@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/diiyw/nodis/ds"
-	"github.com/diiyw/nodis/utils"
 )
 
 type Tx struct {
@@ -19,92 +18,89 @@ func newTx(store *store) *Tx {
 	}
 }
 
-func (tx *Tx) spread(key string) *metadata {
-	hashCode := utils.Fnv32(key)
-	tableSize := uint32(tx.store.metaPoolSize)
-	return tx.store.metaPool[(tableSize-1)&hashCode]
-}
-
 func (tx *Tx) lockKey(key string) *metadata {
-	meta := tx.spread(key)
-	meta.Lock()
-	meta.writeable = true
-	return meta
+	m, ok := tx.store.metadata.Get(key)
+	if ok {
+		m.Lock()
+		m.writeable = true
+		tx.lockedMetas = append(tx.lockedMetas, m)
+		return m
+	}
+	tx.store.mu.Lock()
+	m = newMetadata(newKey(), nil, true)
+	m.Lock()
+	tx.store.metadata.Set(key, m)
+	tx.lockedMetas = append(tx.lockedMetas, m)
+	tx.store.mu.Unlock()
+	return m
 }
 
 func (tx *Tx) rLockKey(key string) *metadata {
-	meta := tx.spread(key)
-	meta.RLock()
-	return meta
+	m, ok := tx.store.metadata.Get(key)
+	if ok {
+		m.RLock()
+		tx.lockedMetas = append(tx.lockedMetas, m)
+		return m
+	}
+	tx.store.mu.Lock()
+	m = newMetadata(newKey(), nil, false)
+	m.RLock()
+	tx.store.metadata.Set(key, m)
+	tx.lockedMetas = append(tx.lockedMetas, m)
+	tx.store.mu.Unlock()
+	return m
 }
 
-func (tx *Tx) newKey(meta *metadata, key string, newFn func() ds.Value) *metadata {
+func (tx *Tx) newKey(m *metadata, key string, newFn func() ds.Value) *metadata {
 	if newFn != nil {
 		tx.store.mu.Lock()
 		defer tx.store.mu.Unlock()
-		d := newFn()
-		if d == nil {
-			return meta
+		value := newFn()
+		if value == nil {
+			return m
 		}
-		k := newKey()
-		tx.store.keys.Set(key, k)
-		tx.store.values.Set(key, d)
-		meta.set(k, d)
-		meta.key.state |= KeyStateModified
-		return meta
+		m.key = newKey()
+		m.setValue(value)
+		m.state |= KeyStateModified
+		tx.store.metadata.Set(key, m)
+		return m
 	}
-	return meta.empty()
+	return m
 }
 
 func (tx *Tx) delKey(key string) {
 	tx.store.mu.Lock()
-	tx.store.keys.Delete(key)
-	tx.store.values.Delete(key)
+	tx.store.metadata.Delete(key)
 	tx.store.mu.Unlock()
 }
 
 func (tx *Tx) writeKey(key string, newFn func() ds.Value) *metadata {
-	meta := tx.lockKey(key)
-	tx.lockedMetas = append(tx.lockedMetas, meta)
-	tx.store.mu.RLock()
-	k, ok := tx.store.keys.Get(key)
-	if ok && !k.expired(time.Now().UnixMilli()) {
+	m := tx.lockKey(key)
+	if m.isOk() && !m.expired(time.Now().UnixMilli()) {
 		// not expired
-		d, ok := tx.store.values.Get(key)
-		if ok {
-			meta.set(k, d)
-			tx.store.mu.RUnlock()
-			return meta
+		if m.value != nil {
+			return m
 		}
 		// if not found in memory, read from storage
-		meta = tx.store.fromStorage(k, meta)
-		tx.store.mu.RUnlock()
-		return meta
+		m = tx.store.fromStorage(m)
+		return m
 	}
-	tx.store.mu.RUnlock()
-	meta.empty()
-	return tx.newKey(meta, key, newFn)
+	return tx.newKey(m, key, newFn)
 }
 
 func (tx *Tx) readKey(key string) *metadata {
-	meta := tx.rLockKey(key)
-	tx.lockedMetas = append(tx.lockedMetas, meta)
-	tx.store.mu.RLock()
-	defer tx.store.mu.RUnlock()
-	k, ok := tx.store.keys.Get(key)
-	if ok {
-		if k.expired(time.Now().UnixMilli()) {
-			return meta.empty()
+	m := tx.rLockKey(key)
+	if m.isOk() {
+		if m.expired(time.Now().UnixMilli()) {
+			return m.empty()
 		}
-		value, ok := tx.store.values.Get(key)
-		if !ok {
+		if m.value == nil {
 			// read from storage
-			return tx.store.fromStorage(k, meta)
+			return tx.store.fromStorage(m)
 		}
-		meta.set(k, value)
-		return meta
+		return m
 	}
-	return meta.empty()
+	return m.empty()
 }
 
 func (tx *Tx) commit() {

@@ -32,9 +32,6 @@ func Open(opt *Options) *Nodis {
 	if opt.Filesystem == nil {
 		opt.Filesystem = &fs.Memory{}
 	}
-	if opt.MetaPoolSize == 0 {
-		opt.MetaPoolSize = 10240
-	}
 	n := &Nodis{
 		options: opt,
 	}
@@ -49,7 +46,7 @@ func Open(opt *Options) *Nodis {
 	} else if !isDir {
 		panic("Path is not a directory")
 	}
-	n.store = newStore(opt.Path, opt.FileSize, opt.MetaPoolSize, opt.Filesystem)
+	n.store = newStore(opt.Path, opt.FileSize, opt.Filesystem)
 	go func() {
 		if opt.TidyDuration != 0 {
 			for {
@@ -104,7 +101,7 @@ func (n *Nodis) GetEntry(key string) (data []byte) {
 		if !meta.isOk() {
 			return nil
 		}
-		var entity = newEntry(key, meta.value, meta.key.expiration)
+		var entity = newEntry(key, meta.value, meta.expiration)
 		data, _ = entity.Marshal()
 		return nil
 	})
