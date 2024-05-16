@@ -198,7 +198,7 @@ func (n *Nodis) patch(op *pb.Op) error {
 	case pb.OpType_SRem:
 		n.SRem(op.Key, op.Operation.Members...)
 	case pb.OpType_Set:
-		n.Set(op.Key, op.Operation.Value)
+		n.Set(op.Key, op.Operation.Value, op.Operation.KeepTTL)
 	case pb.OpType_ZAdd:
 		n.ZAdd(op.Key, op.Operation.Member, op.Operation.Score)
 	case pb.OpType_ZClear:

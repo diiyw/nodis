@@ -158,6 +158,12 @@ func (o *Op) Mode(mode int64) *Op {
 	return o
 }
 
+// KeepTTL set the keep ttl
+func (o *Op) KeepTTL(keepTTL bool) *Op {
+	o.Operation.KeepTTL = keepTTL
+	return o
+}
+
 func (o *Op) Reset() {
 	o.Operation.Reset()
 	opPool.Put(o)

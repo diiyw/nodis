@@ -10,17 +10,17 @@ func TestStr_Set(t *testing.T) {
 		Path:         "testdata",
 		TidyDuration: 60 * time.Second,
 	})
-	n.Set("a", []byte("b"))
+	n.Set("a", []byte("b"), false)
 	v := n.Get("a")
 	if string(v) != "b" {
 		t.Errorf("Set failed expected b got `%s`", string(v))
 	}
-	n.Set("a", []byte("b"))
+	n.Set("a", []byte("b"), false)
 	v = n.Get("a")
 	if string(v) != "b" {
 		t.Errorf("Set failed expected b got `%s`", string(v))
 	}
-	n.Set("a", []byte("b"))
+	n.Set("a", []byte("b"), false)
 	v = n.Get("a")
 	if string(v) != "b" {
 		t.Errorf("Set failed expected b got `%s`", string(v))
@@ -56,6 +56,6 @@ func TestStr_BitCount(t *testing.T) {
 	n.SetBit("a", 6, true)
 	n.SetBit("a", 7, true)
 	if n.BitCount("a", 0, 0, true) != 8 {
-		t.Errorf("BitCount failed expected 8 got %d", n.BitCount("a", 0, 0,true))
+		t.Errorf("BitCount failed expected 8 got %d", n.BitCount("a", 0, 0, true))
 	}
 }

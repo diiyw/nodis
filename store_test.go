@@ -275,7 +275,7 @@ func TestStore_parseValue(t *testing.T) {
 		Path: "testdata",
 	}
 	n := Open(opt)
-	n.Set("test", []byte("test"))
+	n.Set("test", []byte("test"), false)
 	data := n.GetEntry("test")
 	value, err := n.store.parseValue(data)
 	if err != nil {

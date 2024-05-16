@@ -77,6 +77,8 @@ func getCommand(name string) func(n *Nodis, conn *redis.Conn, cmd redis.Command)
 		return randomKey
 	case "TTL":
 		return ttl
+	case "PTTL":
+		return pTtl
 	case "PERSIST":
 		return Persist
 	case "RENAME":
@@ -557,6 +559,25 @@ func ttl(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	})
 }
 
+func pTtl(n *Nodis, conn *redis.Conn, cmd redis.Command) {
+	if len(cmd.Args) == 0 {
+		conn.WriteError("PTTL requires at least one argument")
+		return
+	}
+	execCommand(conn, func() {
+		v := n.PTTL(cmd.Args[0])
+		if v == -1 {
+			conn.WriteInteger(-1)
+			return
+		}
+		if v == -2 {
+			conn.WriteInteger(-2)
+			return
+		}
+		conn.WriteInteger(v)
+	})
+}
+
 func Persist(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("PERSIST requires at least one argument")
@@ -675,11 +696,17 @@ func setString(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			get = n.Get(key)
 		}
 		if cmd.Options.NX > 1 {
-			n.SetNX(key, value)
+			if !n.SetNX(key, value, cmd.Options.KEEPTTL > 1) {
+				conn.WriteBulkNull()
+				return
+			}
 		} else if cmd.Options.XX > 1 {
-			n.SetXX(key, value)
+			if !n.SetXX(key, value, cmd.Options.KEEPTTL > 1) {
+				conn.WriteBulkNull()
+				return
+			}
 		} else {
-			n.Set(key, value)
+			n.Set(key, value, cmd.Options.KEEPTTL > 1)
 		}
 		if cmd.Options.EX > 1 {
 			seconds, _ := strconv.ParseInt(cmd.Args[cmd.Options.EX], 10, 64)
@@ -689,13 +716,19 @@ func setString(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		}
 		if cmd.Options.PX > 1 {
 			milliseconds, _ := strconv.ParseInt(cmd.Args[cmd.Options.PX], 10, 64)
-			n.ExpirePX(key, milliseconds)
+			if n.ExpirePX(key, milliseconds) == 0 {
+				conn.WriteBulkNull()
+				return
+			}
 			conn.WriteOK()
 			return
 		}
 		if cmd.Options.EXAT > 1 {
 			seconds, _ := strconv.ParseInt(cmd.Args[cmd.Options.EXAT], 10, 64)
-			n.ExpireAt(key, time.Unix(seconds, 0))
+			if n.ExpireAt(key, time.Unix(seconds, 0)) == 0 {
+				conn.WriteBulkNull()
+				return
+			}
 			conn.WriteOK()
 			return
 		}
@@ -722,7 +755,7 @@ func mSet(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	execCommand(conn, func() {
 		for i := 0; i < len(cmd.Args); i += 2 {
-			n.Set(cmd.Args[i], []byte(cmd.Args[i+1]))
+			n.Set(cmd.Args[i], []byte(cmd.Args[i+1]), false)
 		}
 		conn.WriteOK()
 	})
@@ -762,7 +795,7 @@ func setnx(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		key := cmd.Args[0]
 		value := []byte(cmd.Args[1])
-		if n.SetNX(key, value) {
+		if n.SetNX(key, value, false) {
 			conn.WriteInteger(1)
 			return
 		}

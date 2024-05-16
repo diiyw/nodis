@@ -15,12 +15,15 @@ func (n *Nodis) newStr() ds.Value {
 }
 
 // Set a key with a value and a TTL
-func (n *Nodis) Set(key string, value []byte) {
+func (n *Nodis) Set(key string, value []byte, keepTTL bool) {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newStr)
 		meta.value.(*str.String).Set(value)
+		if !keepTTL {
+			meta.expiration = 0
+		}
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value))
+		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value).KeepTTL(keepTTL))
 		return nil
 	})
 }
@@ -42,9 +45,7 @@ func (n *Nodis) GetSet(key string, value []byte) []byte {
 func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newStr)
-		if meta.expiration == 0 {
-			meta.expiration = time.Now().UnixMilli()
-		}
+		meta.expiration = time.Now().UnixMilli()
 		meta.expiration += seconds * 1000
 		meta.value.(*str.String).Set(value)
 		n.signalModifiedKey(key, meta)
@@ -57,9 +58,7 @@ func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
 func (n *Nodis) SetPX(key string, value []byte, milliseconds int64) {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newStr)
-		if meta.expiration == 0 {
-			meta.expiration = time.Now().UnixMilli()
-		}
+		meta.expiration = time.Now().UnixMilli()
 		meta.expiration += milliseconds
 		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value).Expiration(meta.expiration))
@@ -69,7 +68,7 @@ func (n *Nodis) SetPX(key string, value []byte, milliseconds int64) {
 }
 
 // SetNX set a key with a value if it does not exist
-func (n *Nodis) SetNX(key string, value []byte) bool {
+func (n *Nodis) SetNX(key string, value []byte, keepTTL bool) bool {
 	var ok bool
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
@@ -77,9 +76,12 @@ func (n *Nodis) SetNX(key string, value []byte) bool {
 			return nil
 		}
 		meta = tx.newKey(meta, key, n.newStr)
+		if !keepTTL {
+			meta.expiration = 0
+		}
 		meta.value.(*str.String).Set(value)
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value))
+		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value).KeepTTL(keepTTL))
 		ok = true
 		return nil
 	})
@@ -87,16 +89,19 @@ func (n *Nodis) SetNX(key string, value []byte) bool {
 }
 
 // SetXX set a key with a value if it exists
-func (n *Nodis) SetXX(key string, value []byte) bool {
+func (n *Nodis) SetXX(key string, value []byte, keepTTL bool) bool {
 	var ok bool
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
 		if !meta.isOk() {
 			return nil
 		}
-		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value))
 		meta.value.(*str.String).Set(value)
+		if !keepTTL {
+			meta.expiration = 0
+		}
+		n.signalModifiedKey(key, meta)
+		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value).KeepTTL(keepTTL))
 		ok = true
 		return nil
 	})
@@ -321,6 +326,6 @@ func (n *Nodis) MSet(pairs ...string) {
 		return
 	}
 	for i := 0; i < len(pairs); i += 2 {
-		n.Set(pairs[i], unsafe.Slice(unsafe.StringData(pairs[i+1]), len(pairs[i+1])))
+		n.Set(pairs[i], unsafe.Slice(unsafe.StringData(pairs[i+1]), len(pairs[i+1])), false)
 	}
 }

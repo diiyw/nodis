@@ -66,9 +66,7 @@ func (n *Nodis) Expire(key string, seconds int64) int64 {
 			v = 0
 			return nil
 		}
-		if meta.expiration == 0 {
-			meta.expiration = time.Now().UnixMilli()
-		}
+		meta.expiration = time.Now().UnixMilli()
 		meta.expiration += seconds * 1000
 		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
@@ -396,6 +394,25 @@ func (n *Nodis) TTL(key string) time.Duration {
 		s := meta.expiration / 1000
 		ns := (meta.expiration - s*1000) * 1000 * 1000
 		v = time.Until(time.Unix(s, ns)).Round(time.Second)
+		return nil
+	})
+	return v
+}
+
+// PTTL gets the TTL in milliseconds
+func (n *Nodis) PTTL(key string) int64 {
+	var v int64
+	_ = n.exec(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			v = -2
+			return nil
+		}
+		if meta.expiration == 0 {
+			v = -1
+			return nil
+		}
+		v = meta.expiration - time.Now().UnixMilli()
 		return nil
 	})
 	return v

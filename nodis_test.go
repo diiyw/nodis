@@ -31,7 +31,7 @@ func TestNodis_OpenAndCloseBigdata10000(t *testing.T) {
 	n := Open(&opt)
 	for i := 0; i < 10000; i++ {
 		is := strconv.Itoa(i)
-		n.Set(is, []byte(is))
+		n.Set(is, []byte(is), false)
 	}
 	for i := 10000; i < 20000; i++ {
 		n.ZAdd("zset", strconv.Itoa(i), float64(i))
@@ -81,7 +81,7 @@ func TestNodis_Snapshot(t *testing.T) {
 		Path: "testdata",
 	}
 	n := Open(opt)
-	n.Set("test", []byte("test"))
+	n.Set("test", []byte("test"), false)
 	n.Snapshot("testdata")
 	_ = n.Close()
 }
@@ -92,10 +92,10 @@ func TestNodis_SnapshotChanged(t *testing.T) {
 		Path: "testdata",
 	}
 	n := Open(opt)
-	n.Set("test", []byte("test"))
+	n.Set("test", []byte("test"), false)
 	n.Snapshot(opt.Path)
 	time.Sleep(time.Second)
-	n.Set("test", []byte("test_new"))
+	n.Set("test", []byte("test_new"), false)
 	n.Snapshot(opt.Path)
 	_ = n.Close()
 }
@@ -129,7 +129,7 @@ func TestNodis_Clear(t *testing.T) {
 		Path: "testdata",
 	}
 	n := Open(opt)
-	n.Set("test", []byte("test"))
+	n.Set("test", []byte("test"), false)
 	n.Clear()
 	v := n.Get("test")
 	if v != nil {
@@ -212,7 +212,7 @@ func TestNodis_SetEntity(t *testing.T) {
 		Path: "testdata",
 	}
 	n := Open(opt)
-	n.Set("test", []byte("test"))
+	n.Set("test", []byte("test"), false)
 	data := n.GetEntry("test")
 	n.Clear()
 	v := n.Get("test")
@@ -236,13 +236,13 @@ func TestNodis_Stick(t *testing.T) {
 		Path: "testdata",
 	}
 	n := Open(opt)
-	n.Set("test", []byte("test"))
+	n.Set("test", []byte("test"), false)
 	n.Stick([]string{"test"}, func(op *pb.Operation) {
 		if op == nil || string(op.Value) != "test_new" {
 			t.Errorf("Stick() = %v, want %v", op, "test_new")
 		}
 	})
-	n.Set("test", []byte("test_new"))
+	n.Set("test", []byte("test_new"), false)
 	time.Sleep(time.Second)
 }
 
@@ -252,14 +252,14 @@ func TestNodis_UnStick(t *testing.T) {
 		Path: "testdata",
 	}
 	n := Open(opt)
-	n.Set("test", []byte("test"))
+	n.Set("test", []byte("test"), false)
 	id := n.Stick([]string{"test"}, func(op *pb.Operation) {
 		if op == nil || string(op.Value) != "test_new" {
 			t.Errorf("Stick() = %v, want %v", op, "test_new")
 		}
 	})
 	n.UnStick(id)
-	n.Set("test", []byte("test_new"))
+	n.Set("test", []byte("test_new"), false)
 	time.Sleep(time.Second)
 }
 
@@ -269,7 +269,7 @@ func TestNodis_OpenAndClose(t *testing.T) {
 		Path: "testdata",
 	}
 	n := Open(opt)
-	n.Set("str", []byte("set"))
+	n.Set("str", []byte("set"), false)
 	n.ZAdd("zset", "zset", 1)
 	n.HSet("hset", "hset", []byte("hset"))
 	n.LPush("lpush", []byte("lpush"))

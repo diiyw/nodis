@@ -12,6 +12,6 @@ func main() {
 	n := nodis.Open(opt)
 	defer n.Close()
 	// Set a key-value pair
-	n.Set("echo", []byte("hello world"))
+	n.Set("echo", []byte("hello world"), false)
 	fmt.Println("Set key-value pair: ", string(n.Get("echo")))
 }

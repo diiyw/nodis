@@ -1,11 +1,12 @@
 # Nodis
+
 ![GitHub top language](https://img.shields.io/github/languages/top/diiyw/nodis) ![GitHub Release](https://img.shields.io/github/v/release/diiyw/nodis)
+
 <div class="column" align="left">
   <a href="https://godoc.org/github.com/diiyw/nodis"><img src="https://godoc.org/github.com/diiyw/nodis?status.svg" /></a>
   <a href="https://goreportcard.com/report/github.com/diiyw/nodis"><img src="https://goreportcard.com/badge/github.com/diiyw/nodis" /></a>
   <a href="https://codecov.io/gh/diiyw/nodis"><img src="https://codecov.io/gh/diiyw/nodis/branch/main/graph/badge.svg?token=CupujOXpbe"/></a>
 </div>
-
 
 English | [简体中文](https://github.com/diiyw/nodis/blob/main/README_zh-cn.md)
 
@@ -21,6 +22,7 @@ Nodis is a Redis implementation using the Golang programming language. This impl
 - Sorted Set
 
 ## Key Features
+
 - **Fast and Embeddable**: The Golang-based implementation is designed to be fast and easily embeddable within your applications.
 - **Low Memory Usage**: The system only stores hot data in memory, minimizing the overall memory footprint.
 - **Snapshot and WAL for Data Storage**: This Redis implementation supports snapshot and write-ahead logging (WAL) mechanisms for reliable data storage.
@@ -30,33 +32,39 @@ Nodis is a Redis implementation using the Golang programming language. This impl
 - **Redis Protocol Compatibility**: As of version 1.5.0, this Redis implementation fully supports the original Redis protocol, ensuring seamless integration with existing Redis clients.
 
 ## Supported Commands
+
 | **Client Handling** | **Configuration** | **Key Commands** | **String Commands** | **Set Commands** | **Hash Commands** | **List Commands** | **Sorted Set Commands** |
-|---------------------|-----------------|-----------------|---------------------|-----------------|-----------------|------------------|----------------|
-| CLIENT              | FLUSHALL       	| DEL             | GET                 | SADD            | HSET            | LPUSH            | ZADD                  |
-| PING                | FLUSHDB     	| EXISTS          | SET                 | SSCAN           | HGET            | RPUSH            | ZCARD                 |
-| QUIT                | SAVE       		| EXPIRE          | INCR                | SCARD           | HDEL            | LPOP             | ZRANK                 |
-| ECHO                | INFO          	| EXPIREAT        | DECR                | SPOP            | HLEN            | RPOP             | ZREVRANK              |
-| DBSIZE              |             	| KEYS            | SETBIT              | SDIFF           | HKEYS           | LLEN             | ZSCORE                |
-| MULTI               |                 | TTL             | GETBIT              | SINTER          | HEXISTS         | LINDEX           | ZINCRBY               |
-| DISCARD             |                 | RENAME          | INCR              	| SISMEMBER       | HGETALL         | LINSERT          | ZRANGE                |
-| EXEC                |                 | TYPE            | DESR                | SMEMBERS        | HINCRBY         | LPUSHX           | ZREVRANGE             |
-|                     |                 | SCAN            | SETEX               | SREM            | HICRBYFLOAT    	| RPUSHX           | ZRANGEBYSCORE         |
-|                     |                 | RANDOMKEY       | INCRBY              | SMOVE           | HSETNX          | LREM             | ZREVRANGEBYSCORE      |
-|                     |                 | RENAMEEX        | DECRBY              | SRANDMEMBER     | HMGET           | LSET             | ZREM                  |
-|                     |                 | PERSIST         | SETNX               | SINTERSTORE     | HMSET           | LRANGE           | ZREMRANGEBYRANK       |
-|                     |                 |                 | INCRBYFLOAT         | SUNIONSTORE     | HCLEAR          | LPOPRPUSH        | ZREMRANGEBYSCORE      |
-|                     |                 |                 | APPEND              |                 | HSCAN           | RPOPLPUSH        | ZCLEAR                |
-|                     |                 |                 | GETRANGE            |                 | HVALS           | BLPOP            | ZEXISTS               |
-|                     |                 |                 | STRLEN              |                 | HSTRLEN         | BRPOP            | ZUNIONSTORE           |
-|                     |                 |                 | SETRANGE            |                 |                 |                  | ZINTERSTORE		   |
+| ------------------- | ----------------- | ---------------- | ------------------- | ---------------- | ----------------- | ----------------- | ----------------------- |
+| CLIENT              | FLUSHALL          | DEL              | GET                 | SADD             | HSET              | LPUSH             | ZADD                    |
+| PING                | FLUSHDB           | EXISTS           | SET                 | SSCAN            | HGET              | RPUSH             | ZCARD                   |
+| QUIT                | SAVE              | EXPIRE           | INCR                | SCARD            | HDEL              | LPOP              | ZRANK                   |
+| ECHO                | INFO              | EXPIREAT         | DECR                | SPOP             | HLEN              | RPOP              | ZREVRANK                |
+| DBSIZE              |                   | KEYS             | SETBIT              | SDIFF            | HKEYS             | LLEN              | ZSCORE                  |
+| MULTI               |                   | TTL              | GETBIT              | SINTER           | HEXISTS           | LINDEX            | ZINCRBY                 |
+| DISCARD             |                   | RENAME           | INCR                | SISMEMBER        | HGETALL           | LINSERT           | ZRANGE                  |
+| EXEC                |                   | TYPE             | DESR                | SMEMBERS         | HINCRBY           | LPUSHX            | ZREVRANGE               |
+|                     |                   | SCAN             | SETEX               | SREM             | HICRBYFLOAT       | RPUSHX            | ZRANGEBYSCORE           |
+|                     |                   | RANDOMKEY        | INCRBY              | SMOVE            | HSETNX            | LREM              | ZREVRANGEBYSCORE        |
+|                     |                   | RENAMEEX         | DECRBY              | SRANDMEMBER      | HMGET             | LSET              | ZREM                    |
+|                     |                   | PERSIST          | SETNX               | SINTERSTORE      | HMSET             | LRANGE            | ZREMRANGEBYRANK         |
+|                     |                   | PTTL             | INCRBYFLOAT         | SUNIONSTORE      | HCLEAR            | LPOPRPUSH         | ZREMRANGEBYSCORE        |
+|                     |                   |                  | APPEND              |                  | HSCAN             | RPOPLPUSH         | ZCLEAR                  |
+|                     |                   |                  | GETRANGE            |                  | HVALS             | BLPOP             | ZEXISTS                 |
+|                     |                   |                  | STRLEN              |                  | HSTRLEN           | BRPOP             | ZUNIONSTORE             |
+|                     |                   |                  | SETRANGE            |                  |                   |                   | ZINTERSTORE             |
+
 ## Get Started
+
 ```bash
  go get github.com/diiyw/nodis@latest
 ```
+
 Or use test version
+
 ```bash
  go get github.com/diiyw/nodis@main
 ```
+
 ```go
 package main
 
@@ -68,16 +76,18 @@ func main() {
 	n := nodis.Open(opt)
 	defer n.Close()
 	// Set a key-value pair
-	n.Set("key", []byte("value"))
+	n.Set("key", []byte("value"),false)
 	n.LPush("list", []byte("value1"))
 }
 ```
+
 ## Examples
 
 <details>
 	<summary> Watch changes</summary>
 
-Server: 
+Server:
+
 ```go
 package main
 
@@ -108,11 +118,13 @@ func main() {
 	}
 }
 ```
+
 - Browser client built with WebAssembly
 
 ```bash
 GOOS=js GOARCH=wasm go build -o test.wasm
 ```
+
 ```go
 package main
 
@@ -139,11 +151,12 @@ func main() {
 	select {}
 }
 ```
+
 </details>
 <details>
 	<summary> Simple Redis Server</summary>
 
-```go	
+```go
 package main
 
 import (
@@ -161,6 +174,7 @@ func main() {
 	}
 }
 ```
+
 You can use redis-cli to connect to the server.
 
 ```bash
@@ -171,6 +185,7 @@ redis-cli -p 6380
 </details>
 
 ## Benchmark
+
 <details>
 	<summary>Embed benchmark</summary>
 
@@ -197,7 +212,7 @@ Linux VM: 4C/8GB
 ```bash
 goos: linux
 goarch: amd64
-pkg: github.com/diiyw/nodis/bench             
+pkg: github.com/diiyw/nodis/bench
 BenchmarkSet-4        	  806912	      1658 ns/op	     543 B/op	       7 allocs/op
 BenchmarkGet-4        	 5941904	       190.6 ns/op	       7 B/op	       0 allocs/op
 BenchmarkLPush-4      	  852932	      1757 ns/op	     615 B/op	       9 allocs/op
@@ -215,7 +230,7 @@ BenchmarkHGet-4       	 4442625	       243.4 ns/op	       7 B/op	       0 allocs
 	<summary>Redis benchmark tool</summary>
 
 ```bash
-redis-benchmark -p 6380 -t set,get,lpush,lpop,sadd,smembers,zadd,zrank,hset,hget -n 100000 -q   
+redis-benchmark -p 6380 -t set,get,lpush,lpop,sadd,smembers,zadd,zrank,hset,hget -n 100000 -q
 ```
 
 ```
@@ -226,7 +241,9 @@ LPOP: 92165.90 requests per second
 SADD: 91911.76 requests per second
 HSET: 93023.25 requests per second
 ```
+
 </details>
 
 ## Note
+
 If you want to persist data, please make sure to call the `Close()` method when your application exits.
