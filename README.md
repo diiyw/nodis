@@ -9,9 +9,7 @@
 
 English | [简体中文](https://github.com/diiyw/nodis/blob/main/README_zh-cn.md)
 
-Redis re-implemented using golang. 
-Simple way to embed in your application or as a standalone server.
-Supported commands are compatible with Redis. testing code using [phpredis](https://github.com/phpredis/phpredis/tree/develop/tests).
+Nodis is a Redis implementation using the Golang programming language. This implementation provides a simple way to embed Redis functionality directly into your application or run it as a standalone server. The supported commands are compatible with the original Redis protocol, allowing you to use existing Redis clients like goredis for testing and integration.
 
 ## Supported Data Types
 
@@ -22,15 +20,14 @@ Supported commands are compatible with Redis. testing code using [phpredis](http
 - Set
 - Sorted Set
 
-## Features
-
-- Fast and embeddable
-- Low memory used, only hot data stored in memory
-- Snapshot and WAL for data storage.
-- Support custom data storage as backend.(e.g. S3, Browser, etc.)
-- Running on browser with WebAssembly. (^v1.2.0)
-- Support watch changes from remote. (^v1.2.0)
-- Support redis protocol. (^v1.5.0)
+## Key Features
+- **Fast and Embeddable**: The Golang-based implementation is designed to be fast and easily embeddable within your applications.
+- **Low Memory Usage**: The system only stores hot data in memory, minimizing the overall memory footprint.
+- **Snapshot and WAL for Data Storage**: This Redis implementation supports snapshot and write-ahead logging (WAL) mechanisms for reliable data storage.
+- **Custom Data Storage Backends**: You can integrate custom data storage backends, such as Amazon S3, browser-based storage, and more.
+- **Browser Support with WebAssembly**: Starting from version 1.2.0, this Redis implementation can run directly in the browser using WebAssembly.
+- **Remote Change Monitoring**: From version 1.2.0 onwards, the system supports watching for changes from remote sources.
+- **Redis Protocol Compatibility**: As of version 1.5.0, this Redis implementation fully supports the original Redis protocol, ensuring seamless integration with existing Redis clients.
 
 ## Supported Commands
 | **Client Handling** | **Configuration** | **Key Commands** | **String Commands** | **Set Commands** | **Hash Commands** | **List Commands** | **Sorted Set Commands** |
