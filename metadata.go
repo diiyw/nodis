@@ -35,7 +35,7 @@ func newMetadata(key *Key, value ds.Value, writeable bool) *metadata {
 
 func (m *metadata) expired(now int64) bool {
 	if m == nil {
-		return false
+		return true
 	}
 	return m.expiration != 0 && m.expiration <= now
 }
@@ -51,6 +51,7 @@ func (m *metadata) modified() bool {
 // reset the key state
 func (m *metadata) reset() {
 	m.state = KeyStateNormal
+	m.useTimes = 0
 }
 
 func (m *metadata) setValue(value ds.Value) {
@@ -59,11 +60,13 @@ func (m *metadata) setValue(value ds.Value) {
 	m.valueType = value.Type()
 }
 
-// empty the key
+// empty copy the metadata to empty
 func (m *metadata) empty() *metadata {
-	return &metadata{
-		RWMutex: m.RWMutex,
+	newM := &metadata{}
+	if m != nil {
+		newM.RWMutex = m.RWMutex
 	}
+	return newM
 }
 
 func (m *metadata) marshal() []byte {
@@ -91,7 +94,7 @@ func (m *metadata) isOk() bool {
 
 func (m *metadata) commit() {
 	if m.RWMutex == nil {
-		// emptyMetadata
+		// empty metadata
 		return
 	}
 	if m.writeable {

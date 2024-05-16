@@ -92,9 +92,10 @@ func TestList_BLPop(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{Path: "testdata"})
 	go func() {
+		time.Sleep(time.Second)
 		n.LPush("list", []byte("value"))
 	}()
-	_, v := n.BLPop(time.Second, "list")
+	_, v := n.BLPop(time.Second*2, "list")
 	if string(v) != "value" {
 		t.Error("BLPop failed excepted value got nil")
 	}

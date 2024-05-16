@@ -129,7 +129,7 @@ func main() {
 	opt.Filesystem = &fs.Memory{}
 	opt.Synchronizer = sync.NewWebsocket()
 	n := nodis.Open(opt)
-	n.Watch([]string{"*"}, func(op *pb.Operation) {
+	n.Stick([]string{"*"}, func(op *pb.Operation) {
 		fmt.Println("Subscribe: ", op.Key)
 	})
 	err := n.Subscribe("ws://127.0.0.1:6380")

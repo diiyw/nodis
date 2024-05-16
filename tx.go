@@ -1,6 +1,7 @@
 package nodis
 
 import (
+	"sync"
 	"time"
 
 	"github.com/diiyw/nodis/ds"
@@ -19,53 +20,48 @@ func newTx(store *store) *Tx {
 }
 
 func (tx *Tx) lockKey(key string) *metadata {
+	tx.store.mu.RLock()
 	m, ok := tx.store.metadata.Get(key)
+	tx.store.mu.RUnlock()
 	if ok {
 		m.Lock()
 		m.writeable = true
 		tx.lockedMetas = append(tx.lockedMetas, m)
+		m.useTimes++
 		return m
 	}
-	tx.store.mu.Lock()
-	m = newMetadata(newKey(), nil, true)
-	m.Lock()
-	tx.store.metadata.Set(key, m)
-	tx.lockedMetas = append(tx.lockedMetas, m)
-	tx.store.mu.Unlock()
-	return m
+	return m.empty()
 }
 
 func (tx *Tx) rLockKey(key string) *metadata {
+	tx.store.mu.RLock()
 	m, ok := tx.store.metadata.Get(key)
+	tx.store.mu.RUnlock()
 	if ok {
 		m.RLock()
 		tx.lockedMetas = append(tx.lockedMetas, m)
+		m.useTimes++
 		return m
 	}
-	tx.store.mu.Lock()
-	m = newMetadata(newKey(), nil, false)
-	m.RLock()
-	tx.store.metadata.Set(key, m)
-	tx.lockedMetas = append(tx.lockedMetas, m)
-	tx.store.mu.Unlock()
-	return m
+	return m.empty()
 }
 
 func (tx *Tx) newKey(m *metadata, key string, newFn func() ds.Value) *metadata {
 	if newFn != nil {
 		tx.store.mu.Lock()
-		defer tx.store.mu.Unlock()
-		value := newFn()
-		if value == nil {
-			return m
+		if m.RWMutex == nil {
+			m.RWMutex = new(sync.RWMutex)
 		}
+		value := newFn()
 		m.key = newKey()
 		m.setValue(value)
 		m.state |= KeyStateModified
+		m.expiration = 0
 		tx.store.metadata.Set(key, m)
+		tx.store.mu.Unlock()
 		return m
 	}
-	return m
+	return m.empty()
 }
 
 func (tx *Tx) delKey(key string) {
@@ -76,14 +72,16 @@ func (tx *Tx) delKey(key string) {
 
 func (tx *Tx) writeKey(key string, newFn func() ds.Value) *metadata {
 	m := tx.lockKey(key)
-	if m.isOk() && !m.expired(time.Now().UnixMilli()) {
+	if m.isOk() {
+		if m.expired(time.Now().UnixMilli()) {
+			return tx.newKey(m, key, newFn)
+		}
 		// not expired
 		if m.value != nil {
 			return m
 		}
 		// if not found in memory, read from storage
-		m = tx.store.fromStorage(m)
-		return m
+		return tx.store.fromStorage(m)
 	}
 	return tx.newKey(m, key, newFn)
 }
@@ -94,11 +92,12 @@ func (tx *Tx) readKey(key string) *metadata {
 		if m.expired(time.Now().UnixMilli()) {
 			return m.empty()
 		}
-		if m.value == nil {
-			// read from storage
-			return tx.store.fromStorage(m)
+		// not expired
+		if m.value != nil {
+			return m
 		}
-		return m
+		// if not found in memory, read from storage
+		return tx.store.fromStorage(m)
 	}
 	return m.empty()
 }

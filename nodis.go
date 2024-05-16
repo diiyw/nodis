@@ -5,14 +5,17 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
+	"github.com/diiyw/nodis/ds/list"
 	"github.com/diiyw/nodis/fs"
 	"github.com/diiyw/nodis/notifier"
 	"github.com/diiyw/nodis/pb"
 	"github.com/diiyw/nodis/redis"
 	nSync "github.com/diiyw/nodis/sync"
+	"github.com/tidwall/btree"
 )
 
 var (
@@ -20,9 +23,11 @@ var (
 )
 
 type Nodis struct {
-	options   *Options
-	store     *store
-	notifiers []*notifier.Notifier
+	store              *store
+	notifiers          []*notifier.Notifier
+	blocklingKeysMutex sync.RWMutex
+	blocklingKeys      btree.Map[string, *list.LinkedListG[chan string]] // blockling keys
+	options            *Options
 }
 
 func Open(opt *Options) *Nodis {

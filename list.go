@@ -21,6 +21,7 @@ func (n *Nodis) LPush(key string, values ...[]byte) int64 {
 		meta := tx.writeKey(key, n.newList)
 		meta.value.(*list.LinkedList).LPush(values...)
 		v = meta.value.(*list.LinkedList).LLen()
+		n.notifyBlockingKey(key)
 		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_LPush, key).Values(values))
 		return nil
@@ -34,6 +35,7 @@ func (n *Nodis) RPush(key string, values ...[]byte) int64 {
 		meta := tx.writeKey(key, n.newList)
 		meta.value.(*list.LinkedList).RPush(values...)
 		v = meta.value.(*list.LinkedList).LLen()
+		n.notifyBlockingKey(key)
 		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_RPush, key).Values(values))
 		return nil
@@ -230,6 +232,7 @@ func (n *Nodis) LPopRPush(source, destination string) []byte {
 		n.signalModifiedKey(source, meta)
 		dst := tx.writeKey(destination, n.newList)
 		dst.value.(*list.LinkedList).RPush(v...)
+		n.notifyBlockingKey(destination)
 		n.signalModifiedKey(destination, dst)
 		n.notify(pb.NewOp(pb.OpType_LPopRPush, source).DstKey(destination))
 		return nil
@@ -254,6 +257,7 @@ func (n *Nodis) RPopLPush(source, destination string) []byte {
 		n.signalModifiedKey(source, meta)
 		dst := tx.writeKey(destination, n.newList)
 		dst.value.(*list.LinkedList).LPush(v...)
+		n.notifyBlockingKey(destination)
 		n.signalModifiedKey(destination, dst)
 		n.notify(pb.NewOp(pb.OpType_RPopLPush, source).DstKey(destination))
 		return nil
@@ -261,40 +265,96 @@ func (n *Nodis) RPopLPush(source, destination string) []byte {
 	return v[0]
 }
 
-func (n *Nodis) BLPop(timeout time.Duration, keys ...string) (string, []byte) {
-	for _, key := range keys {
-		results := n.LPop(key, 1)
-		if results != nil {
-			n.notify(pb.NewOp(pb.OpType_LPop, key))
-			return key, results[0]
-		}
+func (n *Nodis) addBlockKey(key string, c chan string) {
+	n.blocklingKeysMutex.Lock()
+	cList, ok := n.blocklingKeys.Get(key)
+	if !ok {
+		cList = list.NewLinkedListG[chan string]()
+		cList.LPush(c)
+		n.blocklingKeys.Set(key, cList)
+	} else {
+		cList.LPush(c)
 	}
-	time.Sleep(timeout)
+	n.blocklingKeysMutex.Unlock()
+}
+
+func (n *Nodis) notifyBlockingKey(key string) {
+	n.blocklingKeysMutex.RLock()
+	cList, ok := n.blocklingKeys.Get(key)
+	n.blocklingKeysMutex.RUnlock()
+	if !ok {
+		return
+	}
+	cList.ForRange(func(c chan string) bool {
+		c <- key
+		return true
+	})
+}
+
+func (n *Nodis) removeBlockingKeys(rc chan string, keys ...string) {
+	n.blocklingKeysMutex.Lock()
+	for _, key := range keys {
+		cList, ok := n.blocklingKeys.Get(key)
+		if !ok {
+			n.blocklingKeysMutex.Unlock()
+			return
+		}
+		cList.ForRangeNode(func(node *list.NodeG[chan string]) bool {
+			if node.Value() == rc {
+				cList.RemoveNode(node)
+				return false
+			}
+			return true
+		})
+	}
+	close(rc)
+	n.blocklingKeysMutex.Unlock()
+}
+
+func (n *Nodis) BLPop(timeout time.Duration, keys ...string) (string, []byte) {
+	var c = make(chan string)
+	defer n.removeBlockingKeys(c, keys...)
 	for _, key := range keys {
 		results := n.LPop(key, 1)
 		if results != nil {
 			n.notify(pb.NewOp(pb.OpType_LPop, key))
 			return key, results[0]
 		}
+		n.addBlockKey(key, c)
+	}
+	select {
+	case key := <-c:
+		results := n.LPop(key, 1)
+		if results != nil {
+			n.notify(pb.NewOp(pb.OpType_LPop, key))
+			return key, results[0]
+		}
+	case <-time.After(timeout):
+		break
 	}
 	return "", nil
 }
 
 func (n *Nodis) BRPop(timeout time.Duration, keys ...string) (string, []byte) {
+	var c = make(chan string)
+	defer n.removeBlockingKeys(c, keys...)
 	for _, key := range keys {
 		results := n.RPop(key, 1)
 		if results != nil {
 			n.notify(pb.NewOp(pb.OpType_RPop, key))
 			return key, results[0]
 		}
+		n.addBlockKey(key, c)
 	}
-	time.Sleep(timeout)
-	for _, key := range keys {
-		results := n.RPop(key, 1)
+	select {
+	case key := <-c:
+		results := n.LPop(key, 1)
 		if results != nil {
-			n.notify(pb.NewOp(pb.OpType_RPop, key))
+			n.notify(pb.NewOp(pb.OpType_LPop, key))
 			return key, results[0]
 		}
+	case <-time.After(timeout):
+		break
 	}
 	return "", nil
 }

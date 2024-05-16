@@ -9,26 +9,23 @@
 
 English | [简体中文](https://github.com/diiyw/nodis/blob/main/README_zh-cn.md)
 
-使用GO实现的Redis协议的内存数据库，支持持久化，快照，WAL，自定义存储后端，WebAssembly等功能。
+Nodis 是一个使用 Golang 编程语言实现的 Redis。这个实现提供了一种将 Redis 功能直接嵌入到应用程序中或作为独立服务器运行的简单方法。支持的命令与原始 Redis 协议兼容,允许您使用现有的 Redis 客户端(如 goredis)进行测试和集成。
 
-## 支持的类型
-
-- Bitmap
-- String
-- List
-- Hash
-- Set
-- Sorted Set
-
-## 特点
-
-- 快速可嵌入的内存数据库
-- 低内存占用，只存储热数据在内存
-- 支持快照和WAL
-- 支持自定义存储后端（例如S3，浏览器、Sqlite等）
-- 支持WebAssembly运行在浏览器 (^v1.2.0) 
-- 支持远程观察变化 (^v1.2.0)
-- 支持Redis协议 (^v1.5.0)
+## 支持的数据类型
+Bitmap
+String
+List
+Hash
+Set
+Sorted Set
+## 主要特性
+- **快速和可嵌入**: Golang 实现的设计目标是快速和易于嵌入到您的应用程序中。
+- **低内存使用**: 该系统只在内存中存储热数据,将整体内存占用降到最低。
+- **快照和 WAL 用于数据存储**: 这个 Redis 实现支持快照和预写日志(WAL)机制,用于可靠的数据存储。
+- **自定义数据存储后端**: 您可以集成自定义的数据存储后端,如 Amazon S3、浏览器存储等。
+使用 WebAssembly 支持浏览器: 从 1.2.0 版本开始,这个 Redis 实现可以直接在浏览器中使用 WebAssembly 运行。
+- **远程变更监控**: 从 1.2.0 版本开始,该系统支持监视来自远程源的变更。
+- **Redis 协议兼容性**: 从 1.5.0 版本开始,这个 Redis 实现完全支持原始的 Redis 协议,确保与现有的 Redis 客户端无缝集成。
 
 ## 支持的Redis命令
 | **Client Handling** | **Configuration** | **Key Commands** | **String Commands** | **Set Commands** | **Hash Commands** | **List Commands** | **Sorted Set Commands** |
@@ -48,8 +45,8 @@ English | [简体中文](https://github.com/diiyw/nodis/blob/main/README_zh-cn.m
 |                     |                 |                 | INCRBYFLOAT         | SUNIONSTORE     | HCLEAR          | LPOPRPUSH        | ZREMRANGEBYSCORE      |
 |                     |                 |                 | APPEND              |                 | HSCAN           | RPOPLPUSH        | ZCLEAR                |
 |                     |                 |                 | GETRANGE            |                 | HVALS           | BLPOP            | ZEXISTS               |
-|                     |                 |                 | STRLEN              |                 |                 | BRPOP            | ZUNIONSTORE           |
-|                     |                 |                 | STRLEN              |                 |                 | BRPOP            | ZINTERSTORE		   |
+|                     |                 |                 | STRLEN              |                 | HSTRLEN         | BRPOP            | ZUNIONSTORE           |
+|                     |                 |                 | SETRANGE            |                 |                 |                  | ZINTERSTORE		   |
 ## Get Started
 ```bash
  go get github.com/diiyw/nodis@v1.5.0
@@ -94,7 +91,7 @@ func main() {
 	var opt = nodis.DefaultOptions
 	n := nodis.Open(opt)
 	opt.Synchronizer = sync.NewWebsocket()
-	n.Watch([]string{"*"}, func(op *pb.Operation) {
+	n.Stick([]string{"*"}, func(op *pb.Operation) {
 		fmt.Println("Server:", op.Key, string(op.Value))
 	})
 	go func() {

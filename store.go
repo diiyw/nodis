@@ -150,12 +150,10 @@ func (s *store) parseValue(data []byte) (ds.Value, error) {
 // save flush changed keys to disk
 func (s *store) save() {
 	now := time.Now().UnixMilli()
-	tx := newTx(s)
-	defer tx.commit()
 	s.metadata.Scan(func(key string, m *metadata) bool {
-		m.RLock()
-		defer m.RUnlock()
-		if !m.modified() || m.expired(now) {
+		m.Lock()
+		defer m.Unlock()
+		if !m.modified() || m.expired(now) || !m.isOk() {
 			return true
 		}
 		if m.value == nil {
@@ -193,6 +191,7 @@ func (s *store) tidy(keyMaxUseTimes uint64) {
 					log.Println("Tidy: ", err)
 				}
 			}
+			m.reset()
 		}
 		return true
 	})

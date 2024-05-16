@@ -319,16 +319,9 @@ func info(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		keys, expires, avgTTL := n.Keyspace()
 		var keyspace = ""
 		if keys > 0 {
-			keyspace = "\ndb0:keys=" + strconv.FormatInt(keys, 10) + ",expires=" + strconv.FormatInt(expires, 10) + ",avg_ttl=" + strconv.FormatInt(avgTTL, 10)
+			keyspace = "db0:keys=" + strconv.FormatInt(keys, 10) + ",expires=" + strconv.FormatInt(expires, 10) + ",avg_ttl=" + strconv.FormatInt(avgTTL, 10) + "\r\n"
 		}
-		conn.WriteBulk(`# Server
-redis_version:6.0.0
-os:` + runtime.GOOS + `
-process_id:` + pid + `
-# Memory
-used_memory:` + usedMemory + `
-# Keyspace` + keyspace + `
-`)
+		conn.WriteBulk(`# Server` + "\r\n" + `redis_version:6.0.0` + "\r\n" + `os:` + runtime.GOOS + "\r\n" + `process_id:` + pid + "\r\n" + `# Memory` + "\r\n" + `used_memory:` + usedMemory + "\r\n" + `# Keyspace` + keyspace + "\r\n")
 	})
 }
 

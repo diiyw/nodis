@@ -139,12 +139,9 @@ func (n *Nodis) HIncrByFloat(key string, field string, value float64) (float64, 
 func (n *Nodis) HSetNX(key string, field string, value []byte) int64 {
 	var v int64
 	_ = n.exec(func(tx *Tx) error {
-		meta := tx.writeKey(key, nil)
-		if meta.isOk() && meta.value.(*hash.HashMap).HExists(field) {
+		meta := tx.writeKey(key, n.newHash)
+		if meta.value.(*hash.HashMap).HExists(field) {
 			return nil
-		}
-		if !meta.isOk() {
-			meta.setValue(n.newHash())
 		}
 		v = meta.value.(*hash.HashMap).HSet(field, value)
 		n.signalModifiedKey(key, meta)

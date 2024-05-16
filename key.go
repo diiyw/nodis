@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math/rand"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/diiyw/nodis/ds"
@@ -409,6 +410,14 @@ func (n *Nodis) Rename(key, dstKey string) error {
 		}
 		dstMeta := tx.writeKey(dstKey, nil)
 		tx.delKey(key)
+		if !dstMeta.isOk() {
+			dstMeta.key = newKey()
+			dstMeta.RWMutex = new(sync.RWMutex)
+			dstMeta.expiration = meta.expiration
+			n.store.mu.Lock()
+			n.store.metadata.Set(dstKey, dstMeta)
+			n.store.mu.Unlock()
+		}
 		dstMeta.setValue(meta.value)
 		n.signalModifiedKey(key, meta)
 		n.signalModifiedKey(key, dstMeta)
@@ -429,7 +438,13 @@ func (n *Nodis) RenameNX(key, dstKey string) error {
 			return errors.New("key does not exist")
 		}
 		tx.delKey(key)
+		dstMeta.key = newKey()
+		dstMeta.RWMutex = new(sync.RWMutex)
+		dstMeta.expiration = meta.expiration
 		dstMeta.setValue(meta.value)
+		n.store.mu.Lock()
+		n.store.metadata.Set(dstKey, dstMeta)
+		n.store.mu.Unlock()
 		n.signalModifiedKey(key, meta)
 		n.signalModifiedKey(key, dstMeta)
 		n.notify(pb.NewOp(pb.OpType_Rename, key).DstKey(dstKey))

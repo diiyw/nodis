@@ -42,7 +42,9 @@ func (n *Nodis) GetSet(key string, value []byte) []byte {
 func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newStr)
-		meta.expiration = time.Now().UnixMilli()
+		if meta.expiration == 0 {
+			meta.expiration = time.Now().UnixMilli()
+		}
 		meta.expiration += seconds * 1000
 		meta.value.(*str.String).Set(value)
 		n.signalModifiedKey(key, meta)
@@ -55,7 +57,9 @@ func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
 func (n *Nodis) SetPX(key string, value []byte, milliseconds int64) {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newStr)
-		meta.expiration = time.Now().UnixMilli()
+		if meta.expiration == 0 {
+			meta.expiration = time.Now().UnixMilli()
+		}
 		meta.expiration += milliseconds
 		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value).Expiration(meta.expiration))
@@ -73,9 +77,9 @@ func (n *Nodis) SetNX(key string, value []byte) bool {
 			return nil
 		}
 		meta = tx.newKey(meta, key, n.newStr)
+		meta.value.(*str.String).Set(value)
 		n.signalModifiedKey(key, meta)
 		n.notify(pb.NewOp(pb.OpType_Set, key).Value(value))
-		meta.value.(*str.String).Set(value)
 		ok = true
 		return nil
 	})
