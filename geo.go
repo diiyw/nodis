@@ -25,10 +25,14 @@ func (n *Nodis) GeoAdd(key string, members ...*geo.Member) (int64, error) {
 	return v, nil
 }
 
+// GeoAddXX adds the specified members to the key only if the member already exists.
 func (n *Nodis) GeoAddXX(key string, members ...*geo.Member) (int64, error) {
 	var v int64
 	_ = n.exec(func(tx *Tx) error {
-		meta := tx.writeKey(key, n.newZSet)
+		meta := tx.writeKey(key, nil)
+		if !meta.isOk() {
+			return nil
+		}
 		for _, member := range members {
 			v += meta.value.(*zset.SortedSet).ZAddXX(member.Name, float64(member.Hash()))
 		}
@@ -37,10 +41,14 @@ func (n *Nodis) GeoAddXX(key string, members ...*geo.Member) (int64, error) {
 	return v, nil
 }
 
+// GeoAddNX adds the specified members to the key only if the member does not already exist.
 func (n *Nodis) GeoAddNX(key string, members ...*geo.Member) (int64, error) {
 	var v int64
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newZSet)
+		if meta.isOk() {
+			return nil
+		}
 		for _, member := range members {
 			v += meta.value.(*zset.SortedSet).ZAddNX(member.Name, float64(member.Hash()))
 		}
@@ -53,7 +61,7 @@ func (n *Nodis) GeoDist(key string, member1, member2 string) (float64, error) {
 	var v float64
 	err := n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
-		if meta == nil {
+		if !meta.isOk() {
 			return nil
 		}
 		score1, err := meta.value.(*zset.SortedSet).ZScore(member1)
@@ -66,7 +74,7 @@ func (n *Nodis) GeoDist(key string, member1, member2 string) (float64, error) {
 		}
 		lat1, lng1 := geohash.DecodeInt(uint64(score1))
 		lat2, lng2 := geohash.DecodeInt(uint64(score2))
-		v = distance(float64(lat1), float64(lng1), float64(lat2), float64(lng2))
+		v = distance(lat1, lng1, lat2, lng2)
 		return nil
 	})
 	return v, err
@@ -86,7 +94,7 @@ func (n *Nodis) GeoHash(key string, members ...string) ([]string, error) {
 	var v []string
 	err := n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
-		if meta == nil {
+		if !meta.isOk() {
 			return nil
 		}
 		for _, member := range members {
@@ -116,6 +124,18 @@ func (n *Nodis) GeoPos(key string, members ...string) ([]*geo.Member, error) {
 			}
 			lat, lng := geohash.DecodeInt(uint64(score))
 			v = append(v, &geo.Member{Name: member, Latitude: lat, Longitude: lng})
+		}
+		return nil
+	})
+	return v, err
+}
+
+func (n *Nodis) GeoRadius(key string, longitude, latitude, radius float64, count int64, desc bool) ([]*geo.Member, error) {
+	var v []*geo.Member
+	err := n.exec(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if meta == nil {
+			return nil
 		}
 		return nil
 	})
