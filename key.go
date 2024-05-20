@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math/rand"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 
@@ -40,6 +41,12 @@ func (n *Nodis) Del(keys ...string) int64 {
 	return c
 }
 
+func (n *Nodis) Unlink(keys ...string) int64 {
+	v := n.Del(keys...)
+	runtime.GC()
+	return v
+}
+
 func (n *Nodis) Exists(keys ...string) int64 {
 	var num int64
 	_ = n.exec(func(tx *Tx) error {
@@ -69,7 +76,9 @@ func (n *Nodis) Expire(key string, seconds int64) int64 {
 		meta.expiration = time.Now().UnixMilli()
 		meta.expiration += seconds * 1000
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+		})
 		return nil
 	})
 	return v
@@ -92,7 +101,9 @@ func (n *Nodis) ExpirePX(key string, milliseconds int64) int64 {
 		}
 		meta.expiration += milliseconds
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+		})
 		return nil
 	})
 	return v
@@ -113,7 +124,9 @@ func (n *Nodis) ExpireNX(key string, seconds int64) int64 {
 		}
 		meta.expiration = time.Now().UnixMilli() + seconds*1000
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+		})
 		return nil
 	})
 	return v
@@ -134,7 +147,9 @@ func (n *Nodis) ExpireXX(key string, seconds int64) int64 {
 		}
 		meta.expiration += seconds * 1000
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+		})
 		return nil
 	})
 	return v
@@ -157,7 +172,9 @@ func (n *Nodis) ExpireLT(key string, seconds int64) int64 {
 		if meta.expiration > time.Now().UnixMilli()-ms {
 			meta.expiration -= ms
 			n.signalModifiedKey(key, meta)
-			n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
+			n.notify(func() []*pb.Op {
+				return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+			})
 		}
 		return nil
 	})
@@ -180,7 +197,9 @@ func (n *Nodis) ExpireGT(key string, seconds int64) int64 {
 		if meta.expiration < now+ms {
 			meta.expiration += ms
 			n.signalModifiedKey(key, meta)
-			n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
+			n.notify(func() []*pb.Op {
+				return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+			})
 			v = 1
 		}
 		return nil
@@ -199,7 +218,9 @@ func (n *Nodis) ExpireAt(key string, timestamp time.Time) int64 {
 		}
 		meta.expiration = timestamp.UnixMilli()
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+		})
 		return nil
 	})
 	return v
@@ -220,7 +241,9 @@ func (n *Nodis) ExpireAtNX(key string, timestamp time.Time) int64 {
 		}
 		meta.expiration = timestamp.UnixMilli()
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+		})
 		return nil
 	})
 	return v
@@ -241,7 +264,9 @@ func (n *Nodis) ExpireAtXX(key string, timestamp time.Time) int64 {
 		}
 		meta.expiration = timestamp.UnixMilli()
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+		})
 		return nil
 	})
 	return v
@@ -264,7 +289,9 @@ func (n *Nodis) ExpireAtLT(key string, timestamp time.Time) int64 {
 		if meta.expiration > unix {
 			meta.expiration = unix
 			n.signalModifiedKey(key, meta)
-			n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
+			n.notify(func() []*pb.Op {
+				return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+			})
 		}
 		return nil
 	})
@@ -287,7 +314,9 @@ func (n *Nodis) ExpireAtGT(key string, timestamp time.Time) int64 {
 		if meta.expiration < unix {
 			meta.expiration = unix
 			n.signalModifiedKey(key, meta)
-			n.notify(pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration))
+			n.notify(func() []*pb.Op {
+				return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+			})
 		}
 		return nil
 	})
@@ -438,7 +467,9 @@ func (n *Nodis) Rename(key, dstKey string) error {
 		dstMeta.setValue(meta.value)
 		n.signalModifiedKey(key, meta)
 		n.signalModifiedKey(key, dstMeta)
-		n.notify(pb.NewOp(pb.OpType_Rename, key).DstKey(dstKey))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_Rename, key).DstKey(dstKey)}
+		})
 		return nil
 	})
 }
@@ -464,7 +495,9 @@ func (n *Nodis) RenameNX(key, dstKey string) error {
 		n.store.mu.Unlock()
 		n.signalModifiedKey(key, meta)
 		n.signalModifiedKey(key, dstMeta)
-		n.notify(pb.NewOp(pb.OpType_Rename, key).DstKey(dstKey))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_Rename, key).DstKey(dstKey)}
+		})
 		return nil
 	})
 }
@@ -556,7 +589,9 @@ func (n *Nodis) Persist(key string) int64 {
 		v = 1
 		meta.expiration = 0
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_Persist, key))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_Persist, key)}
+		})
 		return nil
 	})
 	return v

@@ -9,8 +9,8 @@ import (
 
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/zset"
+	"github.com/diiyw/nodis/internal/strings"
 	"github.com/diiyw/nodis/redis"
-	"github.com/diiyw/nodis/utils"
 )
 
 func execCommand(conn *redis.Conn, fn func()) {
@@ -65,6 +65,8 @@ func getCommand(name string) func(n *Nodis, conn *redis.Conn, cmd redis.Command)
 		return info
 	case "DEL":
 		return del
+	case "UNLINK":
+		return unlink
 	case "EXISTS":
 		return exists
 	case "EXPIRE":
@@ -273,7 +275,7 @@ func client(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	execCommand(conn, func() {
-		switch utils.ToUpper(cmd.Args[0]) {
+		switch strings.ToUpper(cmd.Args[0]) {
 		case "LIST":
 			conn.WriteString("id=1 addr=" + conn.Network.RemoteAddr().String() + " fd=5 name= age=0 idle=0 flags=N db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=0 obl=0 oll=0 omem=0 events=r cmd=client")
 		case "SETNAME":
@@ -295,7 +297,7 @@ func config(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 				conn.WriteError("CONFIG GET requires at least one argument")
 				return
 			}
-			if utils.ToUpper(cmd.Args[1]) == "DATABASES" {
+			if strings.ToUpper(cmd.Args[1]) == "DATABASES" {
 				conn.WriteArray(2)
 				conn.WriteBulk("databases")
 				conn.WriteBulk("0")
@@ -452,6 +454,16 @@ func del(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	execCommand(conn, func() {
 		conn.WriteInteger(n.Del(cmd.Args...))
+	})
+}
+
+func unlink(n *Nodis, conn *redis.Conn, cmd redis.Command) {
+	if len(cmd.Args) == 0 {
+		conn.WriteError("UNLINK requires at least one argument")
+		return
+	}
+	execCommand(conn, func() {
+		conn.WriteInteger(n.Unlink(cmd.Args...))
 	})
 }
 
@@ -669,7 +681,7 @@ func scan(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		}
 	}
 	if cmd.Options.TYPE > 0 {
-		typ = ds.StringToDataType(utils.ToUpper(cmd.Args[cmd.Options.TYPE]))
+		typ = ds.StringToDataType(strings.ToUpper(cmd.Args[cmd.Options.TYPE]))
 	}
 	execCommand(conn, func() {
 		nextCursor, keys := n.Scan(cursor, match, count, typ)
@@ -1760,7 +1772,7 @@ func lInsert(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	execCommand(conn, func() {
 		key := cmd.Args[0]
-		before := utils.ToUpper(cmd.Args[1]) == "BEFORE"
+		before := strings.ToUpper(cmd.Args[1]) == "BEFORE"
 		pivot := []byte(cmd.Args[2])
 		value := []byte(cmd.Args[3])
 		conn.WriteInteger(n.LInsert(key, pivot, value, before))
@@ -2505,7 +2517,7 @@ func zUnionStore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		aggregate = cmd.Args[cmd.Options.AGGREGATE]
 	}
 	execCommand(conn, func() {
-		n.ZUnionStore(destination, keys, weights, utils.ToUpper(aggregate))
+		n.ZUnionStore(destination, keys, weights, strings.ToUpper(aggregate))
 		conn.WriteInteger(n.ZCard(destination))
 	})
 }
@@ -2542,7 +2554,7 @@ func zInterStore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		aggregate = cmd.Args[cmd.Options.AGGREGATE]
 	}
 	execCommand(conn, func() {
-		n.ZInterStore(destination, keys, weights, utils.ToUpper(aggregate))
+		n.ZInterStore(destination, keys, weights, strings.ToUpper(aggregate))
 		conn.WriteInteger(n.ZCard(destination))
 	})
 }

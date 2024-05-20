@@ -23,7 +23,9 @@ func (n *Nodis) LPush(key string, values ...[]byte) int64 {
 		v = meta.value.(*list.LinkedList).LLen()
 		n.notifyBlockingKey(key)
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_LPush, key).Values(values))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_LPush, key).Values(values)}
+		})
 		return nil
 	})
 	return v
@@ -37,7 +39,9 @@ func (n *Nodis) RPush(key string, values ...[]byte) int64 {
 		v = meta.value.(*list.LinkedList).LLen()
 		n.notifyBlockingKey(key)
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_RPush, key).Values(values))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_RPush, key).Values(values)}
+		})
 		return nil
 	})
 	return v
@@ -55,7 +59,9 @@ func (n *Nodis) LPop(key string, count int64) [][]byte {
 			tx.delKey(key)
 		}
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_LPop, key).Count(count))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_LPop, key).Count(count)}
+		})
 		return nil
 	})
 	return v
@@ -73,7 +79,9 @@ func (n *Nodis) RPop(key string, count int64) [][]byte {
 			tx.delKey(key)
 		}
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_RPop, key).Count(count))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_RPop, key).Count(count)}
+		})
 		return nil
 	})
 	return v
@@ -119,7 +127,9 @@ func (n *Nodis) LInsert(key string, pivot, data []byte, before bool) int64 {
 		}
 		v = meta.value.(*list.LinkedList).LInsert(pivot, data, before)
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_LInsert, key).Value(data).Pivot(pivot).Before(before))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_LInsert, key).Value(data).Pivot(pivot).Before(before)}
+		})
 		return nil
 	})
 	return v
@@ -135,7 +145,9 @@ func (n *Nodis) LPushX(key string, data []byte) int64 {
 		meta.value.(*list.LinkedList).LPush(data)
 		v = meta.value.(*list.LinkedList).LLen()
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_LPushX, key).Value(data))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_LPushX, key).Value(data)}
+		})
 		return nil
 	})
 	return v
@@ -151,7 +163,9 @@ func (n *Nodis) RPushX(key string, data []byte) int64 {
 		meta.value.(*list.LinkedList).RPush(data)
 		v = meta.value.(*list.LinkedList).LLen()
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_RPushX, key).Value(data))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_RPushX, key).Value(data)}
+		})
 		return nil
 	})
 	return v
@@ -170,7 +184,9 @@ func (n *Nodis) LRem(key string, data []byte, count int64) int64 {
 			tx.delKey(key)
 		}
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_LRem, key).Value(data).Count(count))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_LRem, key).Value(data).Count(count)}
+		})
 		return nil
 	})
 	return v
@@ -181,7 +197,9 @@ func (n *Nodis) LSet(key string, index int64, data []byte) bool {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newList)
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_LSet, key).Value(data).Index(index))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_LSet, key).Value(data).Index(index)}
+		})
 		v = meta.value.(*list.LinkedList).LSet(index, data)
 		return nil
 	})
@@ -196,7 +214,9 @@ func (n *Nodis) LTrim(key string, start, stop int64) {
 		}
 		meta.value.(*list.LinkedList).LTrim(start, stop)
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_LTrim, key).Start(start).Stop(stop))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_LTrim, key).Start(start).Stop(stop)}
+		})
 		return nil
 	})
 }
@@ -234,7 +254,9 @@ func (n *Nodis) LPopRPush(source, destination string) []byte {
 		dst.value.(*list.LinkedList).RPush(v...)
 		n.notifyBlockingKey(destination)
 		n.signalModifiedKey(destination, dst)
-		n.notify(pb.NewOp(pb.OpType_LPopRPush, source).DstKey(destination))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_LPopRPush, source).DstKey(destination)}
+		})
 		return nil
 	})
 	return v[0]
@@ -259,7 +281,9 @@ func (n *Nodis) RPopLPush(source, destination string) []byte {
 		dst.value.(*list.LinkedList).LPush(v...)
 		n.notifyBlockingKey(destination)
 		n.signalModifiedKey(destination, dst)
-		n.notify(pb.NewOp(pb.OpType_RPopLPush, source).DstKey(destination))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_RPopLPush, source).DstKey(destination)}
+		})
 		return nil
 	})
 	return v[0]
@@ -317,7 +341,9 @@ func (n *Nodis) BLPop(timeout time.Duration, keys ...string) (string, []byte) {
 	for _, key := range keys {
 		results := n.LPop(key, 1)
 		if results != nil {
-			n.notify(pb.NewOp(pb.OpType_LPop, key))
+			n.notify(func() []*pb.Op {
+				return []*pb.Op{pb.NewOp(pb.OpType_LPop, key)}
+			})
 			return key, results[0]
 		}
 		n.addBlockKey(key, c)
@@ -326,7 +352,9 @@ func (n *Nodis) BLPop(timeout time.Duration, keys ...string) (string, []byte) {
 	case key := <-c:
 		results := n.LPop(key, 1)
 		if results != nil {
-			n.notify(pb.NewOp(pb.OpType_LPop, key))
+			n.notify(func() []*pb.Op {
+				return []*pb.Op{pb.NewOp(pb.OpType_LPop, key)}
+			})
 			return key, results[0]
 		}
 	case <-time.After(timeout):
@@ -341,7 +369,9 @@ func (n *Nodis) BRPop(timeout time.Duration, keys ...string) (string, []byte) {
 	for _, key := range keys {
 		results := n.RPop(key, 1)
 		if results != nil {
-			n.notify(pb.NewOp(pb.OpType_RPop, key))
+			n.notify(func() []*pb.Op {
+				return []*pb.Op{pb.NewOp(pb.OpType_RPop, key)}
+			})
 			return key, results[0]
 		}
 		n.addBlockKey(key, c)
@@ -350,7 +380,9 @@ func (n *Nodis) BRPop(timeout time.Duration, keys ...string) (string, []byte) {
 	case key := <-c:
 		results := n.LPop(key, 1)
 		if results != nil {
-			n.notify(pb.NewOp(pb.OpType_LPop, key))
+			n.notify(func() []*pb.Op {
+				return []*pb.Op{pb.NewOp(pb.OpType_LPop, key)}
+			})
 			return key, results[0]
 		}
 	case <-time.After(timeout):

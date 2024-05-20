@@ -48,7 +48,7 @@ Nodis is a Redis implementation using the Golang programming language. This impl
 |                     |                   | RENAMEEX         | DECRBY              | SRANDMEMBER      | HMGET             | LSET              | ZREM                    |
 |                     |                   | PERSIST          | SETNX               | SINTERSTORE      | HMSET             | LRANGE            | ZREMRANGEBYRANK         |
 |                     |                   | PTTL             | INCRBYFLOAT         | SUNIONSTORE      | HCLEAR            | LPOPRPUSH         | ZREMRANGEBYSCORE        |
-|                     |                   |                  | APPEND              |                  | HSCAN             | RPOPLPUSH         | ZCLEAR                  |
+|                     |                   | UNLINK           | APPEND              |                  | HSCAN             | RPOPLPUSH         | ZCLEAR                  |
 |                     |                   |                  | GETRANGE            |                  | HVALS             | BLPOP             | ZEXISTS                 |
 |                     |                   |                  | STRLEN              |                  | HSTRLEN           | BRPOP             | ZUNIONSTORE             |
 |                     |                   |                  | SETRANGE            |                  |                   |                   | ZINTERSTORE             |
@@ -141,7 +141,7 @@ func main() {
 	opt.Filesystem = &fs.Memory{}
 	opt.Synchronizer = sync.NewWebsocket()
 	n := nodis.Open(opt)
-	n.Stick([]string{"*"}, func(op *pb.Operation) {
+	n.WatchKey([]string{"*"}, func(op *pb.Operation) {
 		fmt.Println("Subscribe: ", op.Key)
 	})
 	err := n.Subscribe("ws://127.0.0.1:6380")

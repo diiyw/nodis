@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/diiyw/nodis/fs"
-	"github.com/diiyw/nodis/sync"
+	"github.com/diiyw/nodis/internal/sync"
 )
 
 const (

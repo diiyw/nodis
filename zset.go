@@ -16,7 +16,9 @@ func (n *Nodis) ZAdd(key string, member string, score float64) int64 {
 		meta := tx.writeKey(key, n.newZSet)
 		v = meta.value.(*zset.SortedSet).ZAdd(member, score)
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score)}
+		})
 		return nil
 	})
 	return v
@@ -29,7 +31,9 @@ func (n *Nodis) ZAddXX(key string, member string, score float64) int64 {
 		meta := tx.writeKey(key, n.newZSet)
 		v = meta.value.(*zset.SortedSet).ZAddXX(member, score)
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score)}
+		})
 		return nil
 	})
 	return v
@@ -41,7 +45,9 @@ func (n *Nodis) ZAddNX(key string, member string, score float64) int64 {
 		meta := tx.writeKey(key, n.newZSet)
 		v = meta.value.(*zset.SortedSet).ZAddNX(member, score)
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score)}
+		})
 		return nil
 	})
 	return v
@@ -54,7 +60,9 @@ func (n *Nodis) ZAddLT(key string, member string, score float64) int64 {
 		meta := tx.writeKey(key, n.newZSet)
 		if meta.value.(*zset.SortedSet).ZAddLT(member, score) {
 			n.signalModifiedKey(key, meta)
-			n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
+			n.notify(func() []*pb.Op {
+				return []*pb.Op{pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score)}
+			})
 			v = 1
 		}
 		return nil
@@ -69,7 +77,9 @@ func (n *Nodis) ZAddGT(key string, member string, score float64) int64 {
 		meta := tx.writeKey(key, n.newZSet)
 		if meta.value.(*zset.SortedSet).ZAddGT(member, score) {
 			n.signalModifiedKey(key, meta)
-			n.notify(pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score))
+			n.notify(func() []*pb.Op {
+				return []*pb.Op{pb.NewOp(pb.OpType_ZAdd, key).Member(member).Score(score)}
+			})
 			v = 1
 		}
 		return nil
@@ -160,7 +170,9 @@ func (n *Nodis) ZIncrBy(key string, member string, score float64) float64 {
 		meta := tx.writeKey(key, n.newZSet)
 		v = meta.value.(*zset.SortedSet).ZIncrBy(member, score)
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_ZIncrBy, key).Member(member).Score(score))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_ZIncrBy, key).Member(member).Score(score)}
+		})
 		return nil
 	})
 	return v
@@ -306,7 +318,9 @@ func (n *Nodis) ZRem(key string, members ...string) int64 {
 		v = meta.value.(*zset.SortedSet).ZRem(members...)
 		if v > 0 {
 			n.signalModifiedKey(key, meta)
-			n.notify(pb.NewOp(pb.OpType_ZRem, key).Members(members))
+			n.notify(func() []*pb.Op {
+				return []*pb.Op{pb.NewOp(pb.OpType_ZRem, key).Members(members)}
+			})
 		}
 		return nil
 	})
@@ -323,7 +337,9 @@ func (n *Nodis) ZRemRangeByRank(key string, start int64, stop int64) int64 {
 		v = meta.value.(*zset.SortedSet).ZRemRangeByRank(start, stop)
 		if v > 0 {
 			n.signalModifiedKey(key, meta)
-			n.notify(pb.NewOp(pb.OpType_ZRemRangeByRank, key).Start(start).Stop(stop))
+			n.notify(func() []*pb.Op {
+				return []*pb.Op{pb.NewOp(pb.OpType_ZRemRangeByRank, key).Start(start).Stop(stop)}
+			})
 		}
 		return nil
 	})
@@ -340,7 +356,9 @@ func (n *Nodis) ZRemRangeByScore(key string, min float64, max float64, mode int)
 		v = meta.value.(*zset.SortedSet).ZRemRangeByScore(min, max, mode)
 		if v > 0 {
 			n.signalModifiedKey(key, meta)
-			n.notify(pb.NewOp(pb.OpType_ZRemRangeByScore, key).Min(min).Max(max))
+			n.notify(func() []*pb.Op {
+				return []*pb.Op{pb.NewOp(pb.OpType_ZRemRangeByScore, key).Min(min).Max(max)}
+			})
 		}
 		return nil
 	})
@@ -464,7 +482,9 @@ func (n *Nodis) ZUnionStore(destination string, keys []string, weights []float64
 			meta.value.(*zset.SortedSet).ZAdd(item.Member, item.Score)
 		}
 		n.signalModifiedKey(destination, meta)
-		n.notify(pb.NewOp(pb.OpType_ZUnionStore, destination).Keys(keys).Weights(weights).Aggregate(aggregate))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_ZUnionStore, destination).Keys(keys).Weights(weights).Aggregate(aggregate)}
+		})
 		v = int64(len(items))
 		return nil
 	})
@@ -542,7 +562,9 @@ func (n *Nodis) ZInterStore(destination string, keys []string, weights []float64
 			meta.value.(*zset.SortedSet).ZAdd(item.Member, item.Score)
 		}
 		n.signalModifiedKey(destination, meta)
-		n.notify(pb.NewOp(pb.OpType_ZInterStore, destination).Keys(keys).Weights(weights).Aggregate(aggregate))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_ZInterStore, destination).Keys(keys).Weights(weights).Aggregate(aggregate)}
+		})
 		v = int64(len(items))
 		return nil
 	})

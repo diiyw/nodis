@@ -237,7 +237,7 @@ func TestNodis_Stick(t *testing.T) {
 	}
 	n := Open(opt)
 	n.Set("test", []byte("test"), false)
-	n.Stick([]string{"test"}, func(op *pb.Operation) {
+	n.WatchKey([]string{"test"}, func(op *pb.Operation) {
 		if op == nil || string(op.Value) != "test_new" {
 			t.Errorf("Stick() = %v, want %v", op, "test_new")
 		}
@@ -253,12 +253,12 @@ func TestNodis_UnStick(t *testing.T) {
 	}
 	n := Open(opt)
 	n.Set("test", []byte("test"), false)
-	id := n.Stick([]string{"test"}, func(op *pb.Operation) {
+	id := n.WatchKey([]string{"test"}, func(op *pb.Operation) {
 		if op == nil || string(op.Value) != "test_new" {
 			t.Errorf("Stick() = %v, want %v", op, "test_new")
 		}
 	})
-	n.UnStick(id)
+	n.UnWatchKey(id)
 	n.Set("test", []byte("test_new"), false)
 	time.Sleep(time.Second)
 }

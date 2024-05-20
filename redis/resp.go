@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"unsafe"
 
-	"github.com/diiyw/nodis/utils"
+	"github.com/diiyw/nodis/internal/strings"
 )
 
 type Reader struct {
@@ -159,7 +159,7 @@ func (r *Reader) ReadCommand() error {
 			return ErrInvalidRequestExceptedArray
 		}
 		if i == 0 {
-			r.cmd.Name = utils.ToUpper(v)
+			r.cmd.Name = strings.ToUpper(v)
 			continue
 		}
 		r.cmd.Args = append(r.cmd.Args, v)
@@ -169,7 +169,7 @@ func (r *Reader) ReadCommand() error {
 }
 
 func (r *Reader) readOptions(v string, i int) {
-	opt := utils.ToUpper(v)
+	opt := strings.ToUpper(v)
 	switch opt {
 	case "NX":
 		r.cmd.Options.NX = i
@@ -278,7 +278,7 @@ func (r *Reader) ReadInlineCommand() error {
 	if err != nil {
 		return err
 	}
-	r.cmd.Name = utils.ToUpper(r.flushNoCopyString())
+	r.cmd.Name = strings.ToUpper(r.flushNoCopyString())
 	if lineEnd {
 		return nil
 	}
@@ -375,28 +375,28 @@ func (w *Writer) writeBytes(bs ...byte) {
 
 func (w *Writer) WriteString(str string) {
 	w.writeByte(StringType)
-	w.writeBytes(utils.String2Bytes(str)...)
+	w.writeBytes(strings.String2Bytes(str)...)
 	w.writeBytes('\r', '\n')
 }
 
 func (w *Writer) WriteBulk(bulk string) {
 	w.writeByte(BulkType)
-	w.writeBytes(utils.String2Bytes(strconv.Itoa(len(bulk)))...)
+	w.writeBytes(strings.String2Bytes(strconv.Itoa(len(bulk)))...)
 	w.writeBytes('\r', '\n')
-	w.writeBytes(utils.String2Bytes(bulk)...)
+	w.writeBytes(strings.String2Bytes(bulk)...)
 	w.writeBytes('\r', '\n')
 }
 
 func (w *Writer) WriteArray(l int) {
 	w.writeByte(ArrayType)
-	w.writeBytes(utils.String2Bytes(strconv.Itoa(l))...)
+	w.writeBytes(strings.String2Bytes(strconv.Itoa(l))...)
 	w.writeBytes('\r', '\n')
 }
 
 func (w *Writer) WriteError(err string) {
 	w.err = true
 	w.writeByte(ErrType)
-	w.writeBytes(utils.String2Bytes(err)...)
+	w.writeBytes(strings.String2Bytes(err)...)
 	w.writeBytes('\r', '\n')
 }
 
@@ -410,19 +410,19 @@ func (w *Writer) WriteArrayNull() {
 
 func (w *Writer) WriteInteger(v int64) {
 	w.writeByte(IntegerType)
-	w.writeBytes(utils.String2Bytes(strconv.FormatInt(v, 10))...)
+	w.writeBytes(strings.String2Bytes(strconv.FormatInt(v, 10))...)
 	w.writeBytes('\r', '\n')
 }
 
 func (w *Writer) WriteDouble(v float64) {
 	w.writeByte(DoubleType)
-	w.writeBytes(utils.String2Bytes(strconv.FormatFloat(v, 'f', -1, 64))...)
+	w.writeBytes(strings.String2Bytes(strconv.FormatFloat(v, 'f', -1, 64))...)
 	w.writeBytes('\r', '\n')
 }
 
 func (w *Writer) WriteMap(n int) {
 	w.writeByte(MapType)
-	w.writeBytes(utils.String2Bytes(strconv.Itoa(n))...)
+	w.writeBytes(strings.String2Bytes(strconv.Itoa(n))...)
 	w.writeBytes('\r', '\n')
 }
 

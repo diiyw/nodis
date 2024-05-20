@@ -11,10 +11,10 @@ import (
 
 	"github.com/diiyw/nodis/ds/list"
 	"github.com/diiyw/nodis/fs"
-	"github.com/diiyw/nodis/notifier"
+	"github.com/diiyw/nodis/internal/notifier"
+	nSync "github.com/diiyw/nodis/internal/sync"
 	"github.com/diiyw/nodis/pb"
 	"github.com/diiyw/nodis/redis"
-	nSync "github.com/diiyw/nodis/sync"
 	"github.com/tidwall/btree"
 )
 
@@ -113,13 +113,13 @@ func (n *Nodis) GetEntry(key string) (data []byte) {
 	return
 }
 
-func (n *Nodis) notify(ops ...*pb.Op) {
+func (n *Nodis) notify(f func() []*pb.Op) {
 	if len(n.notifiers) == 0 {
 		return
 	}
 	go func() {
 		for _, w := range n.notifiers {
-			for _, op := range ops {
+			for _, op := range f() {
 				if w.Matched(op.Key) {
 					w.Push(op.Operation)
 					op.Reset()
@@ -129,13 +129,13 @@ func (n *Nodis) notify(ops ...*pb.Op) {
 	}()
 }
 
-func (n *Nodis) Stick(pattern []string, fn func(op *pb.Operation)) int {
+func (n *Nodis) WatchKey(pattern []string, fn func(op *pb.Operation)) int {
 	w := notifier.New(pattern, fn)
 	n.notifiers = append(n.notifiers, w)
 	return len(n.notifiers) - 1
 }
 
-func (n *Nodis) UnStick(id int) {
+func (n *Nodis) UnWatchKey(id int) {
 	n.notifiers = append(n.notifiers[:id], n.notifiers[id+1:]...)
 }
 
@@ -221,14 +221,14 @@ func (n *Nodis) patch(op *pb.Op) error {
 
 func (n *Nodis) Publish(addr string, pattern []string) error {
 	return n.options.Synchronizer.Publish(addr, func(s nSync.Conn) {
-		id := n.Stick(pattern, func(op *pb.Operation) {
+		id := n.WatchKey(pattern, func(op *pb.Operation) {
 			err := s.Send(&pb.Op{Operation: op})
 			if err != nil {
 				log.Println("Publish: ", err)
 			}
 		})
 		s.Wait()
-		n.UnStick(id)
+		n.UnWatchKey(id)
 	})
 }
 

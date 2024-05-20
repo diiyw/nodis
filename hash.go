@@ -17,7 +17,9 @@ func (n *Nodis) HSet(key string, field string, value []byte) int64 {
 		meta := tx.writeKey(key, n.newHash)
 		v = meta.value.(*hash.HashMap).HSet(field, value)
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value)}
+		})
 		return nil
 	})
 	return v
@@ -48,7 +50,9 @@ func (n *Nodis) HDel(key string, fields ...string) int64 {
 			tx.delKey(key)
 		}
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_HDel, key).Fields(fields...))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_HDel, key).Fields(fields...)}
+		})
 		return nil
 	})
 	return v
@@ -114,7 +118,9 @@ func (n *Nodis) HIncrBy(key string, field string, value int64) (int64, error) {
 		meta := tx.writeKey(key, n.newHash)
 		v, err = meta.value.(*hash.HashMap).HIncrBy(field, value)
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_HIncrBy, key).Fields(field).IncrInt(value))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_HIncrBy, key).Fields(field).IncrInt(value)}
+		})
 		return nil
 	})
 	return v, err
@@ -127,7 +133,9 @@ func (n *Nodis) HIncrByFloat(key string, field string, value float64) (float64, 
 		meta := tx.writeKey(key, n.newHash)
 		v, err = meta.value.(*hash.HashMap).HIncrByFloat(field, value)
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_HIncrByFloat, key).Fields(field).IncrFloat(value))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_HIncrByFloat, key).Fields(field).IncrFloat(value)}
+		})
 		return err
 	})
 	return v, err
@@ -145,7 +153,9 @@ func (n *Nodis) HSetNX(key string, field string, value []byte) int64 {
 		}
 		v = meta.value.(*hash.HashMap).HSet(field, value)
 		n.signalModifiedKey(key, meta)
-		n.notify(pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
+		n.notify(func() []*pb.Op {
+			return []*pb.Op{pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value)}
+		})
 		return nil
 	})
 	return v
@@ -155,14 +165,18 @@ func (n *Nodis) HMSet(key string, fields map[string][]byte) int64 {
 	var v int64
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newHash)
-		var ops = make([]*pb.Op, 0, len(fields))
 		var v int64 = 0
 		for field, value := range fields {
 			v += meta.value.(*hash.HashMap).HSet(field, value)
-			ops = append(ops, pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
 		}
 		n.signalModifiedKey(key, meta)
-		n.notify(ops...)
+		n.notify(func() []*pb.Op {
+			var ops = make([]*pb.Op, 0, len(fields))
+			for field, value := range fields {
+				ops = append(ops, pb.NewOp(pb.OpType_HSet, key).Fields(field).Value(value))
+			}
+			return ops
+		})
 		meta.value.(*hash.HashMap).HMSet(fields)
 		return nil
 	})

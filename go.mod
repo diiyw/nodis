@@ -8,4 +8,7 @@ require (
 	google.golang.org/protobuf v1.34.0
 )
 
-require golang.org/x/net v0.22.0 // indirect
+require (
+	github.com/mmcloughlin/geohash v0.10.0 // indirect
+	golang.org/x/net v0.22.0 // indirect
+)
