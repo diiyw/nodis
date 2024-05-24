@@ -9,6 +9,7 @@ import (
 
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/zset"
+	"github.com/diiyw/nodis/geo"
 	"github.com/diiyw/nodis/internal/strings"
 	"github.com/diiyw/nodis/redis"
 )
@@ -261,6 +262,16 @@ func getCommand(name string) func(n *Nodis, conn *redis.Conn, cmd redis.Command)
 		return zInterStore
 	case "ZEXISTS":
 		return zExists
+	case "GEOADD":
+		return geoAdd
+	case "GEODIST":
+		return geoDist
+	case "GEOHASH":
+		return geoHash
+	case "GEOPOS":
+		return geoPos
+	case "GEORADIUS":
+		return geoRadius
 	}
 	return cmdNotFound
 }
@@ -2590,5 +2601,213 @@ func save(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		n.store.save()
 		conn.WriteString("OK")
+	})
+}
+
+func geoAdd(n *Nodis, conn *redis.Conn, cmd redis.Command) {
+	if len(cmd.Args) < 4 {
+		conn.WriteError("GEOADD requires at least four arguments")
+		return
+	}
+	key := cmd.Args[0]
+	var items = make([]*geo.Member, 0)
+	var args []string
+	if cmd.Options.NX == 2 || cmd.Options.XX == 2 {
+		args = cmd.Args[2:]
+	} else if cmd.Options.NX == 1 || cmd.Options.XX == 1 {
+		if cmd.Options.CH == 2 {
+			args = cmd.Args[2:]
+		} else {
+			args = cmd.Args[1:]
+		}
+	} else {
+		args = cmd.Args[1:]
+	}
+	if len(args) < 3 {
+		conn.WriteError("GEOADD requires at least four arguments")
+		return
+	}
+	if len(args)%3 != 0 {
+		conn.WriteError("syntax error")
+		return
+	}
+	for i := 0; i < len(args); i += 3 {
+		longitude, err := redis.FormatFloat64(args[i])
+		if err != nil {
+			conn.WriteError("ERR longitude value is not a valid float")
+			return
+		}
+		latitude, err := redis.FormatFloat64(args[i+1])
+		if err != nil {
+			conn.WriteError("ERR latitude value is not a valid float")
+			return
+		}
+		items = append(items, &geo.Member{Name: args[i+2], Longitude: longitude, Latitude: latitude})
+	}
+	execCommand(conn, func() {
+		if cmd.Options.NX == 1 {
+			conn.WriteInteger(n.GeoAddNX(key, items...))
+			return
+		}
+		if cmd.Options.XX == 1 {
+			conn.WriteInteger(n.GeoAddXX(key, items...))
+			return
+		}
+		v := n.GeoAdd(key, items...)
+		conn.WriteInteger(v)
+	})
+}
+
+func geoDist(n *Nodis, conn *redis.Conn, cmd redis.Command) {
+	if len(cmd.Args) < 3 {
+		conn.WriteError("GEODIST requires at least three arguments")
+		return
+	}
+	key := cmd.Args[0]
+	member1 := cmd.Args[1]
+	member2 := cmd.Args[2]
+	execCommand(conn, func() {
+		v, err := n.GeoDist(key, member1, member2)
+		if err != nil {
+			conn.WriteBulkNull()
+			return
+		}
+		switch true {
+		case cmd.Options.KM == 3:
+			conn.WriteBulk(strconv.FormatFloat(v/1000, 'f', -1, 64))
+		case cmd.Options.MI == 3:
+			conn.WriteBulk(strconv.FormatFloat(v/1609.34, 'f', -1, 64))
+		case cmd.Options.FT == 3:
+			conn.WriteBulk(strconv.FormatFloat(v/0.3048, 'f', -1, 64))
+		default:
+			conn.WriteBulk(strconv.FormatFloat(v, 'f', -1, 64))
+		}
+	})
+}
+
+func geoHash(n *Nodis, conn *redis.Conn, cmd redis.Command) {
+	if len(cmd.Args) < 2 {
+		conn.WriteError("GEOHASH requires at least two arguments")
+		return
+	}
+	key := cmd.Args[0]
+	execCommand(conn, func() {
+		results := n.GeoHash(key, cmd.Args[1:]...)
+		conn.WriteArray(len(results))
+		for _, v := range results {
+			conn.WriteBulk(v)
+		}
+	})
+}
+
+func geoPos(n *Nodis, conn *redis.Conn, cmd redis.Command) {
+	if len(cmd.Args) < 2 {
+		conn.WriteError("GEOPOS requires at least two arguments")
+		return
+	}
+	key := cmd.Args[0]
+	execCommand(conn, func() {
+		results := n.GeoPos(key, cmd.Args[1:]...)
+		conn.WriteArray(len(results))
+		for _, v := range results {
+			if v == nil {
+				conn.WriteBulkNull()
+				continue
+			}
+			conn.WriteArray(2)
+			conn.WriteBulk(strconv.FormatFloat(v.Longitude, 'f', -1, 64))
+			conn.WriteBulk(strconv.FormatFloat(v.Latitude, 'f', -1, 64))
+		}
+	})
+}
+
+func geoRadius(n *Nodis, conn *redis.Conn, cmd redis.Command) {
+	if len(cmd.Args) < 4 {
+		conn.WriteError("GEORADIUS requires at least four arguments")
+		return
+	}
+	key := cmd.Args[0]
+	longitude, err := redis.FormatFloat64(cmd.Args[1])
+	if err != nil {
+		conn.WriteError("ERR longitude value is not a valid float")
+		return
+	}
+	latitude, err := redis.FormatFloat64(cmd.Args[2])
+	if err != nil {
+		conn.WriteError("ERR latitude value is not a valid float")
+		return
+	}
+	radius, err := redis.FormatFloat64(cmd.Args[3])
+	if err != nil {
+		conn.WriteError("ERR radius value is not a valid float")
+		return
+	}
+	if cmd.Options.KM > 3 {
+		radius *= 1000
+	}
+	if cmd.Options.MI > 3 {
+		radius *= 1609.34
+	}
+	if cmd.Options.FT > 3 {
+		radius *= 0.3048
+	}
+	var count int64 = -1
+	if cmd.Options.COUNT > 3 && cmd.Options.ANY == 0 {
+		count, err = strconv.ParseInt(cmd.Args[cmd.Options.COUNT], 10, 64)
+		if err != nil {
+			conn.WriteError("ERR count value is not a valid integer")
+			return
+		}
+	}
+	execCommand(conn, func() {
+		var results []*geo.Member
+		var err error
+		results, err = n.GeoRadius(key, longitude, latitude, radius, count, cmd.Options.DESC > 3)
+		if err != nil {
+			conn.WriteArrayNull()
+			return
+		}
+		if cmd.Options.WITHCOORD == 0 && cmd.Options.WITHDIST == 0 && cmd.Options.WITHHASH == 0 {
+			conn.WriteArray(len(results))
+			for _, v := range results {
+				conn.WriteBulk(v.Name)
+			}
+			return
+		}
+		conn.WriteArray(len(results))
+		l := 1
+		if cmd.Options.WITHCOORD > 3 {
+			l++
+		}
+		if cmd.Options.WITHDIST > 3 {
+			l++
+		}
+		if cmd.Options.WITHHASH > 3 {
+			l++
+		}
+		for _, v := range results {
+			conn.WriteArray(l)
+			conn.WriteBulk(v.Name)
+			if cmd.Options.WITHDIST > 3 {
+				dist := distance(latitude, longitude, v.Latitude, v.Longitude)
+				if cmd.Options.KM > 3 {
+					conn.WriteBulk(strconv.FormatFloat(dist/1000, 'f', -1, 64))
+				} else if cmd.Options.MI > 3 {
+					conn.WriteBulk(strconv.FormatFloat(dist/1609.34, 'f', -1, 64))
+				} else if cmd.Options.FT > 3 {
+					conn.WriteBulk(strconv.FormatFloat(dist/0.3048, 'f', -1, 64))
+				} else {
+					conn.WriteBulk(strconv.FormatFloat(dist, 'f', -1, 64))
+				}
+			}
+			if cmd.Options.WITHHASH > 3 {
+				conn.WriteInteger(int64(v.Hash()))
+			}
+			if cmd.Options.WITHCOORD > 3 {
+				conn.WriteArray(2)
+				conn.WriteBulk(strconv.FormatFloat(v.Longitude, 'f', -1, 64))
+				conn.WriteBulk(strconv.FormatFloat(v.Latitude, 'f', -1, 64))
+			}
+		}
 	})
 }

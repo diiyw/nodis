@@ -13,7 +13,7 @@ var (
 	dr          = math.Pi / 180.0
 )
 
-func (n *Nodis) GeoAdd(key string, members ...*geo.Member) (int64, error) {
+func (n *Nodis) GeoAdd(key string, members ...*geo.Member) int64 {
 	var v int64
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newZSet)
@@ -22,11 +22,11 @@ func (n *Nodis) GeoAdd(key string, members ...*geo.Member) (int64, error) {
 		}
 		return nil
 	})
-	return v, nil
+	return v
 }
 
 // GeoAddXX adds the specified members to the key only if the member already exists.
-func (n *Nodis) GeoAddXX(key string, members ...*geo.Member) (int64, error) {
+func (n *Nodis) GeoAddXX(key string, members ...*geo.Member) int64 {
 	var v int64
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, nil)
@@ -38,11 +38,11 @@ func (n *Nodis) GeoAddXX(key string, members ...*geo.Member) (int64, error) {
 		}
 		return nil
 	})
-	return v, nil
+	return v
 }
 
 // GeoAddNX adds the specified members to the key only if the member does not already exist.
-func (n *Nodis) GeoAddNX(key string, members ...*geo.Member) (int64, error) {
+func (n *Nodis) GeoAddNX(key string, members ...*geo.Member) int64 {
 	var v int64
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newZSet)
@@ -54,7 +54,7 @@ func (n *Nodis) GeoAddNX(key string, members ...*geo.Member) (int64, error) {
 		}
 		return nil
 	})
-	return v, nil
+	return v
 }
 
 func (n *Nodis) GeoDist(key string, member1, member2 string) (float64, error) {
@@ -90,9 +90,9 @@ func distance(latitude1, longitude1, latitude2, longitude2 float64) float64 {
 		math.Cos(radLat1)*math.Cos(radLat2)*math.Pow(math.Sin(b/2), 2)))
 }
 
-func (n *Nodis) GeoHash(key string, members ...string) ([]string, error) {
+func (n *Nodis) GeoHash(key string, members ...string) []string {
 	var v []string
-	err := n.exec(func(tx *Tx) error {
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
@@ -107,37 +107,84 @@ func (n *Nodis) GeoHash(key string, members ...string) ([]string, error) {
 		}
 		return nil
 	})
-	return v, err
+	return v
 }
 
-func (n *Nodis) GeoPos(key string, members ...string) ([]*geo.Member, error) {
-	var v []*geo.Member
-	err := n.exec(func(tx *Tx) error {
+func (n *Nodis) GeoPos(key string, members ...string) []*geo.Member {
+	var v = make([]*geo.Member, len(members))
+	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if meta == nil {
 			return nil
 		}
-		for _, member := range members {
+		for i, member := range members {
 			score, err := meta.value.(*zset.SortedSet).ZScore(member)
 			if err != nil {
-				return err
+				continue
 			}
 			lat, lng := geohash.DecodeInt(uint64(score))
-			v = append(v, &geo.Member{Name: member, Latitude: lat, Longitude: lng})
+			v[i] = &geo.Member{Name: member, Latitude: lat, Longitude: lng}
 		}
 		return nil
 	})
-	return v, err
+	return v
 }
 
 func (n *Nodis) GeoRadius(key string, longitude, latitude, radius float64, count int64, desc bool) ([]*geo.Member, error) {
 	var v []*geo.Member
 	err := n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
-		if meta == nil {
+		if !meta.isOk() {
 			return nil
+		}
+		bits := estimatePrecisionByRadius(radius, latitude)
+		hash := geohash.EncodeIntWithPrecision(latitude, longitude, bits)
+		neighbors := geohash.NeighborsIntWithPrecision(hash, bits)
+		for _, lower := range neighbors {
+			var items []*zset.Item
+			r := uint64(1 << (64 - bits))
+			upper := lower + r
+			if desc {
+				items = meta.value.(*zset.SortedSet).ZRangeByScore(float64(lower), float64(upper), 0, count, 0)
+			} else {
+				items = meta.value.(*zset.SortedSet).ZRevRangeByScore(float64(lower), float64(upper), 0, count, 0)
+			}
+			for _, item := range items {
+				lat, lng := geohash.DecodeInt(uint64(item.Score))
+				v = append(v, &geo.Member{Name: item.Member, Latitude: lat, Longitude: lng})
+			}
 		}
 		return nil
 	})
 	return v, err
+}
+
+const (
+	MERCATOR_MAX = 20037726.37
+)
+
+func estimatePrecisionByRadius(radiusMeters float64, lat float64) uint {
+	if radiusMeters == 0 {
+		return 63
+	}
+	var precision uint = 1
+	for radiusMeters < MERCATOR_MAX {
+		radiusMeters *= 2
+		precision++
+	}
+	/* Make sure range is included in most of the base cases. */
+	precision -= 2
+	if lat > 66 || lat < -66 {
+		precision--
+		if lat > 80 || lat < -80 {
+			precision--
+		}
+	}
+	if precision < 1 {
+		precision = 1
+	}
+	if precision > 32 {
+		precision = 32
+	}
+	return precision*2 - 1
 }

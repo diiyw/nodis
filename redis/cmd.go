@@ -32,6 +32,16 @@ type Options struct {
 	AGGREGATE  int
 	REV        int
 	TYPE       int
+	M          int
+	KM         int
+	FT         int
+	MI         int
+	ASC        int
+	DESC       int
+	ANY        int
+	WITHCOORD  int
+	WITHDIST   int
+	WITHHASH   int
 }
 
 const (

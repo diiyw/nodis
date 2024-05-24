@@ -219,6 +219,26 @@ func (r *Reader) readOptions(v string, i int) {
 		r.cmd.Options.BYTE = i
 	case "BIT":
 		r.cmd.Options.BIT = i
+	case "KM":
+		r.cmd.Options.KM = i
+	case "M":
+		r.cmd.Options.M = i
+	case "FT":
+		r.cmd.Options.FT = i
+	case "MI":
+		r.cmd.Options.MI = i
+	case "ASC":
+		r.cmd.Options.ASC = i
+	case "DESC":
+		r.cmd.Options.DESC = i
+	case "ANY":
+		r.cmd.Options.ANY = i
+	case "WITHDIST":
+		r.cmd.Options.WITHDIST = i
+	case "WITHCOORD":
+		r.cmd.Options.WITHCOORD = i
+	case "WITHHASH":
+		r.cmd.Options.WITHHASH = i
 	}
 }
 
