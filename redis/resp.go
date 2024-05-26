@@ -428,9 +428,15 @@ func (w *Writer) WriteArrayNull() {
 	w.writeBytes([]byte("*-1\r\n")...)
 }
 
-func (w *Writer) WriteInteger(v int64) {
+func (w *Writer) WriteInt64(v int64) {
 	w.writeByte(IntegerType)
 	w.writeBytes(strings.String2Bytes(strconv.FormatInt(v, 10))...)
+	w.writeBytes('\r', '\n')
+}
+
+func (w *Writer) WriteUInt64(v uint64) {
+	w.writeByte(IntegerType)
+	w.writeBytes(strings.String2Bytes(strconv.FormatUint(v, 10))...)
 	w.writeBytes('\r', '\n')
 }
 

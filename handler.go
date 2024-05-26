@@ -321,7 +321,7 @@ func config(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 
 func dbSize(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
-		conn.WriteInteger(int64(n.store.metadata.Len()))
+		conn.WriteInt64(int64(n.store.metadata.Len()))
 	})
 }
 
@@ -464,7 +464,7 @@ func del(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	execCommand(conn, func() {
-		conn.WriteInteger(n.Del(cmd.Args...))
+		conn.WriteInt64(n.Del(cmd.Args...))
 	})
 }
 
@@ -474,7 +474,7 @@ func unlink(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	execCommand(conn, func() {
-		conn.WriteInteger(n.Unlink(cmd.Args...))
+		conn.WriteInt64(n.Unlink(cmd.Args...))
 	})
 }
 
@@ -484,7 +484,7 @@ func exists(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	execCommand(conn, func() {
-		conn.WriteInteger(n.Exists(cmd.Args...))
+		conn.WriteInt64(n.Exists(cmd.Args...))
 	})
 }
 
@@ -497,22 +497,22 @@ func expire(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		seconds, _ := strconv.ParseInt(cmd.Args[1], 10, 64)
 		if cmd.Options.NX > 1 {
-			conn.WriteInteger(n.ExpireNX(cmd.Args[0], seconds))
+			conn.WriteInt64(n.ExpireNX(cmd.Args[0], seconds))
 			return
 		}
 		if cmd.Options.XX > 1 {
-			conn.WriteInteger(n.ExpireXX(cmd.Args[0], seconds))
+			conn.WriteInt64(n.ExpireXX(cmd.Args[0], seconds))
 			return
 		}
 		if cmd.Options.LT > 1 {
-			conn.WriteInteger(n.ExpireLT(cmd.Args[0], seconds))
+			conn.WriteInt64(n.ExpireLT(cmd.Args[0], seconds))
 			return
 		}
 		if cmd.Options.GT > 1 {
-			conn.WriteInteger(n.ExpireGT(cmd.Args[0], seconds))
+			conn.WriteInt64(n.ExpireGT(cmd.Args[0], seconds))
 			return
 		}
-		conn.WriteInteger(n.Expire(cmd.Args[0], seconds))
+		conn.WriteInt64(n.Expire(cmd.Args[0], seconds))
 	})
 }
 
@@ -530,22 +530,22 @@ func expireAt(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		e := time.Unix(timestamp, 0)
 		if cmd.Options.NX > 1 {
-			conn.WriteInteger(n.ExpireAtNX(cmd.Args[0], e))
+			conn.WriteInt64(n.ExpireAtNX(cmd.Args[0], e))
 			return
 		}
 		if cmd.Options.XX > 1 {
-			conn.WriteInteger(n.ExpireAtXX(cmd.Args[0], e))
+			conn.WriteInt64(n.ExpireAtXX(cmd.Args[0], e))
 			return
 		}
 		if cmd.Options.LT > 1 {
-			conn.WriteInteger(n.ExpireAtLT(cmd.Args[0], e))
+			conn.WriteInt64(n.ExpireAtLT(cmd.Args[0], e))
 			return
 		}
 		if cmd.Options.GT > 1 {
-			conn.WriteInteger(n.ExpireAtGT(cmd.Args[0], e))
+			conn.WriteInt64(n.ExpireAtGT(cmd.Args[0], e))
 			return
 		}
-		conn.WriteInteger(n.ExpireAt(cmd.Args[0], e))
+		conn.WriteInt64(n.ExpireAt(cmd.Args[0], e))
 	})
 }
 
@@ -571,14 +571,14 @@ func ttl(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		v := n.TTL(cmd.Args[0])
 		if v == -1 {
-			conn.WriteInteger(-1)
+			conn.WriteInt64(-1)
 			return
 		}
 		if v == -2 {
-			conn.WriteInteger(-2)
+			conn.WriteInt64(-2)
 			return
 		}
-		conn.WriteInteger(int64(v.Seconds()))
+		conn.WriteInt64(int64(v.Seconds()))
 	})
 }
 
@@ -590,14 +590,14 @@ func pTtl(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		v := n.PTTL(cmd.Args[0])
 		if v == -1 {
-			conn.WriteInteger(-1)
+			conn.WriteInt64(-1)
 			return
 		}
 		if v == -2 {
-			conn.WriteInteger(-2)
+			conn.WriteInt64(-2)
 			return
 		}
-		conn.WriteInteger(v)
+		conn.WriteInt64(v)
 	})
 }
 
@@ -607,7 +607,7 @@ func Persist(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	execCommand(conn, func() {
-		conn.WriteInteger(n.Persist(cmd.Args[0]))
+		conn.WriteInt64(n.Persist(cmd.Args[0]))
 	})
 }
 
@@ -645,10 +645,10 @@ func renameNx(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		newKey := cmd.Args[1]
 		v := n.RenameNX(oldKey, newKey)
 		if v == nil {
-			conn.WriteInteger(1)
+			conn.WriteInt64(1)
 			return
 		}
-		conn.WriteInteger(0)
+		conn.WriteInt64(0)
 	})
 }
 
@@ -792,7 +792,7 @@ func appendString(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		key := cmd.Args[0]
 		value := []byte(cmd.Args[1])
-		conn.WriteInteger(n.Append(key, value))
+		conn.WriteInt64(n.Append(key, value))
 	})
 }
 
@@ -819,10 +819,10 @@ func setnx(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		key := cmd.Args[0]
 		value := []byte(cmd.Args[1])
 		if n.SetNX(key, value, false) {
-			conn.WriteInteger(1)
+			conn.WriteInt64(1)
 			return
 		}
-		conn.WriteInteger(0)
+		conn.WriteInt64(0)
 	})
 }
 
@@ -838,7 +838,7 @@ func incr(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			conn.WriteBulkNull()
 			return
 		}
-		conn.WriteInteger(v)
+		conn.WriteInt64(v)
 	})
 }
 
@@ -859,7 +859,7 @@ func incrBy(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			conn.WriteBulkNull()
 			return
 		}
-		conn.WriteInteger(v)
+		conn.WriteInt64(v)
 	})
 }
 
@@ -875,7 +875,7 @@ func decr(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			conn.WriteBulkNull()
 			return
 		}
-		conn.WriteInteger(v)
+		conn.WriteInt64(v)
 	})
 }
 
@@ -896,7 +896,7 @@ func decrBy(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			conn.WriteBulkNull()
 			return
 		}
-		conn.WriteInteger(v)
+		conn.WriteInt64(v)
 	})
 }
 
@@ -985,7 +985,7 @@ func setRange(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	value := []byte(cmd.Args[2])
 	execCommand(conn, func() {
-		conn.WriteInteger(n.SetRange(key, offset, value))
+		conn.WriteInt64(n.SetRange(key, offset, value))
 	})
 }
 
@@ -1018,7 +1018,7 @@ func strLen(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	execCommand(conn, func() {
 		key := cmd.Args[0]
-		conn.WriteInteger(n.StrLen(key))
+		conn.WriteInt64(n.StrLen(key))
 	})
 }
 
@@ -1039,7 +1039,7 @@ func setBit(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	execCommand(conn, func() {
-		conn.WriteInteger(n.SetBit(key, offset, value == 1))
+		conn.WriteInt64(n.SetBit(key, offset, value == 1))
 	})
 }
 
@@ -1055,7 +1055,7 @@ func getBit(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	execCommand(conn, func() {
-		conn.WriteInteger(n.GetBit(key, offset))
+		conn.WriteInt64(n.GetBit(key, offset))
 	})
 }
 
@@ -1082,7 +1082,7 @@ func bitCount(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		}
 	}
 	execCommand(conn, func() {
-		conn.WriteInteger(n.BitCount(key, start, end, cmd.Options.BIT > 2))
+		conn.WriteInt64(n.BitCount(key, start, end, cmd.Options.BIT > 2))
 	})
 }
 
@@ -1093,7 +1093,7 @@ func sAdd(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	execCommand(conn, func() {
 		key := cmd.Args[0]
-		conn.WriteInteger(n.SAdd(key, cmd.Args[1:]...))
+		conn.WriteInt64(n.SAdd(key, cmd.Args[1:]...))
 	})
 }
 
@@ -1107,10 +1107,10 @@ func sMove(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		dst := cmd.Args[1]
 		member := cmd.Args[2]
 		if n.SMove(src, dst, member) {
-			conn.WriteInteger(1)
+			conn.WriteInt64(1)
 			return
 		}
-		conn.WriteInteger(0)
+		conn.WriteInt64(0)
 	})
 }
 
@@ -1192,7 +1192,7 @@ func scard(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	execCommand(conn, func() {
 		key := cmd.Args[0]
-		conn.WriteInteger(n.SCard(key))
+		conn.WriteInt64(n.SCard(key))
 	})
 }
 
@@ -1219,11 +1219,11 @@ func sDiffStore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		dst := cmd.Args[0]
 		keys := cmd.Args[1:]
 		if n.Exists(keys...) != int64(len(keys)) {
-			conn.WriteInteger(0)
+			conn.WriteInt64(0)
 			return
 		}
 		results := n.SDiffStore(dst, keys...)
-		conn.WriteInteger(results)
+		conn.WriteInt64(results)
 	})
 }
 
@@ -1250,11 +1250,11 @@ func sInterStore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		dst := cmd.Args[0]
 		keys := cmd.Args[1:]
 		if n.Exists(keys...) != int64(len(keys)) {
-			conn.WriteInteger(0)
+			conn.WriteInt64(0)
 			return
 		}
 		results := n.SInterStore(dst, keys...)
-		conn.WriteInteger(results)
+		conn.WriteInt64(results)
 	})
 }
 
@@ -1281,11 +1281,11 @@ func sUnionStore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		dst := cmd.Args[0]
 		keys := cmd.Args[1:]
 		if n.Exists(keys...) == 0 {
-			conn.WriteInteger(0)
+			conn.WriteInt64(0)
 			return
 		}
 		results := n.SUnionStore(dst, keys...)
-		conn.WriteInteger(results)
+		conn.WriteInt64(results)
 	})
 }
 
@@ -1302,7 +1302,7 @@ func sIsMember(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		if is {
 			r = 1
 		}
-		conn.WriteInteger(r)
+		conn.WriteInt64(r)
 	})
 }
 
@@ -1366,7 +1366,7 @@ func sRem(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	execCommand(conn, func() {
 		key := cmd.Args[0]
-		conn.WriteInteger(n.SRem(key, cmd.Args[1:]...))
+		conn.WriteInt64(n.SRem(key, cmd.Args[1:]...))
 	})
 }
 
@@ -1390,7 +1390,7 @@ func hSet(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			}
 			i += n.HMSet(key, fields)
 		}
-		conn.WriteInteger(i)
+		conn.WriteInt64(i)
 	})
 }
 
@@ -1418,7 +1418,7 @@ func hDel(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	execCommand(conn, func() {
 		key := cmd.Args[0]
-		conn.WriteInteger(n.HDel(key, cmd.Args[1:]...))
+		conn.WriteInt64(n.HDel(key, cmd.Args[1:]...))
 	})
 }
 
@@ -1429,7 +1429,7 @@ func hLen(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	execCommand(conn, func() {
 		key := cmd.Args[0]
-		conn.WriteInteger(n.HLen(key))
+		conn.WriteInt64(n.HLen(key))
 	})
 }
 
@@ -1461,7 +1461,7 @@ func hExists(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		if is {
 			r = 1
 		}
-		conn.WriteInteger(r)
+		conn.WriteInt64(r)
 	})
 }
 
@@ -1499,7 +1499,7 @@ func hIncrBy(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			conn.WriteError(err.Error())
 			return
 		}
-		conn.WriteInteger(v)
+		conn.WriteInt64(v)
 	})
 }
 
@@ -1535,7 +1535,7 @@ func hSetNX(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		key := cmd.Args[0]
 		field := cmd.Args[1]
 		value := cmd.Args[2]
-		conn.WriteInteger(n.HSetNX(key, field, []byte(value)))
+		conn.WriteInt64(n.HSetNX(key, field, []byte(value)))
 	})
 }
 
@@ -1598,7 +1598,7 @@ func hStrLen(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		key := cmd.Args[0]
 		field := cmd.Args[1]
-		conn.WriteInteger(n.HStrLen(key, field))
+		conn.WriteInt64(n.HStrLen(key, field))
 	})
 }
 
@@ -1660,7 +1660,7 @@ func lPush(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		for i := 1; i < len(cmd.Args); i++ {
 			values = append(values, []byte(cmd.Args[i]))
 		}
-		conn.WriteInteger(n.LPush(key, values...))
+		conn.WriteInt64(n.LPush(key, values...))
 	})
 }
 
@@ -1675,7 +1675,7 @@ func rPush(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		for i := 1; i < len(cmd.Args); i++ {
 			values = append(values, []byte(cmd.Args[i]))
 		}
-		conn.WriteInteger(n.RPush(key, values...))
+		conn.WriteInt64(n.RPush(key, values...))
 	})
 }
 
@@ -1755,7 +1755,7 @@ func llen(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			conn.WriteBulkNull()
 			return
 		}
-		conn.WriteInteger(v)
+		conn.WriteInt64(v)
 	})
 }
 
@@ -1786,7 +1786,7 @@ func lInsert(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		before := strings.ToUpper(cmd.Args[1]) == "BEFORE"
 		pivot := []byte(cmd.Args[2])
 		value := []byte(cmd.Args[3])
-		conn.WriteInteger(n.LInsert(key, pivot, value, before))
+		conn.WriteInt64(n.LInsert(key, pivot, value, before))
 	})
 }
 
@@ -1798,7 +1798,7 @@ func lPushx(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		key := cmd.Args[0]
 		value := []byte(cmd.Args[1])
-		conn.WriteInteger(n.LPushX(key, value))
+		conn.WriteInt64(n.LPushX(key, value))
 	})
 }
 
@@ -1809,7 +1809,7 @@ func rPushx(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		key := cmd.Args[0]
 		value := []byte(cmd.Args[1])
-		conn.WriteInteger(n.RPushX(key, value))
+		conn.WriteInt64(n.RPushX(key, value))
 	})
 }
 
@@ -1827,7 +1827,7 @@ func lRem(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	execCommand(conn, func() {
 		value := []byte(cmd.Args[2])
-		conn.WriteInteger(n.LRem(key, value, count))
+		conn.WriteInt64(n.LRem(key, value, count))
 	})
 }
 
@@ -2017,24 +2017,24 @@ func zAdd(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 				return
 			}
 			if cmd.Options.XX > 0 {
-				conn.WriteInteger(n.ZAddXX(key, member, score))
+				conn.WriteInt64(n.ZAddXX(key, member, score))
 				return
 			}
 			if cmd.Options.NX > 0 {
-				conn.WriteInteger(n.ZAddNX(key, member, score))
+				conn.WriteInt64(n.ZAddNX(key, member, score))
 				return
 			}
 			if cmd.Options.LT > 0 {
-				conn.WriteInteger(n.ZAddLT(key, member, score))
+				conn.WriteInt64(n.ZAddLT(key, member, score))
 				return
 			}
 			if cmd.Options.GT > 0 {
-				conn.WriteInteger(n.ZAddGT(key, member, score))
+				conn.WriteInt64(n.ZAddGT(key, member, score))
 				return
 			}
 			count += n.ZAdd(key, member, score)
 		}
-		conn.WriteInteger(count)
+		conn.WriteInt64(count)
 	})
 }
 
@@ -2045,7 +2045,7 @@ func zCard(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	execCommand(conn, func() {
 		key := cmd.Args[0]
-		conn.WriteInteger(n.ZCard(key))
+		conn.WriteInt64(n.ZCard(key))
 	})
 }
 
@@ -2062,7 +2062,7 @@ func zRank(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			rank, el := n.ZRankWithScore(key, member)
 			if el != nil {
 				conn.WriteArray(2)
-				conn.WriteInteger(rank)
+				conn.WriteInt64(rank)
 				conn.WriteBulk(el.Member)
 				return
 			}
@@ -2074,7 +2074,7 @@ func zRank(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			conn.WriteBulkNull()
 			return
 		}
-		conn.WriteInteger(v)
+		conn.WriteInt64(v)
 	})
 }
 
@@ -2090,7 +2090,7 @@ func zRevRank(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			rank, el := n.ZRevRankWithScore(key, member)
 			if el != nil {
 				conn.WriteArray(2)
-				conn.WriteInteger(rank)
+				conn.WriteInt64(rank)
 				conn.WriteBulk(el.Member)
 				return
 			}
@@ -2102,7 +2102,7 @@ func zRevRank(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			conn.WriteBulkNull()
 			return
 		}
-		conn.WriteInteger(v)
+		conn.WriteInt64(v)
 	})
 }
 
@@ -2435,7 +2435,7 @@ func zCount(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	execCommand(conn, func() {
-		conn.WriteInteger(n.ZCount(key, min, max, mode))
+		conn.WriteInt64(n.ZCount(key, min, max, mode))
 	})
 }
 
@@ -2445,7 +2445,7 @@ func zRem(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	execCommand(conn, func() {
 		key := cmd.Args[0]
-		conn.WriteInteger(n.ZRem(key, cmd.Args[1:]...))
+		conn.WriteInt64(n.ZRem(key, cmd.Args[1:]...))
 	})
 }
 
@@ -2465,7 +2465,7 @@ func zRemRangeByRank(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	execCommand(conn, func() {
-		conn.WriteInteger(n.ZRemRangeByRank(key, start, stop))
+		conn.WriteInt64(n.ZRemRangeByRank(key, start, stop))
 	})
 }
 
@@ -2492,7 +2492,7 @@ func zRemRangeByScore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		mode |= zset.MaxOpen
 	}
 	execCommand(conn, func() {
-		conn.WriteInteger(n.ZRemRangeByScore(key, min, max, mode))
+		conn.WriteInt64(n.ZRemRangeByScore(key, min, max, mode))
 	})
 }
 
@@ -2529,7 +2529,7 @@ func zUnionStore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	execCommand(conn, func() {
 		n.ZUnionStore(destination, keys, weights, strings.ToUpper(aggregate))
-		conn.WriteInteger(n.ZCard(destination))
+		conn.WriteInt64(n.ZCard(destination))
 	})
 }
 
@@ -2566,7 +2566,7 @@ func zInterStore(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	execCommand(conn, func() {
 		n.ZInterStore(destination, keys, weights, strings.ToUpper(aggregate))
-		conn.WriteInteger(n.ZCard(destination))
+		conn.WriteInt64(n.ZCard(destination))
 	})
 }
 
@@ -2593,7 +2593,7 @@ func zExists(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		if is {
 			r = 1
 		}
-		conn.WriteInteger(r)
+		conn.WriteInt64(r)
 	})
 }
 
@@ -2646,15 +2646,15 @@ func geoAdd(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	execCommand(conn, func() {
 		if cmd.Options.NX == 1 {
-			conn.WriteInteger(n.GeoAddNX(key, items...))
+			conn.WriteInt64(n.GeoAddNX(key, items...))
 			return
 		}
 		if cmd.Options.XX == 1 {
-			conn.WriteInteger(n.GeoAddXX(key, items...))
+			conn.WriteInt64(n.GeoAddXX(key, items...))
 			return
 		}
 		v := n.GeoAdd(key, items...)
-		conn.WriteInteger(v)
+		conn.WriteInt64(v)
 	})
 }
 
@@ -2760,7 +2760,7 @@ func geoRadius(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		}
 	}
 	execCommand(conn, func() {
-		var results []*geo.Member
+		var results map[string]*geo.Member
 		var err error
 		results, err = n.GeoRadius(key, longitude, latitude, radius, count, cmd.Options.DESC > 3)
 		if err != nil {
@@ -2801,7 +2801,7 @@ func geoRadius(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 				}
 			}
 			if cmd.Options.WITHHASH > 3 {
-				conn.WriteInteger(int64(v.Hash()))
+				conn.WriteUInt64(v.Hash())
 			}
 			if cmd.Options.WITHCOORD > 3 {
 				conn.WriteArray(2)

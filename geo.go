@@ -130,16 +130,16 @@ func (n *Nodis) GeoPos(key string, members ...string) []*geo.Member {
 	return v
 }
 
-func (n *Nodis) GeoRadius(key string, longitude, latitude, radius float64, count int64, desc bool) ([]*geo.Member, error) {
-	var v []*geo.Member
+func (n *Nodis) GeoRadius(key string, longitude, latitude, radius float64, count int64, desc bool) (map[string]*geo.Member, error) {
+	var v = make(map[string]*geo.Member)
 	err := n.exec(func(tx *Tx) error {
 		meta := tx.readKey(key)
 		if !meta.isOk() {
 			return nil
 		}
 		bits := estimatePrecisionByRadius(radius, latitude)
-		hash := geohash.EncodeIntWithPrecision(latitude, longitude, bits)
-		neighbors := geohash.NeighborsIntWithPrecision(hash, bits)
+		hash := geohash.EncodeInt(latitude, longitude)
+		neighbors := geohash.NeighborsInt(hash)
 		for _, lower := range neighbors {
 			var items []*zset.Item
 			r := uint64(1 << (64 - bits))
@@ -151,7 +151,7 @@ func (n *Nodis) GeoRadius(key string, longitude, latitude, radius float64, count
 			}
 			for _, item := range items {
 				lat, lng := geohash.DecodeInt(uint64(item.Score))
-				v = append(v, &geo.Member{Name: item.Member, Latitude: lat, Longitude: lng})
+				v[item.Member] = &geo.Member{Name: item.Member, Latitude: lat, Longitude: lng}
 			}
 		}
 		return nil
@@ -160,7 +160,7 @@ func (n *Nodis) GeoRadius(key string, longitude, latitude, radius float64, count
 }
 
 const (
-	MERCATOR_MAX = 20037726.37
+	MercatorMax = 20037726.37
 )
 
 func estimatePrecisionByRadius(radiusMeters float64, lat float64) uint {
@@ -168,7 +168,7 @@ func estimatePrecisionByRadius(radiusMeters float64, lat float64) uint {
 		return 63
 	}
 	var precision uint = 1
-	for radiusMeters < MERCATOR_MAX {
+	for radiusMeters < MercatorMax {
 		radiusMeters *= 2
 		precision++
 	}
