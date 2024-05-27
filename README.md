@@ -33,25 +33,25 @@ Nodis is a Redis implementation using the Golang programming language. This impl
 
 ## Supported Commands
 
-| **Client Handling** | **Configuration** | **Key Commands** | **String Commands** | **Set Commands** | **Hash Commands** | **List Commands** | **Sorted Set Commands** |
-| ------------------- | ----------------- | ---------------- | ------------------- | ---------------- | ----------------- | ----------------- | ----------------------- |
-| CLIENT              | FLUSHALL          | DEL              | GET                 | SADD             | HSET              | LPUSH             | ZADD                    |
-| PING                | FLUSHDB           | EXISTS           | SET                 | SSCAN            | HGET              | RPUSH             | ZCARD                   |
-| QUIT                | SAVE              | EXPIRE           | INCR                | SCARD            | HDEL              | LPOP              | ZRANK                   |
-| ECHO                | INFO              | EXPIREAT         | DECR                | SPOP             | HLEN              | RPOP              | ZREVRANK                |
-| DBSIZE              |                   | KEYS             | SETBIT              | SDIFF            | HKEYS             | LLEN              | ZSCORE                  |
-| MULTI               |                   | TTL              | GETBIT              | SINTER           | HEXISTS           | LINDEX            | ZINCRBY                 |
-| DISCARD             |                   | RENAME           | INCR                | SISMEMBER        | HGETALL           | LINSERT           | ZRANGE                  |
-| EXEC                |                   | TYPE             | DESR                | SMEMBERS         | HINCRBY           | LPUSHX            | ZREVRANGE               |
-|                     |                   | SCAN             | SETEX               | SREM             | HICRBYFLOAT       | RPUSHX            | ZRANGEBYSCORE           |
-|                     |                   | RANDOMKEY        | INCRBY              | SMOVE            | HSETNX            | LREM              | ZREVRANGEBYSCORE        |
-|                     |                   | RENAMEEX         | DECRBY              | SRANDMEMBER      | HMGET             | LSET              | ZREM                    |
-|                     |                   | PERSIST          | SETNX               | SINTERSTORE      | HMSET             | LRANGE            | ZREMRANGEBYRANK         |
-|                     |                   | PTTL             | INCRBYFLOAT         | SUNIONSTORE      | HCLEAR            | LPOPRPUSH         | ZREMRANGEBYSCORE        |
-|                     |                   | UNLINK           | APPEND              |                  | HSCAN             | RPOPLPUSH         | ZCLEAR                  |
-|                     |                   |                  | GETRANGE            |                  | HVALS             | BLPOP             | ZEXISTS                 |
-|                     |                   |                  | STRLEN              |                  | HSTRLEN           | BRPOP             | ZUNIONSTORE             |
-|                     |                   |                  | SETRANGE            |                  |                   |                   | ZINTERSTORE             |
+| **Client Handling** | **Configuration** | **Key Commands** | **String Commands** | **Set Commands** | **Hash Commands** | **List Commands** | **Sorted Set Commands** | **Geo Commands** |
+| ------------------- | ----------------- | ---------------- | ------------------- | ---------------- | ----------------- | ----------------- | ----------------------- | ---------------- |
+| CLIENT              | FLUSHALL          | DEL              | GET                 | SADD             | HSET              | LPUSH             | ZADD                    | GEOADD		   |
+| PING                | FLUSHDB           | EXISTS           | SET                 | SSCAN            | HGET              | RPUSH             | ZCARD                   | GEOPOS		   |
+| QUIT                | SAVE              | EXPIRE           | INCR                | SCARD            | HDEL              | LPOP              | ZRANK                   | GEOHASH		   |
+| ECHO                | INFO              | EXPIREAT         | DECR                | SPOP             | HLEN              | RPOP              | ZREVRANK                | GEODISH		   |
+| DBSIZE              |                   | KEYS             | SETBIT              | SDIFF            | HKEYS             | LLEN              | ZSCORE                  | GEORADIUS		   |
+| MULTI               |                   | TTL              | GETBIT              | SINTER           | HEXISTS           | LINDEX            | ZINCRBY                 | GEORADIUSBYMEMBER|
+| DISCARD             |                   | RENAME           | INCR                | SISMEMBER        | HGETALL           | LINSERT           | ZRANGE                  |				   |
+| EXEC                |                   | TYPE             | DESR                | SMEMBERS         | HINCRBY           | LPUSHX            | ZREVRANGE               |				   |
+|                     |                   | SCAN             | SETEX               | SREM             | HICRBYFLOAT       | RPUSHX            | ZRANGEBYSCORE           |				   |
+|                     |                   | RANDOMKEY        | INCRBY              | SMOVE            | HSETNX            | LREM              | ZREVRANGEBYSCORE        |				   |
+|                     |                   | RENAMEEX         | DECRBY              | SRANDMEMBER      | HMGET             | LSET              | ZREM                    |				   |
+|                     |                   | PERSIST          | SETNX               | SINTERSTORE      | HMSET             | LRANGE            | ZREMRANGEBYRANK         |				   |
+|                     |                   | PTTL             | INCRBYFLOAT         | SUNIONSTORE      | HCLEAR            | LPOPRPUSH         | ZREMRANGEBYSCORE        |				   |
+|                     |                   | UNLINK           | APPEND              |                  | HSCAN             | RPOPLPUSH         | ZCLEAR                  |				   |
+|                     |                   |                  | GETRANGE            |                  | HVALS             | BLPOP             | ZEXISTS                 |				   |
+|                     |                   |                  | STRLEN              |                  | HSTRLEN           | BRPOP             | ZUNIONSTORE             |				   |
+|                     |                   |                  | SETRANGE            |                  |                   |                   | ZINTERSTORE             |				   |
 
 ## Get Started
 

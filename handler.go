@@ -1,6 +1,7 @@
 package nodis
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"runtime"
@@ -9,7 +10,7 @@ import (
 
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/zset"
-	"github.com/diiyw/nodis/geo"
+	"github.com/diiyw/nodis/internal/geohash"
 	"github.com/diiyw/nodis/internal/strings"
 	"github.com/diiyw/nodis/redis"
 )
@@ -272,6 +273,8 @@ func getCommand(name string) func(n *Nodis, conn *redis.Conn, cmd redis.Command)
 		return geoPos
 	case "GEORADIUS":
 		return geoRadius
+	case "GEORADIUSBYMEMBER":
+		return geoRadiusByMember
 	}
 	return cmdNotFound
 }
@@ -2610,7 +2613,7 @@ func geoAdd(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		return
 	}
 	key := cmd.Args[0]
-	var items = make([]*geo.Member, 0)
+	var items = make([]*GeoMember, 0)
 	var args []string
 	if cmd.Options.NX == 2 || cmd.Options.XX == 2 {
 		args = cmd.Args[2:]
@@ -2642,7 +2645,7 @@ func geoAdd(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			conn.WriteError("ERR latitude value is not a valid float")
 			return
 		}
-		items = append(items, &geo.Member{Name: args[i+2], Longitude: longitude, Latitude: latitude})
+		items = append(items, &GeoMember{Member: args[i+2], Longitude: longitude, Latitude: latitude})
 	}
 	execCommand(conn, func() {
 		if cmd.Options.NX == 1 {
@@ -2674,13 +2677,13 @@ func geoDist(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		}
 		switch true {
 		case cmd.Options.KM == 3:
-			conn.WriteBulk(strconv.FormatFloat(v/1000, 'f', -1, 64))
+			conn.WriteBulk(fmt.Sprintf("%0.4f", v/1000))
 		case cmd.Options.MI == 3:
-			conn.WriteBulk(strconv.FormatFloat(v/1609.34, 'f', -1, 64))
+			conn.WriteBulk(fmt.Sprintf("%0.4f", v/1609.34))
 		case cmd.Options.FT == 3:
-			conn.WriteBulk(strconv.FormatFloat(v/0.3048, 'f', -1, 64))
+			conn.WriteBulk(fmt.Sprintf("%0.4f", v/0.3048))
 		default:
-			conn.WriteBulk(strconv.FormatFloat(v, 'f', -1, 64))
+			conn.WriteBulk(fmt.Sprintf("%0.4f", v))
 		}
 	})
 }
@@ -2760,7 +2763,7 @@ func geoRadius(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		}
 	}
 	execCommand(conn, func() {
-		var results map[string]*geo.Member
+		var results []*GeoMember
 		var err error
 		results, err = n.GeoRadius(key, longitude, latitude, radius, count, cmd.Options.DESC > 3)
 		if err != nil {
@@ -2770,7 +2773,7 @@ func geoRadius(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		if cmd.Options.WITHCOORD == 0 && cmd.Options.WITHDIST == 0 && cmd.Options.WITHHASH == 0 {
 			conn.WriteArray(len(results))
 			for _, v := range results {
-				conn.WriteBulk(v.Name)
+				conn.WriteBulk(v.Member)
 			}
 			return
 		}
@@ -2787,18 +2790,103 @@ func geoRadius(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		}
 		for _, v := range results {
 			conn.WriteArray(l)
-			conn.WriteBulk(v.Name)
+			conn.WriteBulk(v.Member)
 			if cmd.Options.WITHDIST > 3 {
-				dist := distance(latitude, longitude, v.Latitude, v.Longitude)
+				h, _ := geohash.EncodeWGS84(longitude, latitude)
+				dist := geohash.DistBetweenGeoHashWGS84(h, v.Hash())
 				if cmd.Options.KM > 3 {
-					conn.WriteBulk(strconv.FormatFloat(dist/1000, 'f', -1, 64))
+					conn.WriteBulk(fmt.Sprintf("%0.4f", dist/1000))
 				} else if cmd.Options.MI > 3 {
-					conn.WriteBulk(strconv.FormatFloat(dist/1609.34, 'f', -1, 64))
+					conn.WriteBulk(fmt.Sprintf("%0.4f", dist/1609.34))
 				} else if cmd.Options.FT > 3 {
-					conn.WriteBulk(strconv.FormatFloat(dist/0.3048, 'f', -1, 64))
+					conn.WriteBulk(fmt.Sprintf("%0.4f", dist/0.3048))
 				} else {
-					conn.WriteBulk(strconv.FormatFloat(dist, 'f', -1, 64))
+					conn.WriteBulk(fmt.Sprintf("%0.4f", dist))
 				}
+			}
+			if cmd.Options.WITHHASH > 3 {
+				conn.WriteUInt64(v.Hash())
+			}
+			if cmd.Options.WITHCOORD > 3 {
+				conn.WriteArray(2)
+				conn.WriteBulk(strconv.FormatFloat(v.Longitude, 'f', -1, 64))
+				conn.WriteBulk(strconv.FormatFloat(v.Latitude, 'f', -1, 64))
+			}
+		}
+	})
+}
+
+func geoRadiusByMember(n *Nodis, conn *redis.Conn, cmd redis.Command) {
+	if len(cmd.Args) < 3 {
+		conn.WriteError("GEORADIUSBYMEMBER requires at least three arguments")
+		return
+	}
+	key := cmd.Args[0]
+	member := cmd.Args[1]
+	radius, err := redis.FormatFloat64(cmd.Args[2])
+	if err != nil {
+		conn.WriteError("ERR radius value is not a valid float")
+		return
+	}
+	if cmd.Options.KM > 3 {
+		radius *= 1000
+	}
+	if cmd.Options.MI > 3 {
+		radius *= 1609.34
+	}
+	if cmd.Options.FT > 3 {
+		radius *= 0.3048
+	}
+	var count int64 = -1
+	if cmd.Options.COUNT > 3 && cmd.Options.ANY == 0 {
+		count, err = strconv.ParseInt(cmd.Args[cmd.Options.COUNT], 10, 64)
+		if err != nil {
+			conn.WriteError("ERR count value is not a valid integer")
+			return
+		}
+	}
+	execCommand(conn, func() {
+		var results []*GeoMember
+		var err error
+		results, err = n.GeoRadiusByMember(key, member, radius, count, cmd.Options.DESC > 3)
+		if err != nil {
+			conn.WriteArrayNull()
+			return
+		}
+		if cmd.Options.WITHCOORD == 0 && cmd.Options.WITHDIST == 0 && cmd.Options.WITHHASH == 0 {
+			conn.WriteArray(len(results))
+			for _, v := range results {
+				conn.WriteBulk(v.Member)
+			}
+			return
+		}
+		conn.WriteArray(len(results))
+		l := 1
+		if cmd.Options.WITHCOORD > 3 {
+			l++
+		}
+		if cmd.Options.WITHDIST > 3 {
+			l++
+		}
+		if cmd.Options.WITHHASH > 3 {
+			l++
+		}
+		for _, v := range results {
+			conn.WriteArray(l)
+			conn.WriteBulk(v.Member)
+			if cmd.Options.WITHDIST > 3 {
+				h, _ := geohash.EncodeWGS84(v.Longitude, v.Latitude)
+				dist := geohash.DistBetweenGeoHashWGS84(h, v.Hash())
+				if cmd.Options.KM > 3 {
+					conn.WriteBulk(fmt.Sprintf("%0.4f", dist/1000))
+				}
+				if cmd.Options.MI > 3 {
+					conn.WriteBulk(fmt.Sprintf("%0.4f", dist/1609.34))
+				}
+				if cmd.Options.FT > 3 {
+					conn.WriteBulk(fmt.Sprintf("%0.4f", dist/0.3048))
+				}
+				conn.WriteBulk(fmt.Sprintf("%0.4f", dist))
 			}
 			if cmd.Options.WITHHASH > 3 {
 				conn.WriteUInt64(v.Hash())
