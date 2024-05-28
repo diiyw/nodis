@@ -1,4 +1,4 @@
-package sync
+package nodis
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 
 func TestWebsocket_Publish(t *testing.T) {
 	ws := NewWebsocket()
-	go ws.Publish("127.0.0.1:8080", func(conn Conn) {
+	go ws.Publish("127.0.0.1:8080", func(conn SyncConn) {
 		fmt.Println("connected")
 		conn.Send(&pb.Op{Operation: &pb.Operation{Type: pb.OpType_Set, Key: "test", Value: []byte("test")}})
 	})

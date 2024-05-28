@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/diiyw/nodis/fs"
-	"github.com/diiyw/nodis/internal/sync"
 )
 
 const (
@@ -39,7 +38,7 @@ type Options struct {
 	Filesystem fs.Fs
 
 	// Synchronizer is the synchronizer to use. The default is nil and no synchronization is performed.
-	Synchronizer sync.Synchronizer
+	Synchronizer Synchronizer
 }
 
 var DefaultOptions = &Options{

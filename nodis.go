@@ -12,7 +12,6 @@ import (
 	"github.com/diiyw/nodis/ds/list"
 	"github.com/diiyw/nodis/fs"
 	"github.com/diiyw/nodis/internal/notifier"
-	nSync "github.com/diiyw/nodis/internal/sync"
 	"github.com/diiyw/nodis/pb"
 	"github.com/diiyw/nodis/redis"
 	"github.com/tidwall/btree"
@@ -220,7 +219,7 @@ func (n *Nodis) patch(op *pb.Op) error {
 }
 
 func (n *Nodis) Publish(addr string, pattern []string) error {
-	return n.options.Synchronizer.Publish(addr, func(s nSync.Conn) {
+	return n.options.Synchronizer.Publish(addr, func(s SyncConn) {
 		id := n.WatchKey(pattern, func(op *pb.Operation) {
 			err := s.Send(&pb.Op{Operation: op})
 			if err != nil {

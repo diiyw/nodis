@@ -1,15 +1,15 @@
-package sync
+package nodis
 
 import (
 	"github.com/diiyw/nodis/pb"
 )
 
 type Synchronizer interface {
-	Publish(addr string, fn func(c Conn)) error
+	Publish(addr string, fn func(c SyncConn)) error
 	Subscribe(addr string, fn func(*pb.Op)) error
 }
 
-type Conn interface {
+type SyncConn interface {
 	Send(*pb.Op) error
 	Wait() error
 }

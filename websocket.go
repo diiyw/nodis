@@ -1,6 +1,6 @@
 //go:build !js
 
-package sync
+package nodis
 
 import (
 	"net/http"
@@ -24,7 +24,7 @@ func NewWebsocket() *Websocket {
 	}
 }
 
-func (ws *Websocket) Publish(addr string, fn func(Conn)) error {
+func (ws *Websocket) Publish(addr string, fn func(SyncConn)) error {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		c, err := ws.upgrader.Upgrade(w, r, nil)
 		if err != nil {

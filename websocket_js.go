@@ -1,4 +1,4 @@
-package sync
+package nodis
 
 import (
 	"errors"
@@ -15,7 +15,7 @@ func NewWebsocket() *Websocket {
 	return &Websocket{}
 }
 
-func (ws *Websocket) Publish(addr string, fn func(c Conn)) error {
+func (ws *Websocket) Publish(addr string, fn func(c SyncConn)) error {
 	return errors.New("Websocket publish not implemented in js")
 }
 
