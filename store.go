@@ -421,5 +421,9 @@ func (s *store) clear() error {
 	if err != nil {
 		return err
 	}
+	err = s.filesystem.Remove(s.indexFile)
+	if err != nil {
+		return err
+	}
 	return nil
 }

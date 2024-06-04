@@ -7,6 +7,7 @@ type Fs interface {
 	// IsDir if not exist, return false whith os.ErrNotExist
 	IsDir(path string) (bool, error)
 	RemoveAll(path string) error
+	Remove(filename string) error
 }
 
 type File interface {

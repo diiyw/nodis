@@ -47,6 +47,13 @@ func (m *Memory) RemoveAll(path string) error {
 	return nil
 }
 
+func (m *Memory) Remove(filename string) error {
+	m.Lock()
+	defer m.Unlock()
+	m.files.Delete(filename)
+	return nil
+}
+
 type MemoryFile struct {
 	data []byte
 }

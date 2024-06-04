@@ -42,6 +42,11 @@ func (d *Disk) IsDir(path string) (bool, error) {
 func (d *Disk) RemoveAll(path string) error {
 	return os.RemoveAll(path)
 }
+
+func (d *Disk) Remove(filename string) error {
+	return os.Remove(filename)
+}
+
 func (d *DiskFile) ReadAt(b []byte, off int64) (n int, err error) {
 	n, err = d.File.ReadAt(b, off)
 	if err == io.EOF {
