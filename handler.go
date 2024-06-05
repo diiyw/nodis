@@ -1551,6 +1551,10 @@ func hMGet(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		key := cmd.Args[0]
 		fields := cmd.Args[1:]
 		results := n.HMGet(key, fields...)
+		if results == nil {
+			conn.WriteBulkNull()
+			return
+		}
 		conn.WriteArray(len(results))
 		for _, v := range results {
 			if v == nil {
