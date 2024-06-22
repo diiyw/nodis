@@ -241,7 +241,7 @@ func TestNodis_Stick(t *testing.T) {
 	n := Open(opt)
 	n.Set("test", []byte("test"), false)
 	n.WatchKey([]string{"test"}, func(op patch.Op) {
-		if string(op.Data.GetKey()) != "test_new" {
+		if string(op.Data.(*patch.OpSet).Value) != "test_new" {
 			t.Errorf("Stick() = %v, want %v", op, "test_new")
 		}
 	})
