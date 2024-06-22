@@ -1,17 +1,16 @@
 package notifier
 
 import (
+	"github.com/diiyw/nodis/patch"
 	"path/filepath"
-
-	"github.com/diiyw/nodis/pb"
 )
 
 type Notifier struct {
 	pattern []string
-	fn      func(op *pb.Operation)
+	fn      func(op patch.Op)
 }
 
-func New(pattern []string, fn func(op *pb.Operation)) *Notifier {
+func New(pattern []string, fn func(op patch.Op)) *Notifier {
 	return &Notifier{
 		pattern: pattern,
 		fn:      fn,
@@ -33,6 +32,6 @@ func (w *Notifier) Matched(key string) bool {
 }
 
 // Push sends the operation to the watcher
-func (w *Notifier) Push(op *pb.Operation) {
+func (w *Notifier) Push(op patch.Op) {
 	w.fn(op)
 }

@@ -1,0 +1,201 @@
+syntax = "proto3";
+
+package patch;
+
+option go_package = "../patch";
+
+message OpClear {
+  string Key = 1;
+}
+
+message OpDel {
+  string Key = 1;
+}
+
+message OpExpire {
+  string Key = 1;
+  int64 Expiration = 2;
+}
+
+message OpExpireAt {
+  string Key = 1;
+  int64 Expiration = 2;
+}
+
+message OpHClear {
+  string Key = 1;
+}
+
+message OpHDel {
+  string Key = 1;
+  repeated string Fields = 2;
+}
+
+message OpHIncrBy {
+  string Key = 1;
+  string Field = 2;
+  int64 IncrInt = 3;
+}
+
+message OpHIncrByFloat {
+  string Key = 1;
+  string Field = 2;
+  double IncrFloat = 3;
+}
+
+message OpHSet {
+  string Key = 1;
+  string Field = 2;
+  bytes Value = 3;
+}
+
+message OpHMSet {
+  string Key = 1;
+  repeated string Fields = 2;
+  repeated bytes Values = 3;
+}
+
+message OpLInsert {
+  string Key = 1;
+  bytes Pivot = 2;
+  bytes Value = 3;
+  bool Before = 4;
+}
+
+message OpLPop {
+  string Key = 1;
+  int64 Count = 2;
+}
+
+message OpLPopRPush {
+  string Key = 1;
+  string DstKey = 2;
+}
+
+message OpLPush {
+  string Key = 1;
+  repeated bytes Values = 2;
+}
+
+message OpLPushX {
+  string Key = 1;
+  bytes Value = 2;
+}
+
+message OpLRem {
+  string Key = 1;
+  bytes Value = 2;
+  int64 Count = 3;
+}
+
+message OpLSet {
+  string Key = 1;
+  int64 Index = 2;
+  bytes Value = 3;
+}
+
+message OpLTrim {
+  string Key = 1;
+  int64 Start = 2;
+  int64 Stop = 3;
+}
+
+message OpRPop {
+  string Key = 1;
+  int64 Count = 2;
+}
+
+message OpRPopLPush {
+  string Key = 1;
+  string DstKey = 2;
+}
+
+message OpRPush {
+  string Key = 1;
+  repeated bytes Values = 2;
+}
+
+message OpRPushX {
+  string Key = 1;
+  bytes Value = 2;
+}
+
+message OpSAdd {
+  string Key = 1;
+  repeated string Members = 2;
+}
+
+message OpSRem {
+  string Key = 1;
+  repeated string Members = 2;
+}
+
+message OpSet {
+  string Key = 1;
+  bytes Value = 2;
+  bool KeepTTL = 3;
+  int64 Expiration = 4;
+}
+
+message OpZAdd {
+  string Key = 1;
+  string Member = 2;
+  double Score = 3;
+}
+
+message OpZClear {
+  string Key = 1;
+}
+
+message OpZIncrBy {
+  string Key = 1;
+  string Member = 2;
+  double Score = 3;
+}
+
+message OpZRem {
+  string Key = 1;
+  string Member = 2;
+  repeated string Members = 3;
+}
+
+message OpZRemRangeByRank {
+  string Key = 1;
+  int64 Start = 2;
+  int64 Stop = 3;
+}
+
+message OpZRemRangeByScore {
+  string Key = 1;
+  int64 Mode = 2;
+  double Min = 3;
+  double Max = 4;
+}
+
+message OpRename {
+  string Key = 1;
+  string DstKey = 2;
+}
+
+message OpPersist {
+  string Key = 1;
+}
+
+message OpZUnionStore {
+  string Key = 1;
+  repeated string Keys = 2;
+  repeated double Weights = 3;
+  string Aggregate = 4;
+}
+
+message OpZInterStore {
+  string Key = 1;
+  repeated string Keys = 2;
+  repeated double Weights = 3;
+  string Aggregate = 4;
+}
+
+message OpRenameNX {
+  string Key = 1;
+  string DstKey = 2;
+}

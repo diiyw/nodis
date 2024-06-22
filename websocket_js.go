@@ -4,8 +4,7 @@ import (
 	"errors"
 	"syscall/js"
 
-	"github.com/diiyw/nodis/pb"
-	"google.golang.org/protobuf/proto"
+	"github.com/diiyw/nodis/patch"
 )
 
 type Websocket struct {
@@ -19,7 +18,7 @@ func (ws *Websocket) Publish(addr string, fn func(c SyncConn)) error {
 	return errors.New("Websocket publish not implemented in js")
 }
 
-func (ws *Websocket) Subscribe(addr string, fn func(*pb.Op)) error {
+func (ws *Websocket) Subscribe(addr string, fn func(patch.Op)) error {
 	jsWs := js.Global().Get("WebSocket").New(addr)
 	jsWs.Call("addEventListener", "open", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		return nil
@@ -31,12 +30,11 @@ func (ws *Websocket) Subscribe(addr string, fn func(*pb.Op)) error {
 			var data = make([]byte, uint8array.Get("length").Int())
 			n := js.CopyBytesToGo(data, uint8array)
 			if n > 0 {
-				var op = &pb.Operation{}
-				err := proto.Unmarshal(data, op)
+				op, err := patch.DecodeOp(data)
 				if err != nil {
 					println("Subscribe:", err.Error())
 				}
-				fn(&pb.Op{Operation: op})
+				fn(op)
 			}
 			return nil
 		}))

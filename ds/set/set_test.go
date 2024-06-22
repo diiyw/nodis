@@ -1,6 +1,9 @@
 package set
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestSet_SAdd(t *testing.T) {
 	s := NewSet()
@@ -118,5 +121,22 @@ func TestSet_SUnionStore(t *testing.T) {
 	s1.SUnionStore(s3, s2)
 	if !s3.SIsMember("world") {
 		t.Errorf("SUnionStore failed")
+	}
+}
+
+func TestGetSetValue(t *testing.T) {
+	s := NewSet()
+	s.SAdd("hello")
+	s.SAdd("world")
+	s.SAdd("worldxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+	s.SAdd("helloxx")
+	v := s.GetValue()
+	s2 := NewSet()
+	s2.SetValue(v)
+	if s.SCard() != s2.SCard() {
+		t.Errorf("GetValue failed")
+	}
+	for _, s3 := range s2.SMembers() {
+		fmt.Println(s3)
 	}
 }

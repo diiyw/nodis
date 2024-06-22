@@ -1,15 +1,13 @@
 package nodis
 
 import (
-	"hash/crc32"
+	"bytes"
 	"log"
 	"os"
 	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
-
-	"google.golang.org/protobuf/proto"
 
 	"encoding/binary"
 
@@ -20,7 +18,6 @@ import (
 	"github.com/diiyw/nodis/ds/str"
 	"github.com/diiyw/nodis/ds/zset"
 	"github.com/diiyw/nodis/fs"
-	"github.com/diiyw/nodis/pb"
 	"github.com/diiyw/nodis/redis"
 	"github.com/tidwall/btree"
 )
@@ -60,20 +57,26 @@ func newStore(path string, fileSize int64, filesystem fs.Fs) *store {
 		panic(err)
 	}
 	if len(data) > 2 {
+		s.fileId = binary.LittleEndian.Uint16(data[:2])
 		if len(data[2:]) > 0 {
-			var idx = &pb.Index{}
-			err = proto.Unmarshal(data[2:], idx)
-			if err != nil {
-				panic(err)
-			}
-			for _, v := range idx.Items {
+			data = data[2:]
+			for {
+				if len(data) == 0 {
+					break
+				}
+				keyLen := int(data[0])
+				key := string(data[1 : 1+keyLen])
+				data = data[1+keyLen:]
+				if len(data) == 0 {
+					break
+				}
 				var m = newMetadata(&Key{}, nil, false)
-				m.unmarshal(v.Data)
+				m.unmarshal(data)
+				data = data[metadataSize:]
 				m.state |= KeyStateNormal
-				s.metadata.Set(v.Key, m)
+				s.metadata.Set(key, m)
 			}
 		}
-		s.fileId = binary.LittleEndian.Uint16(data[:2])
 	}
 	s.filesystem = filesystem
 	s.current = filepath.Join(path, "nodis."+strconv.Itoa(int(s.fileId))+".aof")
@@ -86,7 +89,7 @@ func newStore(path string, fileSize int64, filesystem fs.Fs) *store {
 
 func (s *store) fromStorage(m *metadata) *metadata {
 	// try get from storage
-	v, err := s.getEntryRaw(m.key)
+	v, err := s.getValueEntryRaw(m.key)
 	if err == nil && len(v) > 0 {
 		value, err := s.parseValue(v)
 		if err != nil {
@@ -101,21 +104,17 @@ func (s *store) fromStorage(m *metadata) *metadata {
 	return m
 }
 
-func (s *store) parseEntry(data []byte) (*pb.Entry, error) {
-	c32 := binary.LittleEndian.Uint32(data)
-	if c32 != crc32.ChecksumIEEE(data[4:]) {
-		return nil, ErrCorruptedData
-	}
-	var entry pb.Entry
-	if err := proto.Unmarshal(data[4:], &entry); err != nil {
+func (s *store) parseEntryBytes(data []byte) (*ValueEntry, error) {
+	var entry = &ValueEntry{}
+	if err := entry.decode(data); err != nil {
 		return nil, err
 	}
-	return &entry, nil
+	return entry, nil
 }
 
 // parseValue the data
 func (s *store) parseValue(data []byte) (ds.Value, error) {
-	var entry, err = s.parseEntry(data)
+	var entry, err = s.parseEntryBytes(data)
 	if err != nil {
 		return nil, err
 	}
@@ -123,23 +122,23 @@ func (s *store) parseValue(data []byte) (ds.Value, error) {
 	switch ds.ValueType(entry.Type) {
 	case ds.String:
 		v := str.NewString()
-		v.SetValue(entry.GetStringValue().Value)
+		v.SetValue(entry.Value)
 		value = v
 	case ds.ZSet:
 		z := zset.NewSortedSet()
-		z.SetValue(entry.GetZSetValue().Values)
+		z.SetValue(entry.Value)
 		value = z
 	case ds.List:
 		l := list.NewLinkedList()
-		l.SetValue(entry.GetListValue().Values)
+		l.SetValue(entry.Value)
 		value = l
 	case ds.Hash:
 		h := hash.NewHashMap()
-		h.SetValue(entry.GetHashValue().Values)
+		h.SetValue(entry.Value)
 		value = h
 	case ds.Set:
 		v := set.NewSet()
-		v.SetValue(entry.GetSetValue().Values)
+		v.SetValue(entry.Value)
 		value = v
 	default:
 		panic("unhandled default case")
@@ -160,7 +159,7 @@ func (s *store) save() {
 			return true
 		}
 		// save to storage
-		err := s.putMetadata(key, m)
+		err := s.saveMetadata(key, m)
 		if err != nil {
 			log.Println("Flush changes: ", err)
 		}
@@ -186,7 +185,7 @@ func (s *store) tidy(keyMaxUseTimes uint64) {
 		if m.useTimes < keyMaxUseTimes {
 			if m.modified() {
 				// save to disk
-				err := s.putMetadata(key, m)
+				err := s.saveMetadata(key, m)
 				if err != nil {
 					log.Println("Tidy: ", err)
 				}
@@ -236,18 +235,15 @@ func (s *store) check() (int64, error) {
 	return offset, nil
 }
 
-func (s *store) putMetadata(name string, m *metadata) error {
+func (s *store) saveMetadata(name string, m *metadata) error {
 	offset, err := s.check()
 	if err != nil {
 		return err
 	}
 	m.key.fileId = s.fileId
 	m.key.offset = offset
-	entry := newEntry(name, m.value, m.expiration)
-	data, err := entry.Marshal()
-	if err != nil {
-		return err
-	}
+	v := newValueEntry(name, m.value, m.expiration)
+	data := v.encode()
 	m.key.size = uint32(len(data))
 	_, err = s.aof.Write(data)
 	if err != nil {
@@ -256,17 +252,14 @@ func (s *store) putMetadata(name string, m *metadata) error {
 	return nil
 }
 
-// putEntry a key-value pair into store
-func (s *store) putEntry(entry *pb.Entry) error {
+// saveValueEntry a key-value pair into store
+func (s *store) saveValueEntry(entry *ValueEntry) error {
 	var m = newMetadata(&Key{}, nil, false)
 	offset, err := s.check()
 	if err != nil {
 		return err
 	}
-	data, err := entry.Marshal()
-	if err != nil {
-		return err
-	}
+	data := entry.encode()
 	m.key.fileId = s.fileId
 	m.key.offset = offset
 	m.key.size = uint32(len(data))
@@ -280,7 +273,7 @@ func (s *store) putEntry(entry *pb.Entry) error {
 	return nil
 }
 
-func (s *store) putRaw(name string, m *metadata, data []byte) error {
+func (s *store) saveValueRaw(name string, m *metadata, data []byte) error {
 	offset, err := s.check()
 	if err != nil {
 		return err
@@ -297,8 +290,8 @@ func (s *store) putRaw(name string, m *metadata, data []byte) error {
 	return nil
 }
 
-// getEntryRaw get entry raw data
-func (s *store) getEntryRaw(key *Key) ([]byte, error) {
+// getValueEntryRaw get entry raw data
+func (s *store) getValueEntryRaw(key *Key) ([]byte, error) {
 	if key.fileId == s.fileId {
 		data := make([]byte, key.size)
 		_, err := s.aof.ReadAt(data, key.offset)
@@ -340,12 +333,12 @@ func (s *store) snapshot(path string) {
 	s.save()
 	ns := newStore(snapshotDir, s.fileSize, s.filesystem)
 	s.metadata.Copy().Scan(func(key string, meta *metadata) bool {
-		data, err := s.getEntryRaw(meta.key)
+		data, err := s.getValueEntryRaw(meta.key)
 		if err != nil {
 			log.Println("Snapshot get error: ", err)
 			return true
 		}
-		err = ns.putRaw(key, meta, data)
+		err = ns.saveValueRaw(key, meta, data)
 		if err != nil {
 			log.Println("Snapshot put error: ", err)
 			return true
@@ -378,9 +371,7 @@ func (s *store) close() error {
 	if err != nil {
 		return err
 	}
-	indexData := &pb.Index{
-		Items: make([]*pb.Index_Item, 0, s.metadata.Len()),
-	}
+	var buf bytes.Buffer
 	now := time.Now().UnixMilli()
 	s.metadata.Copy().Scan(func(key string, m *metadata) bool {
 		m.RLock()
@@ -388,17 +379,12 @@ func (s *store) close() error {
 		if m.expired(now) {
 			return true
 		}
-		indexData.Items = append(indexData.Items, &pb.Index_Item{
-			Key:  key,
-			Data: m.marshal(),
-		})
+		buf.WriteByte(byte(len(key)))
+		buf.WriteString(key)
+		buf.Write(m.marshal())
 		return true
 	})
-	data, err := proto.Marshal(indexData)
-	if err != nil {
-		return err
-	}
-	_, err = idxFile.Write(data)
+	_, err = buf.WriteTo(idxFile)
 	if err != nil {
 		return err
 	}

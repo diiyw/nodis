@@ -27,9 +27,9 @@ func TestStorePut(t *testing.T) {
 	value := []byte("testValue")
 	strVal := str.NewString()
 	strVal.Set(value)
-	e := newEntry(key, strVal, time.Now().Unix())
+	e := newValueEntry(key, strVal, time.Now().Unix())
 	// Call the put method
-	err := store.putEntry(newEntry(key, strVal, time.Now().Unix()))
+	err := store.saveValueEntry(newValueEntry(key, strVal, time.Now().Unix()))
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestStorePut(t *testing.T) {
 	if m.key.offset != 0 {
 		t.Errorf("Expected offset to be 0, got %d", m.key.offset)
 	}
-	v, _ := e.Marshal()
+	v := e.encode()
 	if m.key.size != uint32(len(v)) {
 		t.Errorf("Expected size to be %d, got %d", len(v), m.key.size)
 	}
@@ -84,7 +84,7 @@ func TestStoreGet(t *testing.T) {
 	strVal := str.NewString()
 	strVal.Set(value)
 	// Call the put method
-	err := store.putEntry(newEntry(name, strVal, time.Now().Unix()))
+	err := store.saveValueEntry(newValueEntry(name, strVal, time.Now().Unix()))
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestStoreGet(t *testing.T) {
 		t.Fatalf("Failed to get value for key: %v", err)
 	}
 	// Call the get method
-	data, err := store.getEntryRaw(meta.key)
+	data, err := store.getValueEntryRaw(meta.key)
 	if err != nil {
 		t.Fatalf("Failed to get value for key: %v", err)
 	}
@@ -120,10 +120,10 @@ func TestStoreMultiPut(t *testing.T) {
 		strVal := str.NewString()
 		strVal.Set(value)
 		// Call the put method
-		e := newEntry(key, strVal, time.Now().Unix()+3600)
-		data, _ := e.Marshal()
+		e := newValueEntry(key, strVal, time.Now().Unix()+3600)
+		data := e.encode()
 		result[key] = data
-		err := store.putEntry(e)
+		err := store.saveValueEntry(e)
 		if err != nil {
 			t.Fatalf("Failed to put key-value pair: %v", err)
 		}
@@ -137,7 +137,7 @@ func TestStoreMultiPut(t *testing.T) {
 		if !ok {
 			t.Fatalf("Failed to get value for key: %v", name)
 		}
-		v, err := store.getEntryRaw(meta.key)
+		v, err := store.getValueEntryRaw(meta.key)
 		if err != nil {
 			t.Fatalf("Failed to get value for key: %v", err)
 		}
@@ -178,13 +178,13 @@ func TestStoreMultiFilePut(t *testing.T) {
 
 	for _, m := range kv {
 		for key, value := range m {
-			ds := str.NewString()
-			ds.Set(value)
+			v := str.NewString()
+			v.Set(value)
 			// Call the put method
-			e := newEntry(key, ds, time.Now().Unix()+3600)
-			data, _ := e.Marshal()
+			e := newValueEntry(key, v, time.Now().Unix()+3600)
+			data := e.encode()
 			result[key] = data
-			err := store.putEntry(e)
+			err := store.saveValueEntry(e)
 			if err != nil {
 				t.Fatalf("Failed to put key-value pair: %v", err)
 			}
@@ -197,7 +197,7 @@ func TestStoreMultiFilePut(t *testing.T) {
 			if !ok {
 				t.Fatalf("Failed to get value for key: %v", name)
 			}
-			v, err := store.getEntryRaw(meta.key)
+			v, err := store.getValueEntryRaw(meta.key)
 			if err != nil {
 				t.Fatalf("Failed to get value for key: %v , err %v ", name, err)
 			}
@@ -224,7 +224,7 @@ func TestStoreRemove(t *testing.T) {
 	strVal := str.NewString()
 	strVal.Set(value)
 	// Call the put method
-	err := store.putEntry(newEntry(key, strVal, time.Now().Unix()+3600))
+	err := store.saveValueEntry(newValueEntry(key, strVal, time.Now().Unix()+3600))
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
@@ -242,15 +242,12 @@ func TestStorePutRaw(t *testing.T) {
 	strVal := str.NewString()
 	strVal.Set(value)
 	expiration := time.Now().Unix() + 3600
-	var e = newEntry(name, strVal, expiration)
-	data, err := e.Marshal()
-	if err != nil {
-		t.Fatalf("Failed to marshal data: %v", err)
-	}
+	var e = newValueEntry(name, strVal, expiration)
+	data := e.encode()
 	m := newMetadata(&Key{}, nil, false)
 	m.expiration = expiration
-	// Call the putRaw method
-	err = store.putRaw(name, m, data)
+	// Call the saveValueRaw method
+	err := store.saveValueRaw(name, m, data)
 	if err != nil {
 		t.Fatalf("Failed to put key-value pair: %v", err)
 	}
@@ -260,7 +257,7 @@ func TestStorePutRaw(t *testing.T) {
 	if meta == nil {
 		t.Fatalf("Failed to retrieve index for key: %s", name)
 	}
-	nd, err := store.getEntryRaw(meta.key)
+	nd, err := store.getValueEntryRaw(meta.key)
 	if err != nil {
 		t.Fatalf("Failed to get value for key: %v", err)
 	}

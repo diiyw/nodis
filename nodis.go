@@ -12,7 +12,7 @@ import (
 	"github.com/diiyw/nodis/ds/list"
 	"github.com/diiyw/nodis/fs"
 	"github.com/diiyw/nodis/internal/notifier"
-	"github.com/diiyw/nodis/pb"
+	"github.com/diiyw/nodis/patch"
 	"github.com/diiyw/nodis/redis"
 	"github.com/tidwall/btree"
 )
@@ -91,11 +91,11 @@ func (n *Nodis) Clear() {
 
 // SetEntry sets an entity
 func (n *Nodis) SetEntry(data []byte) error {
-	entity, err := n.store.parseEntry(data)
+	entity, err := n.store.parseEntryBytes(data)
 	if err != nil {
 		return err
 	}
-	return n.store.putEntry(entity)
+	return n.store.saveValueEntry(entity)
 }
 
 // GetEntry gets an entity
@@ -105,30 +105,29 @@ func (n *Nodis) GetEntry(key string) (data []byte) {
 		if !meta.isOk() {
 			return nil
 		}
-		var entity = newEntry(key, meta.value, meta.expiration)
-		data, _ = entity.Marshal()
+		var entity = newValueEntry(key, meta.value, meta.expiration)
+		data = entity.encode()
 		return nil
 	})
 	return
 }
 
-func (n *Nodis) notify(f func() []*pb.Op) {
+func (n *Nodis) notify(f func() []patch.Op) {
 	if len(n.notifiers) == 0 {
 		return
 	}
 	go func() {
 		for _, w := range n.notifiers {
 			for _, op := range f() {
-				if w.Matched(op.Key) {
-					w.Push(op.Operation)
-					op.Reset()
+				if w.Matched(op.Data.GetKey()) {
+					w.Push(op)
 				}
 			}
 		}
 	}()
 }
 
-func (n *Nodis) WatchKey(pattern []string, fn func(op *pb.Operation)) int {
+func (n *Nodis) WatchKey(pattern []string, fn func(op patch.Op)) int {
 	w := notifier.New(pattern, fn)
 	n.notifiers = append(n.notifiers, w)
 	return len(n.notifiers) - 1
@@ -138,7 +137,7 @@ func (n *Nodis) UnWatchKey(id int) {
 	n.notifiers = append(n.notifiers[:id], n.notifiers[id+1:]...)
 }
 
-func (n *Nodis) Patch(ops ...*pb.Op) error {
+func (n *Nodis) Patch(ops ...patch.Op) error {
 	for _, op := range ops {
 		err := n.patch(op)
 		if err != nil {
@@ -148,70 +147,72 @@ func (n *Nodis) Patch(ops ...*pb.Op) error {
 	return nil
 }
 
-func (n *Nodis) patch(op *pb.Op) error {
-	switch op.Operation.Type {
-	case pb.OpType_Clear:
+func (n *Nodis) patch(p patch.Op) error {
+	switch op := p.Data.(type) {
+	case *patch.OpClear:
 		n.Clear()
-	case pb.OpType_Del:
+	case *patch.OpDel:
 		n.Del(op.Key)
-	case pb.OpType_Expire:
-		n.Expire(op.Key, op.Operation.Expiration)
-	case pb.OpType_ExpireAt:
-		n.ExpireAt(op.Key, time.Unix(op.Operation.Expiration, 0))
-	case pb.OpType_HClear:
+	case *patch.OpExpire:
+		n.Expire(op.Key, op.Expiration)
+	case *patch.OpExpireAt:
+		n.ExpireAt(op.Key, time.Unix(op.Expiration, 0))
+	case *patch.OpHClear:
 		n.HClear(op.Key)
-	case pb.OpType_HDel:
-		n.HDel(op.Key, op.Operation.Fields...)
-	case pb.OpType_HIncrBy:
-		n.HIncrBy(op.Key, op.Operation.Field, op.Operation.IncrInt)
-	case pb.OpType_HIncrByFloat:
-		n.HIncrByFloat(op.Key, op.Operation.Field, op.Operation.IncrFloat)
-	case pb.OpType_HSet:
-		n.HSet(op.Key, op.Operation.Field, op.Operation.Value)
-	case pb.OpType_LInsert:
-		n.LInsert(op.Key, op.Operation.Pivot, op.Operation.Value, op.Operation.Before)
-	case pb.OpType_LPop:
-		n.LPop(op.Key, op.Operation.Count)
-	case pb.OpType_LPopRPush:
-		n.LPopRPush(op.Key, op.Operation.DstKey)
-	case pb.OpType_LPush:
-		n.LPush(op.Key, op.Operation.Values...)
-	case pb.OpType_LPushX:
-		n.LPushX(op.Key, op.Operation.Value)
-	case pb.OpType_LRem:
-		n.LRem(op.Key, op.Operation.Value, op.Operation.Count)
-	case pb.OpType_LSet:
-		n.LSet(op.Key, op.Operation.Index, op.Operation.Value)
-	case pb.OpType_LTrim:
-		n.LTrim(op.Key, op.Operation.Start, op.Operation.Stop)
-	case pb.OpType_RPop:
-		n.RPop(op.Key, op.Operation.Count)
-	case pb.OpType_RPopLPush:
-		n.RPopLPush(op.Key, op.Operation.DstKey)
-	case pb.OpType_RPush:
-		n.RPush(op.Key, op.Operation.Values...)
-	case pb.OpType_RPushX:
-		n.RPushX(op.Key, op.Operation.Value)
-	case pb.OpType_SAdd:
-		n.SAdd(op.Key, op.Operation.Members...)
-	case pb.OpType_SRem:
-		n.SRem(op.Key, op.Operation.Members...)
-	case pb.OpType_Set:
-		n.Set(op.Key, op.Operation.Value, op.Operation.KeepTTL)
-	case pb.OpType_ZAdd:
-		n.ZAdd(op.Key, op.Operation.Member, op.Operation.Score)
-	case pb.OpType_ZClear:
+	case *patch.OpHDel:
+		n.HDel(op.Key, op.Fields...)
+	case *patch.OpHIncrBy:
+		_, err := n.HIncrBy(op.Key, op.Field, op.IncrInt)
+		return err
+	case *patch.OpHIncrByFloat:
+		_, err := n.HIncrByFloat(op.Key, op.Field, op.IncrFloat)
+		return err
+	case *patch.OpHSet:
+		n.HSet(op.Key, op.Field, op.Value)
+	case *patch.OpLInsert:
+		n.LInsert(op.Key, op.Pivot, op.Value, op.Before)
+	case *patch.OpLPop:
+		n.LPop(op.Key, op.Count)
+	case *patch.OpLPopRPush:
+		n.LPopRPush(op.Key, op.DstKey)
+	case *patch.OpLPush:
+		n.LPush(op.Key, op.Values...)
+	case *patch.OpLPushX:
+		n.LPushX(op.Key, op.Value)
+	case *patch.OpLRem:
+		n.LRem(op.Key, op.Value, op.Count)
+	case *patch.OpLSet:
+		n.LSet(op.Key, op.Index, op.Value)
+	case *patch.OpLTrim:
+		n.LTrim(op.Key, op.Start, op.Stop)
+	case *patch.OpRPop:
+		n.RPop(op.Key, op.Count)
+	case *patch.OpRPopLPush:
+		n.RPopLPush(op.Key, op.DstKey)
+	case *patch.OpRPush:
+		n.RPush(op.Key, op.Values...)
+	case *patch.OpRPushX:
+		n.RPushX(op.Key, op.Value)
+	case *patch.OpSAdd:
+		n.SAdd(op.Key, op.Members...)
+	case *patch.OpSRem:
+		n.SRem(op.Key, op.Members...)
+	case *patch.OpSet:
+		n.Set(op.Key, op.Value, op.KeepTTL)
+	case *patch.OpZAdd:
+		n.ZAdd(op.Key, op.Member, op.Score)
+	case *patch.OpZClear:
 		n.ZClear(op.Key)
-	case pb.OpType_ZIncrBy:
-		n.ZIncrBy(op.Key, op.Operation.Member, op.Operation.Score)
-	case pb.OpType_ZRem:
-		n.ZRem(op.Key, op.Operation.Member)
-	case pb.OpType_ZRemRangeByRank:
-		n.ZRemRangeByRank(op.Key, op.Operation.Start, op.Operation.Stop)
-	case pb.OpType_ZRemRangeByScore:
-		n.ZRemRangeByScore(op.Key, op.Operation.Min, op.Operation.Max, int(op.Operation.Mode))
-	case pb.OpType_Rename:
-		_ = n.Rename(op.Key, op.Operation.DstKey)
+	case *patch.OpZIncrBy:
+		n.ZIncrBy(op.Key, op.Member, op.Score)
+	case *patch.OpZRem:
+		n.ZRem(op.Key, op.Member)
+	case *patch.OpZRemRangeByRank:
+		n.ZRemRangeByRank(op.Key, op.Start, op.Stop)
+	case *patch.OpZRemRangeByScore:
+		n.ZRemRangeByScore(op.Key, op.Min, op.Max, int(op.Mode))
+	case *patch.OpRename:
+		return n.Rename(op.Key, op.DstKey)
 	default:
 		return ErrUnknownOperation
 	}
@@ -220,8 +221,8 @@ func (n *Nodis) patch(op *pb.Op) error {
 
 func (n *Nodis) Publish(addr string, pattern []string) error {
 	return n.options.Synchronizer.Publish(addr, func(s SyncConn) {
-		id := n.WatchKey(pattern, func(op *pb.Operation) {
-			err := s.Send(&pb.Op{Operation: op})
+		id := n.WatchKey(pattern, func(op patch.Op) {
+			err := s.Send(op)
 			if err != nil {
 				log.Println("Publish: ", err)
 			}
@@ -232,7 +233,7 @@ func (n *Nodis) Publish(addr string, pattern []string) error {
 }
 
 func (n *Nodis) Subscribe(addr string) error {
-	return n.options.Synchronizer.Subscribe(addr, func(o *pb.Op) {
+	return n.options.Synchronizer.Subscribe(addr, func(o patch.Op) {
 		n.Patch(o)
 	})
 }

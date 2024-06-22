@@ -262,3 +262,34 @@ func BenchmarkHashMap_HMGet(b *testing.B) {
 		hash.HMGet("testKey1", "testKey2", "testKey3")
 	}
 }
+
+func TestGetSetValue(t *testing.T) {
+	h := NewHashMap()
+	h.HSet("testKey", []byte("testValue"))
+	h.HSet("testKey1", []byte("testValue1"))
+	h.HSet("testKey2", []byte("testValue2"))
+	v := h.GetValue()
+	h2 := NewHashMap()
+	h2.SetValue(v)
+	vv := h.HGet("testKey")
+	if vv == nil {
+		t.Errorf("GetSetValue failed, expected %s but got nothing", "testValue")
+	}
+	if string(vv) != "testValue" {
+		t.Errorf("GetSetValue failed, expected %s but got %s", "testValue", vv)
+	}
+	vv = h.HGet("testKey1")
+	if vv == nil {
+		t.Errorf("GetSetValue failed, expected %s but got nothing", "testValue")
+	}
+	if string(vv) != "testValue1" {
+		t.Errorf("GetSetValue failed, expected %s but got %s", "testValue1", vv)
+	}
+	vv = h.HGet("testKey2")
+	if vv == nil {
+		t.Errorf("GetSetValue failed, expected %s but got nothing", "testValue")
+	}
+	if string(vv) != "testValue2" {
+		t.Errorf("GetSetValue failed, expected %s but got %s", "testValue2", vv)
+	}
+}

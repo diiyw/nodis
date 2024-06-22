@@ -1,6 +1,7 @@
 package set
 
 import (
+	"encoding/binary"
 	"math/rand"
 	"path/filepath"
 
@@ -233,13 +234,29 @@ func (s *Set) Type() ds.ValueType {
 }
 
 // GetValue the string to bytes
-func (s *Set) GetValue() []string {
-	return s.SMembers()
+func (s *Set) GetValue() []byte {
+	var members = make([]byte, 0, s.data.Len())
+	s.data.Scan(func(member string, _ struct{}) bool {
+		mLen := len(member)
+		var b = make([]byte, mLen+1)
+		n := binary.PutVarint(b, int64(mLen))
+		copy(b[n:], member)
+		members = append(members, b...)
+		return true
+	})
+	return members
 }
 
 // SetValue the bytes to string
-func (s *Set) SetValue(members []string) {
-	for _, member := range members {
+func (s *Set) SetValue(members []byte) {
+	for {
+		if len(members) == 0 {
+			break
+		}
+		mLen, n := binary.Varint(members)
+		members = members[n:]
+		member := string(members[:mLen])
+		members = members[mLen:]
 		s.data.Set(member, struct{}{})
 	}
 }

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diiyw/nodis/pb"
+	"github.com/diiyw/nodis/patch"
 )
 
 func TestNodis_Open(t *testing.T) {
@@ -143,39 +143,39 @@ func TestNodis_Patch(t *testing.T) {
 	opt := &Options{
 		Path: "testdata",
 	}
-	var ops = []*pb.Op{
+	var ops = []patch.Op{
 		{
-			Operation: &pb.Operation{
-				Type:  pb.OpType_Set,
+			Type: patch.OpTypeSet,
+			Data: &patch.OpSet{
 				Key:   "string",
 				Value: []byte("string"),
 			},
 		},
 		{
-			Operation: &pb.Operation{
-				Type:   pb.OpType_ZAdd,
+			Type: patch.OpTypeZAdd,
+			Data: &patch.OpZAdd{
 				Key:    "zset",
 				Member: "zset",
 				Score:  10,
 			},
 		},
 		{
-			Operation: &pb.Operation{
-				Type:   pb.OpType_LPush,
+			Type: patch.OpTypeLPush,
+			Data: &patch.OpLPush{
 				Key:    "lpush",
 				Values: [][]byte{[]byte("lpush3"), []byte("lpush2"), []byte("lpush")},
 			},
 		},
 		{
-			Operation: &pb.Operation{
-				Type:    pb.OpType_SAdd,
+			Type: patch.OpTypeSAdd,
+			Data: &patch.OpSAdd{
 				Key:     "set",
 				Members: []string{"member", "member2", "member3"},
 			},
 		},
 		{
-			Operation: &pb.Operation{
-				Type:  pb.OpType_HSet,
+			Type: patch.OpTypeHSet,
+			Data: &patch.OpHSet{
 				Key:   "hash",
 				Field: "field",
 				Value: []byte("value"),
@@ -183,10 +183,13 @@ func TestNodis_Patch(t *testing.T) {
 		},
 	}
 	n := Open(opt)
-	n.Patch(ops...)
+	err := n.Patch(ops...)
+	if err != nil {
+		t.Errorf("Patch() = %v, want %v", err, nil)
+	}
 	v := n.Get("string")
 	if string(v) != "string" {
-		t.Errorf("Get() = %v, want %v", v, "test_new")
+		t.Errorf("Get() = %v, want %v", v, "string")
 	}
 	s, _ := n.ZScore("zset", "zset")
 	if s != 10 {
@@ -237,8 +240,8 @@ func TestNodis_Stick(t *testing.T) {
 	}
 	n := Open(opt)
 	n.Set("test", []byte("test"), false)
-	n.WatchKey([]string{"test"}, func(op *pb.Operation) {
-		if op == nil || string(op.Value) != "test_new" {
+	n.WatchKey([]string{"test"}, func(op patch.Op) {
+		if string(op.Data.GetKey()) != "test_new" {
 			t.Errorf("Stick() = %v, want %v", op, "test_new")
 		}
 	})
@@ -253,8 +256,8 @@ func TestNodis_UnStick(t *testing.T) {
 	}
 	n := Open(opt)
 	n.Set("test", []byte("test"), false)
-	id := n.WatchKey([]string{"test"}, func(op *pb.Operation) {
-		if op == nil || string(op.Value) != "test_new" {
+	id := n.WatchKey([]string{"test"}, func(op patch.Op) {
+		if string(op.Data.GetKey()) != "test_new" {
 			t.Errorf("Stick() = %v, want %v", op, "test_new")
 		}
 	})

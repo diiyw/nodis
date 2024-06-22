@@ -94,7 +94,7 @@ package main
 import (
 	"fmt"
 	"github.com/diiyw/nodis"
-	"github.com/diiyw/nodis/pb"
+	"github.com/diiyw/nodis/patch"
 	"github.com/diiyw/nodis/sync"
 	"time"
 )
@@ -132,7 +132,7 @@ import (
 	"fmt"
 	"github.com/diiyw/nodis"
 	"github.com/diiyw/nodis/fs"
-	"github.com/diiyw/nodis/pb"
+	"github.com/diiyw/nodis/patch"
 	"github.com/diiyw/nodis/sync"
 )
 

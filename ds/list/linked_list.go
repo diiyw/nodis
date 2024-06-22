@@ -2,6 +2,7 @@ package list
 
 import (
 	"bytes"
+	"encoding/binary"
 
 	"github.com/diiyw/nodis/ds"
 )
@@ -108,10 +109,18 @@ func (l *LinkedList) RPop(count int64) [][]byte {
 // LRange returns a range of elements from the list
 func (l *LinkedList) LRange(start, end int64) [][]byte {
 	var result [][]byte
+	l.forEach(start, end, func(v []byte) {
+		result = append(result, v)
+	})
+	return result
+}
+
+// LRange returns a range of elements from the list
+func (l *LinkedList) forEach(start, end int64, fn func(v []byte)) {
 	currentNode := l.head
 	var index int64 = 0
 	if start != 0 && start >= end {
-		return result
+		return
 	}
 	if start < 0 {
 		start = l.size() + start
@@ -121,7 +130,7 @@ func (l *LinkedList) LRange(start, end int64) [][]byte {
 	}
 	for currentNode != nil {
 		if index >= start && index <= end {
-			result = append(result, currentNode.data)
+			fn(currentNode.data)
 		}
 		if index > end {
 			break
@@ -129,7 +138,6 @@ func (l *LinkedList) LRange(start, end int64) [][]byte {
 		currentNode = currentNode.next
 		index++
 	}
-	return result
 }
 
 func (l *LinkedList) size() int64 {
@@ -336,13 +344,30 @@ func (l *LinkedList) LTrim(start, end int64) {
 }
 
 // GetValue returns the byte slice of the list
-func (l *LinkedList) GetValue() [][]byte {
-	return l.LRange(0, -1)
+func (l *LinkedList) GetValue() []byte {
+	var list []byte
+	l.forEach(0, -1, func(v []byte) {
+		var b = make([]byte, len(v)+8)
+		var vLen = len(v)
+		n := binary.PutVarint(b, int64(vLen))
+		copy(b[n:], v)
+		list = append(list, b[:n+vLen]...)
+	})
+	return list
 }
 
 // SetValue restores the list from the byte slice
-func (l *LinkedList) SetValue(list [][]byte) {
-	for _, item := range list {
-		l.RPush(item)
+func (l *LinkedList) SetValue(list []byte) {
+	for {
+		if len(list) == 0 {
+			break
+		}
+		vLen, n := binary.Varint(list)
+		if n == 0 {
+			break
+		}
+		v := list[n : n+int(vLen)]
+		list = list[n+int(vLen):]
+		l.RPush(v)
 	}
 }

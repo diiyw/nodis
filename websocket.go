@@ -5,9 +5,8 @@ package nodis
 import (
 	"net/http"
 
-	"github.com/diiyw/nodis/pb"
+	"github.com/diiyw/nodis/patch"
 	"github.com/gorilla/websocket"
-	"google.golang.org/protobuf/proto"
 )
 
 type Websocket struct {
@@ -35,7 +34,7 @@ func (ws *Websocket) Publish(addr string, fn func(SyncConn)) error {
 	return http.ListenAndServe(addr, nil)
 }
 
-func (ws *Websocket) Subscribe(addr string, fn func(*pb.Op)) error {
+func (ws *Websocket) Subscribe(addr string, fn func(patch.Op)) error {
 	c, _, err := websocket.DefaultDialer.Dial(addr, nil)
 	if err != nil {
 		return err
@@ -45,8 +44,8 @@ func (ws *Websocket) Subscribe(addr string, fn func(*pb.Op)) error {
 		if err != nil {
 			return err
 		}
-		var op = &pb.Op{Operation: &pb.Operation{}}
-		err = proto.Unmarshal(message, op.Operation)
+		var op patch.Op
+		op, err = patch.DecodeOp(message)
 		if err != nil {
 			return err
 		}
@@ -58,12 +57,8 @@ type WsConn struct {
 	c *websocket.Conn
 }
 
-func (w *WsConn) Send(op *pb.Op) error {
-	p, err := proto.Marshal(op)
-	if err != nil {
-		return err
-	}
-	err = w.c.WriteMessage(websocket.BinaryMessage, p)
+func (w *WsConn) Send(op patch.Op) error {
+	err := w.c.WriteMessage(websocket.BinaryMessage, op.Encode())
 	if err != nil {
 		return err
 	}

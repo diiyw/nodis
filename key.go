@@ -2,16 +2,16 @@ package nodis
 
 import (
 	"errors"
+	"github.com/diiyw/nodis/ds"
+	"github.com/diiyw/nodis/ds/list"
+	"github.com/diiyw/nodis/redis"
 	"math/rand"
 	"path/filepath"
 	"runtime"
 	"sync"
 	"time"
 
-	"github.com/diiyw/nodis/ds"
-	"github.com/diiyw/nodis/ds/list"
-	"github.com/diiyw/nodis/pb"
-	"github.com/diiyw/nodis/redis"
+	"github.com/diiyw/nodis/patch"
 )
 
 type Key struct {
@@ -76,8 +76,8 @@ func (n *Nodis) Expire(key string, seconds int64) int64 {
 		meta.expiration = time.Now().UnixMilli()
 		meta.expiration += seconds * 1000
 		n.signalModifiedKey(key, meta)
-		n.notify(func() []*pb.Op {
-			return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+		n.notify(func() []patch.Op {
+			return []patch.Op{{patch.OpTypeExpire, &patch.OpExpire{Key: key, Expiration: meta.expiration}}}
 		})
 		return nil
 	})
@@ -101,8 +101,8 @@ func (n *Nodis) ExpirePX(key string, milliseconds int64) int64 {
 		}
 		meta.expiration += milliseconds
 		n.signalModifiedKey(key, meta)
-		n.notify(func() []*pb.Op {
-			return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+		n.notify(func() []patch.Op {
+			return []patch.Op{{patch.OpTypeExpire, &patch.OpExpire{Key: key, Expiration: meta.expiration}}}
 		})
 		return nil
 	})
@@ -124,8 +124,8 @@ func (n *Nodis) ExpireNX(key string, seconds int64) int64 {
 		}
 		meta.expiration = time.Now().UnixMilli() + seconds*1000
 		n.signalModifiedKey(key, meta)
-		n.notify(func() []*pb.Op {
-			return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+		n.notify(func() []patch.Op {
+			return []patch.Op{{patch.OpTypeExpire, &patch.OpExpire{Key: key, Expiration: meta.expiration}}}
 		})
 		return nil
 	})
@@ -147,8 +147,8 @@ func (n *Nodis) ExpireXX(key string, seconds int64) int64 {
 		}
 		meta.expiration += seconds * 1000
 		n.signalModifiedKey(key, meta)
-		n.notify(func() []*pb.Op {
-			return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+		n.notify(func() []patch.Op {
+			return []patch.Op{{patch.OpTypeExpire, &patch.OpExpire{Key: key, Expiration: meta.expiration}}}
 		})
 		return nil
 	})
@@ -172,8 +172,8 @@ func (n *Nodis) ExpireLT(key string, seconds int64) int64 {
 		if meta.expiration > time.Now().UnixMilli()-ms {
 			meta.expiration -= ms
 			n.signalModifiedKey(key, meta)
-			n.notify(func() []*pb.Op {
-				return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+			n.notify(func() []patch.Op {
+				return []patch.Op{{patch.OpTypeExpire, &patch.OpExpire{Key: key, Expiration: meta.expiration}}}
 			})
 		}
 		return nil
@@ -197,8 +197,8 @@ func (n *Nodis) ExpireGT(key string, seconds int64) int64 {
 		if meta.expiration < now+ms {
 			meta.expiration += ms
 			n.signalModifiedKey(key, meta)
-			n.notify(func() []*pb.Op {
-				return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+			n.notify(func() []patch.Op {
+				return []patch.Op{{patch.OpTypeExpire, &patch.OpExpire{Key: key, Expiration: meta.expiration}}}
 			})
 			v = 1
 		}
@@ -218,8 +218,8 @@ func (n *Nodis) ExpireAt(key string, timestamp time.Time) int64 {
 		}
 		meta.expiration = timestamp.UnixMilli()
 		n.signalModifiedKey(key, meta)
-		n.notify(func() []*pb.Op {
-			return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+		n.notify(func() []patch.Op {
+			return []patch.Op{{patch.OpTypeExpire, &patch.OpExpire{Key: key, Expiration: meta.expiration}}}
 		})
 		return nil
 	})
@@ -241,8 +241,8 @@ func (n *Nodis) ExpireAtNX(key string, timestamp time.Time) int64 {
 		}
 		meta.expiration = timestamp.UnixMilli()
 		n.signalModifiedKey(key, meta)
-		n.notify(func() []*pb.Op {
-			return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+		n.notify(func() []patch.Op {
+			return []patch.Op{{patch.OpTypeExpire, &patch.OpExpire{Key: key, Expiration: meta.expiration}}}
 		})
 		return nil
 	})
@@ -264,8 +264,8 @@ func (n *Nodis) ExpireAtXX(key string, timestamp time.Time) int64 {
 		}
 		meta.expiration = timestamp.UnixMilli()
 		n.signalModifiedKey(key, meta)
-		n.notify(func() []*pb.Op {
-			return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+		n.notify(func() []patch.Op {
+			return []patch.Op{{patch.OpTypeExpire, &patch.OpExpire{Key: key, Expiration: meta.expiration}}}
 		})
 		return nil
 	})
@@ -289,8 +289,8 @@ func (n *Nodis) ExpireAtLT(key string, timestamp time.Time) int64 {
 		if meta.expiration > unix {
 			meta.expiration = unix
 			n.signalModifiedKey(key, meta)
-			n.notify(func() []*pb.Op {
-				return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+			n.notify(func() []patch.Op {
+				return []patch.Op{{patch.OpTypeExpire, &patch.OpExpire{Key: key, Expiration: meta.expiration}}}
 			})
 		}
 		return nil
@@ -314,8 +314,8 @@ func (n *Nodis) ExpireAtGT(key string, timestamp time.Time) int64 {
 		if meta.expiration < unix {
 			meta.expiration = unix
 			n.signalModifiedKey(key, meta)
-			n.notify(func() []*pb.Op {
-				return []*pb.Op{pb.NewOp(pb.OpType_Expire, key).Expiration(meta.expiration)}
+			n.notify(func() []patch.Op {
+				return []patch.Op{{patch.OpTypeExpire, &patch.OpExpire{Key: key, Expiration: meta.expiration}}}
 			})
 		}
 		return nil
@@ -467,8 +467,8 @@ func (n *Nodis) Rename(key, dstKey string) error {
 		dstMeta.setValue(meta.value)
 		n.signalModifiedKey(key, meta)
 		n.signalModifiedKey(key, dstMeta)
-		n.notify(func() []*pb.Op {
-			return []*pb.Op{pb.NewOp(pb.OpType_Rename, key).DstKey(dstKey)}
+		n.notify(func() []patch.Op {
+			return []patch.Op{{patch.OpTypeRename, &patch.OpRename{Key: key, DstKey: dstKey}}}
 		})
 		return nil
 	})
@@ -495,8 +495,8 @@ func (n *Nodis) RenameNX(key, dstKey string) error {
 		n.store.mu.Unlock()
 		n.signalModifiedKey(key, meta)
 		n.signalModifiedKey(key, dstMeta)
-		n.notify(func() []*pb.Op {
-			return []*pb.Op{pb.NewOp(pb.OpType_Rename, key).DstKey(dstKey)}
+		n.notify(func() []patch.Op {
+			return []patch.Op{{patch.OpTypeRename, &patch.OpRename{Key: key, DstKey: dstKey}}}
 		})
 		return nil
 	})
@@ -589,8 +589,8 @@ func (n *Nodis) Persist(key string) int64 {
 		v = 1
 		meta.expiration = 0
 		n.signalModifiedKey(key, meta)
-		n.notify(func() []*pb.Op {
-			return []*pb.Op{pb.NewOp(pb.OpType_Persist, key)}
+		n.notify(func() []patch.Op {
+			return []patch.Op{{patch.OpTypePersist, &patch.OpPersist{Key: key}}}
 		})
 		return nil
 	})

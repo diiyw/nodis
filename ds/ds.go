@@ -2,6 +2,7 @@ package ds
 
 type Value interface {
 	Type() ValueType
+	GetValue() []byte
 }
 
 type ValueType uint8

@@ -1,11 +1,11 @@
 package zset
 
 import (
+	"encoding/binary"
 	"errors"
 	"path/filepath"
 
 	"github.com/diiyw/nodis/ds"
-	"github.com/diiyw/nodis/pb"
 	"github.com/tidwall/btree"
 )
 
@@ -414,18 +414,33 @@ func (sortedSet *SortedSet) ZScan(cursor int64, match string, count int64) (int6
 	return cursor + int64(len(items)), nil
 }
 
-func (sortedSet *SortedSet) GetValue() []*pb.KeyScore {
-	var keyScores = make([]*pb.KeyScore, 0, sortedSet.dict.Len())
-	sortedSet.dict.Scan(func(member string, value *Item) bool {
-		keyScores = append(keyScores, &pb.KeyScore{Member: member, Score: value.Score})
+func (sortedSet *SortedSet) GetValue() []byte {
+	var keyScores = make([]byte, 0, sortedSet.dict.Len())
+	sortedSet.dict.Scan(func(_ string, v *Item) bool {
+		data := v.encode()
+		dataLen := len(data)
+		var b = make([]byte, 8+dataLen)
+		n := binary.PutVarint(b, int64(dataLen))
+		copy(b[n:], data)
+		keyScores = append(keyScores, b[:n+dataLen]...)
 		return true
 	})
 	return keyScores
 }
 
-func (sortedSet *SortedSet) SetValue(keyScores []*pb.KeyScore) {
+func (sortedSet *SortedSet) SetValue(keyScores []byte) {
 	sortedSet.skiplist = makeSkiplist()
-	for _, v := range keyScores {
-		sortedSet.zAdd(v.Member, v.Score)
+	for {
+		if len(keyScores) == 0 {
+			break
+		}
+		dataLen, n := binary.Varint(keyScores)
+		if n <= 0 {
+			break
+		}
+		end := n + int(dataLen)
+		item := decodeItem(keyScores[n:end])
+		sortedSet.zAdd(item.Member, item.Score)
+		keyScores = keyScores[end:]
 	}
 }

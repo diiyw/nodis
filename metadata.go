@@ -10,6 +10,8 @@ import (
 const (
 	KeyStateNormal   uint8 = 1
 	KeyStateModified uint8 = 2
+
+	metadataSize = 23
 )
 
 type metadata struct {
@@ -70,7 +72,7 @@ func (m *metadata) empty() *metadata {
 }
 
 func (m *metadata) marshal() []byte {
-	var b [23]byte
+	var b [metadataSize]byte
 	binary.LittleEndian.PutUint16(b[0:2], m.key.fileId)
 	binary.LittleEndian.PutUint64(b[2:10], uint64(m.key.offset))
 	binary.LittleEndian.PutUint32(b[10:14], m.key.size)

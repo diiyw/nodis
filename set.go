@@ -3,7 +3,7 @@ package nodis
 import (
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/set"
-	"github.com/diiyw/nodis/pb"
+	"github.com/diiyw/nodis/patch"
 )
 
 func (n *Nodis) newSet() ds.Value {
@@ -17,8 +17,8 @@ func (n *Nodis) SAdd(key string, members ...string) int64 {
 		meta := tx.writeKey(key, n.newSet)
 		v = meta.value.(*set.Set).SAdd(members...)
 		n.signalModifiedKey(key, meta)
-		n.notify(func() []*pb.Op {
-			return []*pb.Op{pb.NewOp(pb.OpType_SAdd, key).Members(members)}
+		n.notify(func() []patch.Op {
+			return []patch.Op{{patch.OpTypeSAdd, &patch.OpSAdd{Key: key, Members: members}}}
 		})
 		return nil
 	})
@@ -179,8 +179,8 @@ func (n *Nodis) SRem(key string, members ...string) int64 {
 		}
 		v = meta.value.(*set.Set).SRem(members...)
 		n.signalModifiedKey(key, meta)
-		n.notify(func() []*pb.Op {
-			return []*pb.Op{pb.NewOp(pb.OpType_SRem, key).Members(members)}
+		n.notify(func() []patch.Op {
+			return []patch.Op{{patch.OpTypeSRem, &patch.OpSRem{Key: key, Members: members}}}
 		})
 		return nil
 	})
@@ -215,8 +215,8 @@ func (n *Nodis) SPop(key string, count int64) []string {
 		}
 		v = meta.value.(*set.Set).SPop(count)
 		n.signalModifiedKey(key, meta)
-		n.notify(func() []*pb.Op {
-			return []*pb.Op{pb.NewOp(pb.OpType_SRem, key).Members(v)}
+		n.notify(func() []patch.Op {
+			return []patch.Op{{patch.OpTypeSRem, &patch.OpSRem{Key: key, Members: v}}}
 		})
 		return nil
 	})
@@ -239,8 +239,8 @@ func (n *Nodis) SMove(source, destination, member string) bool {
 		meta = tx.writeKey(destination, n.newSet)
 		m = meta.value.(*set.Set).SAdd(member)
 		n.signalModifiedKey(destination, meta)
-		n.notify(func() []*pb.Op {
-			return []*pb.Op{pb.NewOp(pb.OpType_SAdd, destination).Members([]string{member})}
+		n.notify(func() []patch.Op {
+			return []patch.Op{{patch.OpTypeSAdd, &patch.OpSAdd{Key: destination, Members: []string{member}}}}
 		})
 		v = m > 0
 		return nil

@@ -1,6 +1,8 @@
 package zset
 
 import (
+	"encoding/binary"
+	"math"
 	"math/bits"
 	"math/rand"
 )
@@ -11,8 +13,24 @@ const (
 
 // Item is a key-score pair
 type Item struct {
-	Member string
 	Score  float64
+	Member string
+}
+
+func (i *Item) encode() []byte {
+	var b = make([]byte, 8+len(i.Member))
+	binary.LittleEndian.PutUint64(b, math.Float64bits(i.Score))
+	copy(b[8:], i.Member)
+	return b
+}
+
+func decodeItem(b []byte) *Item {
+	score := math.Float64frombits(binary.LittleEndian.Uint64(b))
+	member := string(b[8:])
+	return &Item{
+		Score:  score,
+		Member: member,
+	}
 }
 
 // Level aspect of a node

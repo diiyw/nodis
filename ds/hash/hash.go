@@ -1,18 +1,43 @@
 package hash
 
 import (
+	"encoding/binary"
 	"errors"
 	"path/filepath"
 	"strconv"
 	"unsafe"
 
 	"github.com/diiyw/nodis/ds"
-	"github.com/diiyw/nodis/pb"
 	"github.com/tidwall/btree"
 )
 
 type HashMap struct {
 	data btree.Map[string, []byte]
+}
+
+type keyValuePair struct {
+	key   string
+	value []byte
+}
+
+func (kvPair *keyValuePair) encode() []byte {
+	var kLen = len(kvPair.key)
+	var b = make([]byte, 8+kLen+len(kvPair.value))
+	n := binary.PutVarint(b, int64(kLen))
+	copy(b[n:], kvPair.key)
+	n += kLen
+	n += copy(b[n:], kvPair.value)
+	return b[:n]
+}
+
+func decodeKeyValuePair(b []byte) *keyValuePair {
+	l, n := binary.Varint(b)
+	b = b[n:]
+	key := string(b[:l])
+	return &keyValuePair{
+		key:   key,
+		value: b[l:],
+	}
 }
 
 // NewHashMap creates a new hash
@@ -97,7 +122,7 @@ func (s *HashMap) HIncrBy(key string, value int64) (int64, error) {
 	return i, nil
 }
 
-// HIncByFloat increments the value of a hash
+// HIncrByFloat increments the value of a hash
 func (s *HashMap) HIncrByFloat(key string, value float64) (float64, error) {
 	v, ok := s.data.Get(key)
 	if !ok {
@@ -173,18 +198,37 @@ func (s *HashMap) HStrLen(field string) int64 {
 	return int64(len(*(*string)(unsafe.Pointer(&v))))
 }
 
-func (s *HashMap) GetValue() []*pb.MemberBytes {
-	values := make([]*pb.MemberBytes, 0, s.data.Len())
+func (s *HashMap) GetValue() []byte {
+	values := make([]byte, 0, s.data.Len())
 	s.data.Scan(func(key string, value []byte) bool {
-		values = append(values, &pb.MemberBytes{Member: key, Value: value})
+		kvPair := &keyValuePair{
+			key:   key,
+			value: value,
+		}
+		data := kvPair.encode()
+		dataLen := len(data)
+		var b = make([]byte, 8+dataLen)
+		n := binary.PutVarint(b, int64(dataLen))
+		copy(b[n:], data)
+		values = append(values, b[:n+dataLen]...)
 		return true
 	})
 	return values
 }
 
 // SetValue the set from bytes
-func (s *HashMap) SetValue(values []*pb.MemberBytes) {
-	for _, v := range values {
-		s.data.Set(v.Member, v.Value)
+func (s *HashMap) SetValue(values []byte) {
+	for {
+		if len(values) == 0 {
+			break
+		}
+		dataLen, n := binary.Varint(values)
+		if n <= 0 {
+			break
+		}
+		end := n + int(dataLen)
+		item := decodeKeyValuePair(values[n:end])
+		s.HSet(item.key, item.value)
+		values = values[end:]
 	}
 }

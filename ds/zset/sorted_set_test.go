@@ -1,6 +1,8 @@
 package zset
 
 import (
+	"fmt"
+	"math"
 	"testing"
 )
 
@@ -231,5 +233,22 @@ func TestSortedSet_ZCount(t *testing.T) {
 	}
 	if ss.ZCount(2, 4, 0) != 2 {
 		t.Errorf("Count error expected 2 got %d", ss.ZCount(2, 4, 0))
+	}
+}
+
+func TestGetSetValue(t *testing.T) {
+	ss := NewSortedSet()
+	ss.ZAdd("member1", 1.5)
+	ss.ZAdd("member2", 2.5)
+	ss.ZAdd("member3", math.MaxFloat64)
+
+	v := ss.GetValue()
+	ss2 := NewSortedSet()
+	ss2.SetValue(v)
+	if ss2.dict.Len() != 3 {
+		t.Errorf("Value error expected 3 got %d", ss2.dict.Len())
+	}
+	for _, item := range ss.ZRange(0, -1) {
+		fmt.Println(item.Member, item.Score)
 	}
 }

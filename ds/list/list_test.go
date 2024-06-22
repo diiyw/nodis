@@ -166,3 +166,23 @@ func BenchmarkDoublyLinkedList_LPop(b *testing.B) {
 		l.LPop(1)
 	}
 }
+
+func TestGetSetValue(t *testing.T) {
+	l := NewLinkedList()
+	for i := 0; i < 10; i++ {
+		is := strconv.Itoa(i)
+		l.LPush([]byte(is))
+	}
+	v := l.GetValue()
+	l2 := NewLinkedList()
+	l2.SetValue(v)
+	if l.LLen() != l2.LLen() {
+		t.Errorf("get set value error")
+	}
+	l2Pop := l2.LPop(10)
+	for i, it := range l.LPop(10) {
+		if string(it) != string(l2Pop[i]) {
+			t.Errorf("get set value error")
+		}
+	}
+}

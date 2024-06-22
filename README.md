@@ -94,22 +94,21 @@ package main
 import (
 	"fmt"
 	"github.com/diiyw/nodis"
-	"github.com/diiyw/nodis/pb"
-	"github.com/diiyw/nodis/sync"
+	"github.com/diiyw/nodis/patch"
 	"time"
 )
 
 func main() {
 	var opt = nodis.DefaultOptions
 	n := nodis.Open(opt)
-	opt.Synchronizer = sync.NewWebsocket()
-	n.Watch([]string{"*"}, func(op *pb.Operation) {
-		fmt.Println("Server:", op.Key, string(op.Value))
+	opt.Synchronizer = nodis.NewWebsocket()
+	n.WatchKey([]string{"*"}, func(op patch.Op) {
+		fmt.Println("Server:", op.Data.GetKey(), op.Data.(*patch.OpSet).Value)
 	})
 	go func() {
 		for {
 			time.Sleep(time.Second)
-			n.Set("test", []byte(time.Now().Format("2006-01-02 15:04:05")))
+			n.Set("test", []byte(time.Now().Format("2006-01-02 15:04:05")), false)
 		}
 	}()
 	err := n.Publish("127.0.0.1:6380", []string{"*"})
@@ -132,17 +131,16 @@ import (
 	"fmt"
 	"github.com/diiyw/nodis"
 	"github.com/diiyw/nodis/fs"
-	"github.com/diiyw/nodis/pb"
-	"github.com/diiyw/nodis/sync"
+	"github.com/diiyw/nodis/patch"
 )
 
 func main() {
 	var opt = nodis.DefaultOptions
 	opt.Filesystem = &fs.Memory{}
-	opt.Synchronizer = sync.NewWebsocket()
+	opt.Synchronizer = nodis.NewWebsocket()
 	n := nodis.Open(opt)
-	n.WatchKey([]string{"*"}, func(op *pb.Operation) {
-		fmt.Println("Subscribe: ", op.Key)
+	n.WatchKey([]string{"*"}, func(op patch.Op) {
+		fmt.Println("Subscribe: ", op.Data.GetKey())
 	})
 	err := n.Subscribe("ws://127.0.0.1:6380")
 	if err != nil {
@@ -195,16 +193,27 @@ Windows 11: 12C/32G
 goos: windows
 goarch: amd64
 pkg: github.com/diiyw/nodis/bench
-BenchmarkSet-12         	 1469863	        715.9 ns/op	     543 B/op	       7 allocs/op
-BenchmarkGet-12         	12480278	        96.47 ns/op	       7 B/op	       0 allocs/op
-BenchmarkLPush-12       	 1484466	        786.2 ns/op	     615 B/op	       9 allocs/op
-BenchmarkLPop-12        	77275986	        15.10 ns/op	       0 B/op	       0 allocs/op
-BenchmarkSAdd-12        	 1542252	        831.9 ns/op	     663 B/op	      10 allocs/op
-BenchmarkSMembers-12    	12739020	        95.18 ns/op	       8 B/op	       1 allocs/op
-BenchmarkZAdd-12        	 1000000	        1177 ns/op	     550 B/op	      10 allocs/op
-BenchmarkZRank-12       	11430135	        104.1 ns/op	       7 B/op	       0 allocs/op
-BenchmarkHSet-12        	 1341817	        863.5 ns/op	     743 B/op	      11 allocs/op
-BenchmarkHGet-12        	 9801158	        105.9 ns/op	       7 B/op	       0 allocs/op
+cpu: 12th Gen Intel(R) Core(TM) i5-12490F
+BenchmarkSet
+BenchmarkSet-12         	 2159343	       514.7 ns/op	     302 B/op	       8 allocs/op
+BenchmarkGet
+BenchmarkGet-12         	 6421864	       183.8 ns/op	     166 B/op	       3 allocs/op
+BenchmarkLPush
+BenchmarkLPush-12       	 2166828	       566.3 ns/op	     358 B/op	      10 allocs/op
+BenchmarkLPop
+BenchmarkLPop-12        	13069830	        80.41 ns/op	     159 B/op	       3 allocs/op
+BenchmarkSAdd
+BenchmarkSAdd-12        	 2007924	       592.6 ns/op	     406 B/op	      11 allocs/op
+BenchmarkSMembers
+BenchmarkSMembers-12    	 6303288	       179.8 ns/op	     166 B/op	       3 allocs/op
+BenchmarkZAdd
+BenchmarkZAdd-12        	 1580179	       832.6 ns/op	     302 B/op	      10 allocs/op
+BenchmarkZRank
+BenchmarkZRank-12       	 6011108	       186.7 ns/op	     165 B/op	       3 allocs/op
+BenchmarkHSet
+BenchmarkHSet-12        	 1997553	       654.3 ns/op	     486 B/op	      11 allocs/op
+BenchmarkHGet
+BenchmarkHGet-12        	 5895134	       193.3 ns/op	     165 B/op	       3 allocs/op
 ```
 
 Linux VM: 4C/8GB
@@ -229,17 +238,19 @@ BenchmarkHGet-4       	 4442625	       243.4 ns/op	       7 B/op	       0 allocs
 <details>
 	<summary>Redis benchmark tool</summary>
 
+Windows 11: 12C/32G
+
 ```bash
 redis-benchmark -p 6380 -t set,get,lpush,lpop,sadd,smembers,zadd,zrank,hset,hget -n 100000 -q
 ```
 
 ```
-SET: 89126.56 requests per second
-GET: 90415.91 requests per second
-LPUSH: 91491.30 requests per second
-LPOP: 92165.90 requests per second
-SADD: 91911.76 requests per second
-HSET: 93023.25 requests per second
+SET: 116144.02 requests per second
+GET: 125156.45 requests per second
+LPUSH: 121951.22 requests per second
+LPOP: 126103.41 requests per second
+SADD: 121951.22 requests per second
+HSET: 122850.12 requests per second
 ```
 
 </details>

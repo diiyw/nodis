@@ -3,7 +3,7 @@ package notifier
 import (
 	"testing"
 
-	"github.com/diiyw/nodis/pb"
+	"github.com/diiyw/nodis/patch"
 )
 
 func TestNotifier_Matched(t *testing.T) {
@@ -19,13 +19,13 @@ func TestNotifier_Matched(t *testing.T) {
 
 func TestNotifier_Push(t *testing.T) {
 	pattern := []string{"test"}
-	w := New(pattern, func(op *pb.Operation) {
-		if op.Key != "test" {
-			t.Errorf("Push() = %v, want %v", op.Key, "test")
+	w := New(pattern, func(op patch.Op) {
+		if op.Data.GetKey() != "test" {
+			t.Errorf("Push() = %v, want %v", op.Data.GetKey(), "test")
 		}
 	})
 	if w == nil {
 		t.Errorf("NewNotifier() = %v, want %v", w, "Notifier{}")
 	}
-	w.Push(&pb.Operation{Key: "test"})
+	w.Push(patch.Op{patch.OpTypeSet, &patch.OpSet{Key: "test", Value: []byte("test")}})
 }
