@@ -339,7 +339,7 @@ func info(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		if keys > 0 {
 			keyspace = "db0:keys=" + strconv.FormatInt(keys, 10) + ",expires=" + strconv.FormatInt(expires, 10) + ",avg_ttl=" + strconv.FormatInt(avgTTL, 10) + "\r\n"
 		}
-		conn.WriteBulk(`# Server` + "\r\n" + `redis_version:6.0.0` + "\r\n" + `os:` + runtime.GOOS + "\r\n" + `process_id:` + pid + "\r\n" + `# Memory` + "\r\n" + `used_memory:` + usedMemory + "\r\n" + `# Keyspace` + keyspace + "\r\n")
+		conn.WriteBulk(`# Server` + "\r\n" + `redis_version:6.0.0` + "\r\n" + `os:` + runtime.GOOS + "\r\n" + `process_id:` + pid + "\r\n" + `# Memory` + "\r\n" + `used_memory:` + usedMemory + "\r\n" + `# Keyspace` + "\r\n" + keyspace + "\r\n")
 	})
 }
 
