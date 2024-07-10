@@ -147,13 +147,13 @@ func (s *HashMap) HMSet(values map[string][]byte) {
 
 // HMGet gets the values of a hash
 func (s *HashMap) HMGet(fields ...string) [][]byte {
-	values := make([][]byte, 0, len(fields))
-	for _, key := range fields {
+	values := make([][]byte, len(fields))
+	for i, key := range fields {
 		value, ok := s.data.Get(key)
 		if ok {
-			values = append(values, value)
+			values[i] = value
 		} else {
-			values = append(values, nil)
+			values[i] = nil
 		}
 	}
 	return values
