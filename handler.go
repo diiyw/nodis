@@ -1555,8 +1555,8 @@ func hMGet(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			conn.WriteArray(len(fields))
 			for _, _ = range fields {
 				conn.WriteBulkNull()
-		   	}
-		   	return
+			}
+			return
 		}
 		conn.WriteArray(len(results))
 		for _, v := range results {
@@ -2609,7 +2609,14 @@ func zExists(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 
 func save(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
-		n.store.save()
+		n.store.mu.Lock()
+		defer n.store.mu.Unlock()
+		n.store.saveData()
+		err := n.store.saveKeyIndex()
+		if err != nil {
+			conn.WriteError("ERR " + err.Error())
+			return
+		}
 		conn.WriteString("OK")
 	})
 }

@@ -146,8 +146,8 @@ func (s *store) parseValue(data []byte) (ds.Value, error) {
 	return value, nil
 }
 
-// save flush changed keys to disk
-func (s *store) save() {
+// saveData flush changed keys to disk
+func (s *store) saveData() {
 	now := time.Now().UnixMilli()
 	s.metadata.Scan(func(key string, m *metadata) bool {
 		m.Lock()
@@ -158,13 +158,52 @@ func (s *store) save() {
 		if m.value == nil {
 			return true
 		}
-		// save to storage
+		// saveData to storage
 		err := s.saveMetadata(key, m)
 		if err != nil {
 			log.Println("Flush changes: ", err)
 		}
 		return true
 	})
+}
+
+// saveKeyIndex save the key index to disk
+func (s *store) saveKeyIndex() error {
+	idxFile, err := s.filesystem.OpenFile(s.indexFile+"~", os.O_RDWR|os.O_CREATE|os.O_APPEND)
+	if err != nil {
+		return err
+	}
+	var header = make([]byte, 2)
+	binary.LittleEndian.PutUint16(header, s.fileId)
+	_, err = idxFile.Write(header)
+	if err != nil {
+		return err
+	}
+	var buf bytes.Buffer
+	now := time.Now().UnixMilli()
+	s.metadata.Copy().Scan(func(key string, m *metadata) bool {
+		m.RLock()
+		defer m.RUnlock()
+		if m.expired(now) {
+			return true
+		}
+		buf.WriteByte(byte(len(key)))
+		buf.WriteString(key)
+		buf.Write(m.marshal())
+		return true
+	})
+	_, err = buf.WriteTo(idxFile)
+	if err != nil {
+		return err
+	}
+	if err = idxFile.Close(); err != nil {
+		log.Println("Close sync error: ", err)
+	}
+	err = s.filesystem.Rename(s.indexFile+"~", s.indexFile)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // tidy removes expired and unused keys
@@ -175,6 +214,10 @@ func (s *store) tidy(keyMaxUseTimes uint64) {
 		return
 	}
 	now := time.Now().UnixMilli()
+	err := s.saveKeyIndex()
+	if err != nil {
+		log.Println("Tidy: ", err)
+	}
 	s.metadata.Scan(func(key string, m *metadata) bool {
 		m.Lock()
 		defer m.Unlock()
@@ -184,7 +227,7 @@ func (s *store) tidy(keyMaxUseTimes uint64) {
 		}
 		if m.useTimes < keyMaxUseTimes {
 			if m.modified() {
-				// save to disk
+				// saveData to disk
 				err := s.saveMetadata(key, m)
 				if err != nil {
 					log.Println("Tidy: ", err)
@@ -330,7 +373,7 @@ func (s *store) snapshot(path string) {
 		log.Println("Snapshot mkdir error: ", err)
 		return
 	}
-	s.save()
+	s.saveData()
 	ns := newStore(snapshotDir, s.fileSize, s.filesystem)
 	s.metadata.Copy().Scan(func(key string, meta *metadata) bool {
 		data, err := s.getValueEntryRaw(meta.key)
@@ -347,7 +390,7 @@ func (s *store) snapshot(path string) {
 	})
 	err = ns.close()
 	if err != nil {
-		log.Println("Snapshot save error: ", err)
+		log.Println("Snapshot saveData error: ", err)
 	}
 }
 
@@ -356,46 +399,12 @@ func (s *store) close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.closed = true
-	s.save()
+	s.saveData()
 	err := s.aof.Close()
 	if err != nil {
 		return err
 	}
-	idxFile, err := s.filesystem.OpenFile(s.indexFile+"~", os.O_RDWR|os.O_CREATE|os.O_APPEND)
-	if err != nil {
-		return err
-	}
-	var header = make([]byte, 2)
-	binary.LittleEndian.PutUint16(header, s.fileId)
-	_, err = idxFile.Write(header)
-	if err != nil {
-		return err
-	}
-	var buf bytes.Buffer
-	now := time.Now().UnixMilli()
-	s.metadata.Copy().Scan(func(key string, m *metadata) bool {
-		m.RLock()
-		defer m.RUnlock()
-		if m.expired(now) {
-			return true
-		}
-		buf.WriteByte(byte(len(key)))
-		buf.WriteString(key)
-		buf.Write(m.marshal())
-		return true
-	})
-	_, err = buf.WriteTo(idxFile)
-	if err != nil {
-		return err
-	}
-	if err = idxFile.Close(); err != nil {
-		log.Println("Close sync error: ", err)
-	}
-	err = s.filesystem.Rename(s.indexFile+"~", s.indexFile)
-	if err != nil {
-		return err
-	}
-	return nil
+	return s.saveKeyIndex()
 }
 
 // clear the store
