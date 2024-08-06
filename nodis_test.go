@@ -11,9 +11,9 @@ import (
 
 func TestNodis_Open(t *testing.T) {
 	opt := Options{
-		Path:         "testdata",
-		TidyDuration: 60 * time.Second,
-		FileSize:     FileSizeGB,
+		Path:       "testdata",
+		GCDuration: 60 * time.Second,
+		FileSize:   FileSizeGB,
 	}
 	got := Open(&opt)
 	if got == nil {
@@ -24,9 +24,9 @@ func TestNodis_Open(t *testing.T) {
 func TestNodis_OpenAndCloseBigdata10000(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	opt := Options{
-		Path:         "testdata",
-		TidyDuration: 60 * time.Second,
-		FileSize:     FileSizeGB,
+		Path:       "testdata",
+		GCDuration: 60 * time.Second,
+		FileSize:   FileSizeGB,
 	}
 	n := Open(&opt)
 	for i := 0; i < 10000; i++ {
@@ -100,11 +100,11 @@ func TestNodis_SnapshotChanged(t *testing.T) {
 	_ = n.Close()
 }
 
-func TestNodis_Tidy(t *testing.T) {
+func TestNodis_GC(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	opt := &Options{
-		Path:         "testdata",
-		TidyDuration: time.Second,
+		Path:       "testdata",
+		GCDuration: time.Second,
 	}
 	n := Open(opt)
 	n.SetEX("test", []byte("test"), 1)

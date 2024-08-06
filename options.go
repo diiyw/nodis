@@ -17,14 +17,14 @@ type Options struct {
 	// Path is the path to the database.
 	Path string
 
-	// TidyDuration is the interval which the database is flushing unused keys to disk.
+	// GCDuration is the interval which the database is flushing unused keys to disk.
 	// This is useful for reducing the risk of data loss in the event of a crash.
 	// It is also used for refreshing hot keys.
-	TidyDuration time.Duration
+	GCDuration time.Duration
 
 	// MaxKeyUseTimes is the maximum number of times a key can be used before it is considered hot.
 	// The default value is 0, which means that the key will never be considered hot.
-	// Hot keys are refreshed every TidyDuration.
+	// Hot keys are refreshed every GCDuration.
 	MaxKeyUseTimes uint64
 
 	// FileSize is the size of each file. The default value is 1GB.
@@ -42,7 +42,7 @@ type Options struct {
 }
 
 var DefaultOptions = &Options{
-	Path:         "data",
-	FileSize:     FileSizeGB,
-	TidyDuration: 60 * time.Second,
+	Path:       "data",
+	FileSize:   FileSizeGB,
+	GCDuration: 60 * time.Second,
 }

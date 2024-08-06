@@ -25,13 +25,13 @@ type metadata struct {
 	writeable  bool
 }
 
-func newMetadata(key *Key, value ds.Value, writeable bool) *metadata {
+func newMetadata() *metadata {
 	return &metadata{
 		RWMutex:   new(sync.RWMutex),
-		useTimes:  1,
-		key:       key,
-		value:     value,
-		writeable: writeable,
+		useTimes:  0,
+		key:       &Key{},
+		value:     nil,
+		writeable: false,
 	}
 }
 

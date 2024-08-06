@@ -244,7 +244,7 @@ func TestStorePutRaw(t *testing.T) {
 	expiration := time.Now().Unix() + 3600
 	var e = newValueEntry(name, strVal, expiration)
 	data := e.encode()
-	m := newMetadata(&Key{}, nil, false)
+	m := newMetadata()
 	m.expiration = expiration
 	// Call the saveValueRaw method
 	err := store.saveValueRaw(name, m, data)

@@ -52,10 +52,10 @@ func Open(opt *Options) *Nodis {
 	}
 	n.store = newStore(opt.Path, opt.FileSize, opt.Filesystem)
 	go func() {
-		if opt.TidyDuration != 0 {
+		if opt.GCDuration != 0 {
 			for {
-				time.Sleep(opt.TidyDuration)
-				n.store.tidy(opt.MaxKeyUseTimes)
+				time.Sleep(opt.GCDuration)
+				n.store.gc(opt.MaxKeyUseTimes)
 			}
 		}
 	}()

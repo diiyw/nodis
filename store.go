@@ -70,8 +70,7 @@ func newStore(path string, fileSize int64, filesystem fs.Fs) *store {
 				if len(data) == 0 {
 					break
 				}
-				var m = newMetadata(&Key{}, nil, false)
-				m.unmarshal(data)
+				var m = newMetadata().unmarshal(data)
 				data = data[metadataSize:]
 				m.state |= KeyStateNormal
 				s.metadata.Set(key, m)
@@ -206,8 +205,8 @@ func (s *store) saveKeyIndex() error {
 	return nil
 }
 
-// tidy removes expired and unused keys
-func (s *store) tidy(keyMaxUseTimes uint64) {
+// gc removes expired and unused keys
+func (s *store) gc(keyMaxUseTimes uint64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
@@ -216,7 +215,7 @@ func (s *store) tidy(keyMaxUseTimes uint64) {
 	now := time.Now().UnixMilli()
 	err := s.saveKeyIndex()
 	if err != nil {
-		log.Println("Tidy: ", err)
+		log.Println("GC: ", err)
 	}
 	s.metadata.Scan(func(key string, m *metadata) bool {
 		m.Lock()
@@ -228,9 +227,9 @@ func (s *store) tidy(keyMaxUseTimes uint64) {
 		if m.useTimes < keyMaxUseTimes {
 			if m.modified() {
 				// saveData to disk
-				err := s.saveMetadata(key, m)
+				err = s.saveMetadata(key, m)
 				if err != nil {
-					log.Println("Tidy: ", err)
+					log.Println("GC: ", err)
 				}
 			}
 			m.reset()
@@ -297,7 +296,7 @@ func (s *store) saveMetadata(name string, m *metadata) error {
 
 // saveValueEntry a key-value pair into store
 func (s *store) saveValueEntry(entry *ValueEntry) error {
-	var m = newMetadata(&Key{}, nil, false)
+	var m = newMetadata()
 	offset, err := s.check()
 	if err != nil {
 		return err

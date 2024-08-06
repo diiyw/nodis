@@ -7,8 +7,8 @@ import (
 
 func TestStr_Set(t *testing.T) {
 	n := Open(&Options{
-		Path:         "testdata",
-		TidyDuration: 60 * time.Second,
+		Path:       "testdata",
+		GCDuration: 60 * time.Second,
 	})
 	n.Set("a", []byte("b"), false)
 	v := n.Get("a")
@@ -29,8 +29,8 @@ func TestStr_Set(t *testing.T) {
 
 func TestStr_SetBit(t *testing.T) {
 	n := Open(&Options{
-		Path:         "testdata",
-		TidyDuration: 60 * time.Second,
+		Path:       "testdata",
+		GCDuration: 60 * time.Second,
 	})
 	n.SetBit("a", 0, true)
 	if n.GetBit("a", 0) != 1 {
@@ -44,8 +44,8 @@ func TestStr_SetBit(t *testing.T) {
 
 func TestStr_BitCount(t *testing.T) {
 	n := Open(&Options{
-		Path:         "testdata",
-		TidyDuration: 60 * time.Second,
+		Path:       "testdata",
+		GCDuration: 60 * time.Second,
 	})
 	n.SetBit("a", 0, true)
 	n.SetBit("a", 1, true)
