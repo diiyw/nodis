@@ -104,7 +104,7 @@ func TestNodis_GC(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	opt := &Options{
 		Path:       "testdata",
-		GCDuration: time.Second,
+		GCDuration: 3 * time.Second,
 	}
 	n := Open(opt)
 	n.SetEX("test", []byte("test"), 1)

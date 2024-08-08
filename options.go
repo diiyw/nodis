@@ -22,11 +22,6 @@ type Options struct {
 	// It is also used for refreshing hot keys.
 	GCDuration time.Duration
 
-	// MaxKeyUseTimes is the maximum number of times a key can be used before it is considered hot.
-	// The default value is 0, which means that the key will never be considered hot.
-	// Hot keys are refreshed every GCDuration.
-	MaxKeyUseTimes uint64
-
 	// FileSize is the size of each file. The default value is 1GB.
 	FileSize int64
 

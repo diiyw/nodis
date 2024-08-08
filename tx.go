@@ -27,7 +27,7 @@ func (tx *Tx) lockKey(key string) *metadata {
 		m.Lock()
 		m.writeable = true
 		tx.lockedMetas = append(tx.lockedMetas, m)
-		m.useTimes++
+		m.count++
 		return m
 	}
 	return m.empty()
@@ -40,7 +40,7 @@ func (tx *Tx) rLockKey(key string) *metadata {
 	if ok {
 		m.RLock()
 		tx.lockedMetas = append(tx.lockedMetas, m)
-		m.useTimes++
+		m.count++
 		return m
 	}
 	return m.empty()

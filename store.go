@@ -206,7 +206,7 @@ func (s *store) saveKeyIndex() error {
 }
 
 // gc removes expired and unused keys
-func (s *store) gc(keyMaxUseTimes uint64) {
+func (s *store) gc() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
@@ -224,15 +224,16 @@ func (s *store) gc(keyMaxUseTimes uint64) {
 			s.metadata.Delete(key)
 			return true
 		}
-		if m.useTimes < keyMaxUseTimes {
-			if m.modified() {
-				// saveData to disk
-				err = s.saveMetadata(key, m)
-				if err != nil {
-					log.Println("GC: ", err)
-				}
+		if m.modified() {
+			// saveData to disk
+			err = s.saveMetadata(key, m)
+			if err != nil {
+				log.Println("GC: ", err)
 			}
-			m.reset()
+		}
+		m.reset()
+		if m.count < 0 {
+			s.metadata.Delete(key)
 		}
 		return true
 	})

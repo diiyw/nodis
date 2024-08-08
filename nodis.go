@@ -22,11 +22,11 @@ var (
 )
 
 type Nodis struct {
-	store              *store
-	notifiers          []*notifier.Notifier
-	blocklingKeysMutex sync.RWMutex
-	blocklingKeys      btree.Map[string, *list.LinkedListG[chan string]] // blockling keys
-	options            *Options
+	store             *store
+	notifiers         []*notifier.Notifier
+	blockingKeysMutex sync.RWMutex
+	blockingKeys      btree.Map[string, *list.LinkedListG[chan string]] // blocking keys
+	options           *Options
 }
 
 func Open(opt *Options) *Nodis {
@@ -55,7 +55,7 @@ func Open(opt *Options) *Nodis {
 		if opt.GCDuration != 0 {
 			for {
 				time.Sleep(opt.GCDuration)
-				n.store.gc(opt.MaxKeyUseTimes)
+				n.store.gc()
 			}
 		}
 	}()

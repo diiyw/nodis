@@ -18,7 +18,7 @@ type metadata struct {
 	*sync.RWMutex
 	key        *Key
 	value      ds.Value
-	useTimes   uint64
+	count      int64
 	expiration int64
 	valueType  ds.ValueType
 	state      uint8
@@ -28,7 +28,7 @@ type metadata struct {
 func newMetadata() *metadata {
 	return &metadata{
 		RWMutex:   new(sync.RWMutex),
-		useTimes:  0,
+		count:     0,
 		key:       &Key{},
 		value:     nil,
 		writeable: false,
@@ -53,7 +53,7 @@ func (m *metadata) modified() bool {
 // reset the key state
 func (m *metadata) reset() {
 	m.state = KeyStateNormal
-	m.useTimes = 0
+	m.count--
 }
 
 func (m *metadata) setValue(value ds.Value) {

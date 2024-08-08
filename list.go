@@ -288,22 +288,22 @@ func (n *Nodis) RPopLPush(source, destination string) []byte {
 }
 
 func (n *Nodis) addBlockKey(key string, c chan string) {
-	n.blocklingKeysMutex.Lock()
-	cList, ok := n.blocklingKeys.Get(key)
+	n.blockingKeysMutex.Lock()
+	cList, ok := n.blockingKeys.Get(key)
 	if !ok {
 		cList = list.NewLinkedListG[chan string]()
 		cList.LPush(c)
-		n.blocklingKeys.Set(key, cList)
+		n.blockingKeys.Set(key, cList)
 	} else {
 		cList.LPush(c)
 	}
-	n.blocklingKeysMutex.Unlock()
+	n.blockingKeysMutex.Unlock()
 }
 
 func (n *Nodis) notifyBlockingKey(key string) {
-	n.blocklingKeysMutex.RLock()
-	cList, ok := n.blocklingKeys.Get(key)
-	n.blocklingKeysMutex.RUnlock()
+	n.blockingKeysMutex.RLock()
+	cList, ok := n.blockingKeys.Get(key)
+	n.blockingKeysMutex.RUnlock()
 	if !ok {
 		return
 	}
@@ -314,11 +314,11 @@ func (n *Nodis) notifyBlockingKey(key string) {
 }
 
 func (n *Nodis) removeBlockingKeys(rc chan string, keys ...string) {
-	n.blocklingKeysMutex.Lock()
+	n.blockingKeysMutex.Lock()
 	for _, key := range keys {
-		cList, ok := n.blocklingKeys.Get(key)
+		cList, ok := n.blockingKeys.Get(key)
 		if !ok {
-			n.blocklingKeysMutex.Unlock()
+			n.blockingKeysMutex.Unlock()
 			return
 		}
 		cList.ForRangeNode(func(node *list.NodeG[chan string]) bool {
@@ -330,7 +330,7 @@ func (n *Nodis) removeBlockingKeys(rc chan string, keys ...string) {
 		})
 	}
 	close(rc)
-	n.blocklingKeysMutex.Unlock()
+	n.blockingKeysMutex.Unlock()
 }
 
 func (n *Nodis) BLPop(timeout time.Duration, keys ...string) (string, []byte) {
