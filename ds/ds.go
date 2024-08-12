@@ -1,5 +1,15 @@
 package ds
 
+type Key struct {
+	Name       string
+	Expiration int64
+}
+
+// NewKey returns a new key.
+func NewKey(name string, expiration int64) *Key {
+	return &Key{Name: name, Expiration: expiration}
+}
+
 type Value interface {
 	Type() ValueType
 	GetValue() []byte

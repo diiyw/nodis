@@ -7,7 +7,6 @@ import (
 
 func TestStr_Set(t *testing.T) {
 	n := Open(&Options{
-		Path:       "testdata",
 		GCDuration: 60 * time.Second,
 	})
 	n.Set("a", []byte("b"), false)
@@ -29,7 +28,7 @@ func TestStr_Set(t *testing.T) {
 
 func TestStr_SetBit(t *testing.T) {
 	n := Open(&Options{
-		Path:       "testdata",
+
 		GCDuration: 60 * time.Second,
 	})
 	n.SetBit("a", 0, true)
@@ -44,7 +43,6 @@ func TestStr_SetBit(t *testing.T) {
 
 func TestStr_BitCount(t *testing.T) {
 	n := Open(&Options{
-		Path:       "testdata",
 		GCDuration: 60 * time.Second,
 	})
 	n.SetBit("a", 0, true)

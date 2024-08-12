@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	ErrCorruptedData = errors.New("corrupted data")
+	ErrCorruptedData = errors.New("corrupted values")
 )
 
 // ValueEntry is the entry of the value
@@ -53,7 +53,7 @@ func (v *ValueEntry) decode(b []byte) error {
 	v.Type = b[0]
 	i, n := binary.Varint(b[1:])
 	v.Expiration = i
-	// type+expiration+keyIndex
+	// type+Expiration+keyIndex
 	keyLen := int(b[1+n+1])
 	if len(b) < keyLen {
 		return ErrCorruptedData

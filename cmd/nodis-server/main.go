@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/diiyw/nodis/fs"
 	"net"
 	"os"
 
@@ -20,7 +19,6 @@ func main() {
 		}
 	}
 	opt := nodis.DefaultOptions
-	opt.Filesystem = &fs.Disk{}
 	n := nodis.Open(opt)
 	if err := n.Serve(addr); err != nil {
 		fmt.Printf("Serve() = %v", err)

@@ -19,7 +19,7 @@ func (n *Nodis) Set(key string, value []byte, keepTTL bool) {
 		meta := tx.writeKey(key, n.newStr)
 		meta.value.(*str.String).Set(value)
 		if !keepTTL {
-			meta.expiration = 0
+			meta.key.Expiration = 0
 		}
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
@@ -48,12 +48,12 @@ func (n *Nodis) GetSet(key string, value []byte) []byte {
 func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newStr)
-		meta.expiration = time.Now().UnixMilli()
-		meta.expiration += seconds * 1000
+		meta.key.Expiration = time.Now().UnixMilli()
+		meta.key.Expiration += seconds * 1000
 		meta.value.(*str.String).Set(value)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSet, &patch.OpSet{Key: key, Value: value, Expiration: meta.expiration}}}
+			return []patch.Op{{patch.OpTypeSet, &patch.OpSet{Key: key, Value: value, Expiration: meta.key.Expiration}}}
 		})
 		return nil
 	})
@@ -63,11 +63,11 @@ func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
 func (n *Nodis) SetPX(key string, value []byte, milliseconds int64) {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newStr)
-		meta.expiration = time.Now().UnixMilli()
-		meta.expiration += milliseconds
+		meta.key.Expiration = time.Now().UnixMilli()
+		meta.key.Expiration += milliseconds
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSet, &patch.OpSet{Key: key, Value: value, Expiration: meta.expiration}}}
+			return []patch.Op{{patch.OpTypeSet, &patch.OpSet{Key: key, Value: value, Expiration: meta.key.Expiration}}}
 		})
 		meta.value.(*str.String).Set(value)
 		return nil
@@ -84,7 +84,7 @@ func (n *Nodis) SetNX(key string, value []byte, keepTTL bool) bool {
 		}
 		meta = tx.newKey(meta, key, n.newStr)
 		if !keepTTL {
-			meta.expiration = 0
+			meta.key.Expiration = 0
 		}
 		meta.value.(*str.String).Set(value)
 		n.signalModifiedKey(key, meta)
@@ -107,7 +107,7 @@ func (n *Nodis) SetXX(key string, value []byte, keepTTL bool) bool {
 		}
 		meta.value.(*str.String).Set(value)
 		if !keepTTL {
-			meta.expiration = 0
+			meta.key.Expiration = 0
 		}
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {

@@ -6,13 +6,11 @@ import (
 	"time"
 
 	"github.com/diiyw/nodis/ds"
-	"github.com/diiyw/nodis/fs"
 )
 
 func TestKey_Expire(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:       "testdata",
 		GCDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"), false)
@@ -25,9 +23,7 @@ func TestKey_Expire(t *testing.T) {
 
 func TestKey_ExpireXX(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{
-		Path: "testdata",
-	})
+	n := Open(&Options{})
 	n.Set("test", []byte("test1"), false)
 	n.ExpireXX("test", 3)
 	if n.TTL("test") != -1 {
@@ -43,7 +39,7 @@ func TestKey_ExpireXX(t *testing.T) {
 func TestKey_ExpireNX(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:       "testdata",
+
 		GCDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"), false)
@@ -61,7 +57,7 @@ func TestKey_ExpireNX(t *testing.T) {
 func TestKey_ExpireLT(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:       "testdata",
+
 		GCDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"), false)
@@ -79,7 +75,7 @@ func TestKey_ExpireLT(t *testing.T) {
 func TestKey_ExpireGT(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:       "testdata",
+
 		GCDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"), false)
@@ -97,7 +93,6 @@ func TestKey_ExpireGT(t *testing.T) {
 func TestKey_ExpireAt(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:       "testdata",
 		GCDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"), false)
@@ -112,7 +107,6 @@ func TestKey_ExpireAt(t *testing.T) {
 func TestKey_TTL(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:       "testdata",
 		GCDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"), false)
@@ -131,7 +125,7 @@ func TestKey_TTL(t *testing.T) {
 func TestKey_Rename(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:       "testdata",
+
 		GCDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"), false)
@@ -148,9 +142,7 @@ func TestKey_Rename(t *testing.T) {
 
 func TestKey_RenameNX(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{
-		Path: "testdata",
-	})
+	n := Open(&Options{})
 	n.Set("test", []byte("test1"), false)
 	n.Set("test2", []byte("test2"), false)
 	err := n.RenameNX("test", "test2")
@@ -166,7 +158,7 @@ func TestKey_RenameNX(t *testing.T) {
 func TestKey_Keys(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:       "testdata",
+
 		GCDuration: 60 * time.Second,
 	})
 	n.Set("test1", []byte("test1"), false)
@@ -174,17 +166,16 @@ func TestKey_Keys(t *testing.T) {
 	n.Set("test3", []byte("test3"), false)
 	keys := n.Keys("test*")
 	if len(keys) != 3 {
-		t.Errorf("Keys() = %v, want %v", len(keys), 3)
+		t.Errorf("ScanKeys() = %v, want %v", len(keys), 3)
 	}
 }
 
 func TestKey_Type(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{
-		Path:       "testdata",
+	var opt = &Options{
 		GCDuration: 60 * time.Second,
-		Filesystem: &fs.Disk{},
-	})
+	}
+	n := Open(opt)
 	n.Set("test1", []byte("test1"), false)
 	n.LPush("test2", []byte("test2"))
 	n.ZAdd("test3", "test3", 10)
@@ -210,9 +201,8 @@ func TestKey_Type(t *testing.T) {
 		t.Fatalf("Close() = %v, want %v", err, nil)
 	}
 	n = Open(&Options{
-		Path:       "testdata",
 		GCDuration: 60 * time.Second,
-		Filesystem: &fs.Disk{},
+		Storage:    opt.Storage,
 	})
 	if n.Type("test1") != "string" {
 		t.Errorf("Type() = %v, want %v", n.Type("test1"), "string")
@@ -234,7 +224,6 @@ func TestKey_Type(t *testing.T) {
 func TestKey_Scan(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:       "testdata",
 		GCDuration: 60 * time.Second,
 	})
 	n.Set("test1", []byte("test1"), false)
@@ -293,7 +282,7 @@ func TestKey_Scan(t *testing.T) {
 func TestKey_Exists(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-		Path:       "testdata",
+
 		GCDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"), false)

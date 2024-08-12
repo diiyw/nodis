@@ -13,10 +13,10 @@ var (
 type Storage interface {
 	Open() error
 	Get(key string) (ds.Value, error)
-	Put(key string, value ds.Value, expiration int64) error
+	Put(key *ds.Key, value ds.Value) error
 	Delete(key string) error
-	GetIndex() []byte
-	PutIndex(index []byte) error
 	Reset() error
 	Close() error
+	Snapshot() error
+	ScanKeys(func(*ds.Key) bool)
 }

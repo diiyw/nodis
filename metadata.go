@@ -16,20 +16,18 @@ const (
 
 type metadata struct {
 	*sync.RWMutex
-	key        *Key
-	value      ds.Value
-	count      int64
-	expiration int64
-	valueType  ds.ValueType
-	state      uint8
-	writeable  bool
+	key       *ds.Key
+	value     ds.Value
+	count     int64
+	valueType ds.ValueType
+	state     uint8
+	writeable bool
 }
 
 func newMetadata() *metadata {
 	return &metadata{
 		RWMutex:   new(sync.RWMutex),
 		count:     0,
-		key:       &Key{},
 		value:     nil,
 		writeable: false,
 	}
@@ -39,7 +37,7 @@ func (m *metadata) expired(now int64) bool {
 	if m == nil {
 		return true
 	}
-	return m.expiration != 0 && m.expiration <= now
+	return m.key.Expiration != 0 && m.key.Expiration <= now
 }
 
 // modified return if the key is modified
@@ -73,19 +71,13 @@ func (m *metadata) empty() *metadata {
 
 func (m *metadata) marshal() []byte {
 	var b [metadataSize]byte
-	binary.LittleEndian.PutUint16(b[0:2], m.key.fileId)
-	binary.LittleEndian.PutUint64(b[2:10], uint64(m.key.offset))
-	binary.LittleEndian.PutUint32(b[10:14], m.key.size)
-	binary.LittleEndian.PutUint64(b[14:22], uint64(m.expiration))
+	binary.LittleEndian.PutUint64(b[14:22], uint64(m.key.Expiration))
 	b[22] = uint8(m.valueType)
 	return b[:]
 }
 
 func (m *metadata) unmarshal(b []byte) *metadata {
-	m.key.fileId = binary.LittleEndian.Uint16(b[0:2])
-	m.key.offset = int64(binary.LittleEndian.Uint64(b[2:10]))
-	m.key.size = binary.LittleEndian.Uint32(b[10:14])
-	m.expiration = int64(binary.LittleEndian.Uint64(b[14:22]))
+	m.key.Expiration = int64(binary.LittleEndian.Uint64(b[14:22]))
 	m.valueType = ds.ValueType(b[22])
 	return m
 }

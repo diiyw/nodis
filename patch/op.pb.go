@@ -1937,7 +1937,7 @@ type OpZUnionStore struct {
 	unknownFields protoimpl.UnknownFields
 
 	Key       string    `protobuf:"bytes,1,opt,name=Key,proto3" json:"Key,omitempty"`
-	Keys      []string  `protobuf:"bytes,2,rep,name=Keys,proto3" json:"Keys,omitempty"`
+	Keys      []string  `protobuf:"bytes,2,rep,name=ScanKeys,proto3" json:"ScanKeys,omitempty"`
 	Weights   []float64 `protobuf:"fixed64,3,rep,packed,name=Weights,proto3" json:"Weights,omitempty"`
 	Aggregate string    `protobuf:"bytes,4,opt,name=Aggregate,proto3" json:"Aggregate,omitempty"`
 }
@@ -2008,7 +2008,7 @@ type OpZInterStore struct {
 	unknownFields protoimpl.UnknownFields
 
 	Key       string    `protobuf:"bytes,1,opt,name=Key,proto3" json:"Key,omitempty"`
-	Keys      []string  `protobuf:"bytes,2,rep,name=Keys,proto3" json:"Keys,omitempty"`
+	Keys      []string  `protobuf:"bytes,2,rep,name=ScanKeys,proto3" json:"ScanKeys,omitempty"`
 	Weights   []float64 `protobuf:"fixed64,3,rep,packed,name=Weights,proto3" json:"Weights,omitempty"`
 	Aggregate string    `protobuf:"bytes,4,opt,name=Aggregate,proto3" json:"Aggregate,omitempty"`
 }

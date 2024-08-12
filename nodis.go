@@ -2,6 +2,7 @@ package nodis
 
 import (
 	"errors"
+	"github.com/diiyw/nodis/storage"
 	"log"
 	"os"
 	"os/signal"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/diiyw/nodis/ds/list"
-	"github.com/diiyw/nodis/fs"
 	"github.com/diiyw/nodis/internal/notifier"
 	"github.com/diiyw/nodis/patch"
 	"github.com/diiyw/nodis/redis"
@@ -30,27 +30,13 @@ type Nodis struct {
 }
 
 func Open(opt *Options) *Nodis {
-	if opt.FileSize == 0 {
-		opt.FileSize = FileSizeGB
-	}
-	if opt.Filesystem == nil {
-		opt.Filesystem = &fs.Memory{}
+	if opt.Storage == nil {
+		opt.Storage = &storage.Memory{}
 	}
 	n := &Nodis{
 		options: opt,
 	}
-	isDir, err := opt.Filesystem.IsDir(opt.Path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			err = opt.Filesystem.MkdirAll(opt.Path)
-			if err != nil {
-				panic(err)
-			}
-		}
-	} else if !isDir {
-		panic("Path is not a directory")
-	}
-	n.store = newStore(opt.Path, opt.FileSize, opt.Filesystem)
+	n.store = newStore(opt.Storage)
 	go func() {
 		if opt.GCDuration != 0 {
 			for {
@@ -63,7 +49,10 @@ func Open(opt *Options) *Nodis {
 		if opt.SnapshotDuration != 0 {
 			for {
 				time.Sleep(opt.SnapshotDuration)
-				n.Snapshot(n.store.path)
+				if err := n.Snapshot(); err != nil {
+					log.Println("Snapshot Err: ", err)
+					continue
+				}
 				log.Println("Snapshot at", time.Now().Format("2006-01-02 15:04:05"))
 			}
 		}
@@ -72,8 +61,8 @@ func Open(opt *Options) *Nodis {
 }
 
 // Snapshot saves the data to disk
-func (n *Nodis) Snapshot(path string) {
-	n.store.snapshot(path)
+func (n *Nodis) Snapshot() error {
+	return n.store.sg.Snapshot()
 }
 
 // Close the store
@@ -87,29 +76,6 @@ func (n *Nodis) Clear() {
 	if err != nil {
 		log.Println("Clear: ", err)
 	}
-}
-
-// SetEntry sets an entity
-func (n *Nodis) SetEntry(data []byte) error {
-	entity, err := n.store.parseEntryBytes(data)
-	if err != nil {
-		return err
-	}
-	return n.store.saveValueEntry(entity)
-}
-
-// GetEntry gets an entity
-func (n *Nodis) GetEntry(key string) (data []byte) {
-	_ = n.exec(func(tx *Tx) error {
-		meta := tx.readKey(key)
-		if !meta.isOk() {
-			return nil
-		}
-		var entity = newValueEntry(key, meta.value, meta.expiration)
-		data = entity.encode()
-		return nil
-	})
-	return
 }
 
 func (n *Nodis) notify(f func() []patch.Op) {

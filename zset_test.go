@@ -6,9 +6,7 @@ import (
 )
 
 func TestZSet_ZAdd(t *testing.T) {
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -21,9 +19,7 @@ func TestZSet_ZAdd(t *testing.T) {
 }
 
 func TestZSet_ZRange(t *testing.T) {
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -57,9 +53,7 @@ func TestZSet_ZRange(t *testing.T) {
 }
 
 func TestZSet_ZRangeByScore(t *testing.T) {
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -79,9 +73,7 @@ func TestZSet_ZRangeByScore(t *testing.T) {
 }
 
 func TestZSet_ZRank(t *testing.T) {
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -100,9 +92,7 @@ func TestZSet_ZRank(t *testing.T) {
 }
 
 func TestZSet_ZRevRange(t *testing.T) {
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -122,9 +112,7 @@ func TestZSet_ZRevRange(t *testing.T) {
 }
 
 func TestZSet_ZRevRangeByScore(t *testing.T) {
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -144,9 +132,7 @@ func TestZSet_ZRevRangeByScore(t *testing.T) {
 }
 
 func TestZSet_ZRevRank(t *testing.T) {
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -168,9 +154,7 @@ func TestZSet_ZRevRank(t *testing.T) {
 }
 
 func TestZSet_ZScore(t *testing.T) {
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -189,9 +173,7 @@ func TestZSet_ZScore(t *testing.T) {
 }
 
 func TestZSet_ZIncrBy(t *testing.T) {
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -203,9 +185,7 @@ func TestZSet_ZIncrBy(t *testing.T) {
 }
 
 func TestZSet_ZRem(t *testing.T) {
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -219,9 +199,7 @@ func TestZSet_ZRem(t *testing.T) {
 }
 
 func TestZSet_ZRemRangeByRank(t *testing.T) {
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -235,9 +213,7 @@ func TestZSet_ZRemRangeByRank(t *testing.T) {
 }
 
 func TestZSet_ZRemRangeByScore(t *testing.T) {
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -251,9 +227,7 @@ func TestZSet_ZRemRangeByScore(t *testing.T) {
 }
 
 func TestZSet_ZClear(t *testing.T) {
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -267,9 +241,7 @@ func TestZSet_ZClear(t *testing.T) {
 }
 
 func TestZSet_ZExists(t *testing.T) {
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -280,9 +252,7 @@ func TestZSet_ZExists(t *testing.T) {
 }
 
 func TestZSet_ZRangeWithScores(t *testing.T) {
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -302,9 +272,7 @@ func TestZSet_ZRangeWithScores(t *testing.T) {
 }
 
 func TestZSet_ZRevRangeWithScores(t *testing.T) {
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -324,9 +292,7 @@ func TestZSet_ZRevRangeWithScores(t *testing.T) {
 }
 
 func TestZSet_ZRangeByScoreWithScores(t *testing.T) {
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()
@@ -346,9 +312,7 @@ func TestZSet_ZRangeByScoreWithScores(t *testing.T) {
 }
 
 func TestZSet_ZRevRangeByScoreWithScores(t *testing.T) {
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	os.RemoveAll("testdata")
 	n := Open(opt)
 	defer n.Close()

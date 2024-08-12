@@ -25,8 +25,7 @@ Nodis is a Redis implementation using the Golang programming language. This impl
 
 - **Fast and Embeddable**: The Golang-based implementation is designed to be fast and easily embeddable within your applications.
 - **Low Memory Usage**: The system only stores hot data in memory, minimizing the overall memory footprint.
-- **Snapshot and WAL for Data Storage**: This Redis implementation supports snapshot and write-ahead logging (WAL) mechanisms for reliable data storage.
-- **Custom Data Storage Backends**: You can integrate custom data storage backends, such as Amazon S3, browser-based storage, and more.
+- **Custom Data Storage Backends**: You can integrate custom data storage backends, such as Amazon S3,sqlite, browser-based storage, and more.
 - **Browser Support with WebAssembly**: Starting from version 1.2.0, this Redis implementation can run directly in the browser using WebAssembly.
 - **Remote Change Monitoring**: From version 1.2.0 onwards, the system supports watching for changes from remote sources.
 - **Redis Protocol Compatibility**: As of version 1.5.0, this Redis implementation fully supports the original Redis protocol, ensuring seamless integration with existing Redis clients.

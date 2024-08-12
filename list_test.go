@@ -8,7 +8,7 @@ import (
 
 func TestList_LPush(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	n.LPush("list", []byte("value"))
 	n.LPush("list", []byte("value1"))
 	n.LPush("list", []byte("value2"))
@@ -27,7 +27,7 @@ func TestList_LPush(t *testing.T) {
 
 func TestList_RPush(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	n.RPush("list", []byte("value"))
 	if string(n.RPop("list", 1)[0]) != "value" {
 		t.Error("RPush failed")
@@ -36,7 +36,7 @@ func TestList_RPush(t *testing.T) {
 
 func TestList_LPop(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	n.LPush("list", []byte("value"))
 	if string(n.LPop("list", 1)[0]) != "value" {
 		t.Error("LPop failed")
@@ -45,7 +45,7 @@ func TestList_LPop(t *testing.T) {
 
 func TestList_RPop(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	n.RPush("list", []byte("value"))
 	if string(n.RPop("list", 1)[0]) != "value" {
 		t.Error("RPop failed")
@@ -54,7 +54,7 @@ func TestList_RPop(t *testing.T) {
 
 func TestList_LLen(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	n.LPush("list", []byte("value"))
 	if n.LLen("list") != 1 {
 		t.Error("LLen failed")
@@ -63,7 +63,7 @@ func TestList_LLen(t *testing.T) {
 
 func TestList_LRange(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	n.LPush("list", []byte("value"))
 	if string(n.LRange("list", 0, -1)[0]) != "value" {
 		t.Error("LRange failed")
@@ -72,7 +72,7 @@ func TestList_LRange(t *testing.T) {
 
 func TestList_LIndex(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	n.LPush("list", []byte("value"))
 	if string(n.LIndex("list", 0)) != "value" {
 		t.Error("LIndex failed")
@@ -81,7 +81,7 @@ func TestList_LIndex(t *testing.T) {
 
 func TestList_BLPopNoPush(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	k, _ := n.BLPop(time.Second, "list")
 	if k != "" {
 		t.Error("BLPop failed excepted value got nil")
@@ -90,7 +90,7 @@ func TestList_BLPopNoPush(t *testing.T) {
 
 func TestList_BLPop(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	go func() {
 		time.Sleep(time.Second)
 		n.LPush("list", []byte("value"))
@@ -103,7 +103,7 @@ func TestList_BLPop(t *testing.T) {
 
 func TestList_BRPopNoPush(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	k, _ := n.BRPop(time.Second, "list")
 	if k != "" {
 		t.Error("BRPop failed")
@@ -112,7 +112,7 @@ func TestList_BRPopNoPush(t *testing.T) {
 
 func TestList_BRPop(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	go func() {
 		n.RPush("list", []byte("value"))
 	}()
@@ -124,7 +124,7 @@ func TestList_BRPop(t *testing.T) {
 
 func TestList_LSet(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	n.LPush("list", []byte("value"))
 	n.LSet("list", 0, []byte("new"))
 	if string(n.LIndex("list", 0)) != "new" {
@@ -134,7 +134,7 @@ func TestList_LSet(t *testing.T) {
 
 func TestList_LTrim(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	n.LPush("list", []byte("value"))
 	n.LTrim("list", 0, 0)
 	if string(n.LIndex("list", 0)) != "value" {
@@ -144,7 +144,7 @@ func TestList_LTrim(t *testing.T) {
 
 func TestList_LRem(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	n.LPush("list", []byte("value"))
 	n.LRem("list", []byte("value"), 0)
 	if n.LLen("list") != 0 {
@@ -154,7 +154,7 @@ func TestList_LRem(t *testing.T) {
 
 func TestList_LInsert(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	n.LPush("list", []byte("value"))
 	n.LInsert("list", []byte("value"), []byte("new"), true)
 	if string(n.LIndex("list", 0)) != "new" {
@@ -164,7 +164,7 @@ func TestList_LInsert(t *testing.T) {
 
 func TestList_LPushX(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	n.LPushX("list", []byte("value"))
 	v := n.LPop("list", 1)
 	if len(v) > 0 && string(v[0]) == "value" {
@@ -174,7 +174,7 @@ func TestList_LPushX(t *testing.T) {
 
 func TestList_RPushX(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	n.RPushX("list", []byte("value"))
 	v := n.RPop("list", 1)
 	if len(v) > 0 && string(v[0]) == "value" {
@@ -184,7 +184,7 @@ func TestList_RPushX(t *testing.T) {
 
 func TestList_LPopRPush(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	n.LPush("list", []byte("value"))
 	n.LPush("list2", []byte("value2"))
 	if string(n.LPopRPush("list", "list2")) != "value" {
@@ -197,7 +197,7 @@ func TestList_LPopRPush(t *testing.T) {
 
 func TestList_RPopLPush(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	n.RPush("list", []byte("value"))
 	n.RPush("list2", []byte("value"))
 	if string(n.RPopLPush("list", "list2")) != "value" {
@@ -210,7 +210,7 @@ func TestList_RPopLPush(t *testing.T) {
 
 func TestList_LPopRPush2(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	n.LPush("list", []byte("value"))
 	if string(n.LPopRPush("list", "list2")) != "value" {
 		t.Error("LPopRPush failed")
@@ -222,7 +222,7 @@ func TestList_LPopRPush2(t *testing.T) {
 
 func TestList_RPopLPush2(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	n := Open(&Options{Path: "testdata"})
+	n := Open(&Options{})
 	n.RPush("list", []byte("value"))
 	if string(n.RPopLPush("list", "list2")) != "value" {
 		t.Error("RPopLPush failed")

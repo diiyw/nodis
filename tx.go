@@ -1,6 +1,7 @@
 package nodis
 
 import (
+	"github.com/diiyw/nodis/storage"
 	"sync"
 	"time"
 
@@ -53,10 +54,9 @@ func (tx *Tx) newKey(m *metadata, key string, newFn func() ds.Value) *metadata {
 			m.RWMutex = new(sync.RWMutex)
 		}
 		value := newFn()
-		m.key = newKey()
+		m.key = storage.NewKey(key, 0)
 		m.setValue(value)
 		m.state |= KeyStateModified
-		m.expiration = 0
 		tx.store.metadata.Set(key, m)
 		tx.store.mu.Unlock()
 		return m
@@ -81,7 +81,12 @@ func (tx *Tx) writeKey(key string, newFn func() ds.Value) *metadata {
 			return m
 		}
 		// if not found in memory, read from storage
-		return tx.store.fromStorage(m)
+		v, err := tx.store.sg.Get(key)
+		if err != nil {
+			return tx.newKey(m, key, newFn)
+		}
+		m.setValue(v)
+		return m
 	}
 	return tx.newKey(m, key, newFn)
 }
@@ -97,7 +102,12 @@ func (tx *Tx) readKey(key string) *metadata {
 			return m
 		}
 		// if not found in memory, read from storage
-		return tx.store.fromStorage(m)
+		v, err := tx.store.sg.Get(key)
+		if err != nil {
+			return m.empty()
+		}
+		m.setValue(v)
+		return m
 	}
 	return m.empty()
 }

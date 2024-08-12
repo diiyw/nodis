@@ -11,9 +11,7 @@ import (
 
 func TestNodis_Open(t *testing.T) {
 	opt := Options{
-		Path:       "testdata",
 		GCDuration: 60 * time.Second,
-		FileSize:   FileSizeGB,
 	}
 	got := Open(&opt)
 	if got == nil {
@@ -24,9 +22,7 @@ func TestNodis_Open(t *testing.T) {
 func TestNodis_OpenAndCloseBigdata10000(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	opt := Options{
-		Path:       "testdata",
 		GCDuration: 60 * time.Second,
-		FileSize:   FileSizeGB,
 	}
 	n := Open(&opt)
 	for i := 0; i < 10000; i++ {
@@ -75,35 +71,9 @@ func TestNodis_OpenAndCloseBigdata10000(t *testing.T) {
 	}
 }
 
-func TestNodis_Snapshot(t *testing.T) {
-	_ = os.RemoveAll("testdata")
-	opt := &Options{
-		Path: "testdata",
-	}
-	n := Open(opt)
-	n.Set("test", []byte("test"), false)
-	n.Snapshot("testdata")
-	_ = n.Close()
-}
-
-func TestNodis_SnapshotChanged(t *testing.T) {
-	_ = os.RemoveAll("testdata")
-	opt := &Options{
-		Path: "testdata",
-	}
-	n := Open(opt)
-	n.Set("test", []byte("test"), false)
-	n.Snapshot(opt.Path)
-	time.Sleep(time.Second)
-	n.Set("test", []byte("test_new"), false)
-	n.Snapshot(opt.Path)
-	_ = n.Close()
-}
-
 func TestNodis_GC(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	opt := &Options{
-		Path:       "testdata",
 		GCDuration: 3 * time.Second,
 	}
 	n := Open(opt)
@@ -125,9 +95,7 @@ func TestNodis_GC(t *testing.T) {
 
 func TestNodis_Clear(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	n := Open(opt)
 	n.Set("test", []byte("test"), false)
 	n.Clear()
@@ -140,9 +108,7 @@ func TestNodis_Clear(t *testing.T) {
 
 func TestNodis_Patch(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	var ops = []patch.Op{
 		{
 			Type: patch.OpTypeSet,
@@ -209,35 +175,9 @@ func TestNodis_Patch(t *testing.T) {
 	}
 }
 
-func TestNodis_SetEntity(t *testing.T) {
+func TestNodis_WatchKey(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	opt := &Options{
-		Path: "testdata",
-	}
-	n := Open(opt)
-	n.Set("test", []byte("test"), false)
-	data := n.GetEntry("test")
-	n.Clear()
-	v := n.Get("test")
-	if v != nil {
-		t.Errorf("Get() = %v, want %v", v, nil)
-		return
-	}
-	err := n.SetEntry(data)
-	if err != nil {
-		t.Errorf("SetEntity() = %v, want %v", err, nil)
-	}
-	v = n.Get("test")
-	if string(v) != "test" {
-		t.Errorf("Get() = %s, want %v", v, "test")
-	}
-}
-
-func TestNodis_Stick(t *testing.T) {
-	_ = os.RemoveAll("testdata")
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	n := Open(opt)
 	n.Set("test", []byte("test"), false)
 	n.WatchKey([]string{"test"}, func(op patch.Op) {
@@ -249,11 +189,9 @@ func TestNodis_Stick(t *testing.T) {
 	time.Sleep(time.Second)
 }
 
-func TestNodis_UnStick(t *testing.T) {
+func TestNodis_UnWatchKey(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	n := Open(opt)
 	n.Set("test", []byte("test"), false)
 	id := n.WatchKey([]string{"test"}, func(op patch.Op) {
@@ -268,9 +206,7 @@ func TestNodis_UnStick(t *testing.T) {
 
 func TestNodis_OpenAndClose(t *testing.T) {
 	_ = os.RemoveAll("testdata")
-	opt := &Options{
-		Path: "testdata",
-	}
+	opt := &Options{}
 	n := Open(opt)
 	n.Set("str", []byte("set"), false)
 	n.ZAdd("zset", "zset", 1)

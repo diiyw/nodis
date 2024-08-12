@@ -2611,12 +2611,7 @@ func save(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		n.store.mu.Lock()
 		defer n.store.mu.Unlock()
-		n.store.saveData()
-		err := n.store.saveKeyIndex()
-		if err != nil {
-			conn.WriteError("ERR " + err.Error())
-			return
-		}
+		n.store.sync()
 		conn.WriteString("OK")
 	})
 }
