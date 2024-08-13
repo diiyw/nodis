@@ -14,12 +14,18 @@ type Pebble struct {
 	db   *pebble.DB
 }
 
-func (p *Pebble) Open(path string) error {
-	db, err := pebble.Open(path, &pebble.Options{})
+// NewPebble creates a new Pebble storage
+func NewPebble(path string) *Pebble {
+	return &Pebble{
+		path: path,
+	}
+}
+
+func (p *Pebble) Init() error {
+	db, err := pebble.Open(p.path, &pebble.Options{})
 	if err != nil {
 		return err
 	}
-	p.path = path
 	p.db = db
 	return nil
 }

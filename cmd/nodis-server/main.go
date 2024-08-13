@@ -2,25 +2,24 @@ package main
 
 import (
 	"fmt"
-	"net"
-	"os"
-
+	"github.com/alecthomas/kong"
 	"github.com/diiyw/nodis"
+	"github.com/diiyw/nodis/storage"
 )
 
+var CLI struct {
+	Addr    string `arg:"" default:":6380" usage:"nodis server address"`
+	Storage string `arg:"" default:"memory" usage:"select storage"`
+}
+
 func main() {
-	addr := ":6380"
-	if len(os.Args) > 1 {
-		addr = os.Args[1]
-		ip := net.ParseIP(addr)
-		if ip == nil {
-			fmt.Printf("invalid ip address: %s", addr)
-			os.Exit(0)
-		}
-	}
+	_ = kong.Parse(&CLI)
 	opt := nodis.DefaultOptions
+	if CLI.Storage == "pebble" {
+		opt.Storage = storage.NewPebble("data")
+	}
 	n := nodis.Open(opt)
-	if err := n.Serve(addr); err != nil {
+	if err := n.Serve(CLI.Addr); err != nil {
 		fmt.Printf("Serve() = %v", err)
 	}
 }
