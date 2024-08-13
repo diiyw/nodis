@@ -1,5 +1,13 @@
 package ds
 
+import (
+	"errors"
+)
+
+var (
+	ErrCorruptedData = errors.New("corrupted data")
+)
+
 type Key struct {
 	Name       string
 	Expiration int64

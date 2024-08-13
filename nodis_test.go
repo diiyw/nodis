@@ -149,7 +149,7 @@ func TestNodis_Patch(t *testing.T) {
 		},
 	}
 	n := Open(opt)
-	err := n.Patch(ops...)
+	err := n.ApplyPatch(ops...)
 	if err != nil {
 		t.Errorf("Patch() = %v, want %v", err, nil)
 	}

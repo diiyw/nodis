@@ -2,14 +2,13 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/diiyw/nodis"
-	"github.com/diiyw/nodis/fs"
 	"github.com/diiyw/nodis/patch"
 )
 
 func main() {
 	var opt = nodis.DefaultOptions
-	opt.Filesystem = &fs.Memory{}
 	opt.Synchronizer = nodis.NewWebsocket()
 	n := nodis.Open(opt)
 	n.WatchKey([]string{"*"}, func(op patch.Op) {

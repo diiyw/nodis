@@ -1,12 +1,17 @@
 package storage
 
 import (
+	"os"
+	"path/filepath"
+	"time"
+
 	"github.com/cockroachdb/pebble"
 	"github.com/diiyw/nodis/ds"
 )
 
 type Pebble struct {
-	db *pebble.DB
+	path string
+	db   *pebble.DB
 }
 
 func (p *Pebble) Open(path string) error {
@@ -14,6 +19,7 @@ func (p *Pebble) Open(path string) error {
 	if err != nil {
 		return err
 	}
+	p.path = path
 	p.db = db
 	return nil
 }
@@ -25,16 +31,13 @@ func (p *Pebble) Get(key string) (ds.Value, error) {
 		return nil, err
 	}
 	defer closer.Close()
-	entry, err := parseValueEntry(v)
-	if err != nil {
-		return nil, err
-	}
-	return parseValue(entry.Value)
+	_, dv, err := parseValue(v)
+	return dv, err
 }
 
 // Put the value to the storage
 func (p *Pebble) Put(key *ds.Key, value ds.Value) error {
-	entry := NewValueEntry(key.Name, value, key.Expiration)
+	entry := NewValueEntry(value, key.Expiration)
 	data := entry.encode()
 	return p.db.Set([]byte(key.Name), data, pebble.Sync)
 }
@@ -44,9 +47,22 @@ func (p *Pebble) Delete(key string) error {
 	return p.db.Delete([]byte(key), pebble.Sync)
 }
 
-// Reset the storage
-func (p *Pebble) Reset() error {
-	return p.db.Flush()
+// Clear the storage
+func (p *Pebble) Clear() error {
+	err := p.db.Close()
+	if err != nil {
+		return err
+	}
+	err = os.RemoveAll(p.path)
+	if err != nil {
+		return err
+	}
+	db, err := pebble.Open(p.path, &pebble.Options{})
+	if err != nil {
+		return err
+	}
+	p.db = db
+	return nil
 }
 
 // Close the storage
@@ -56,7 +72,8 @@ func (p *Pebble) Close() error {
 
 // Snapshot the storage
 func (p *Pebble) Snapshot() error {
-	return nil
+	dstDir := time.Now().Format("20060102150405")
+	return p.db.Checkpoint(filepath.Join(p.path, dstDir))
 }
 
 // ScanKeys returns the keys in the storage
@@ -76,7 +93,7 @@ func (p *Pebble) ScanKeys(fn func(*ds.Key) bool) {
 			continue
 		}
 		key := &ds.Key{
-			Name:       entry.Key,
+			Name:       string(iter.Key()),
 			Expiration: entry.Expiration,
 		}
 		if !fn(key) {

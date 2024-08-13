@@ -2,15 +2,15 @@ package nodis
 
 import (
 	"errors"
-	"github.com/diiyw/nodis/ds"
-	"github.com/diiyw/nodis/ds/list"
-	"github.com/diiyw/nodis/redis"
-	"github.com/diiyw/nodis/storage"
 	"math/rand"
 	"path/filepath"
 	"runtime"
 	"sync"
 	"time"
+
+	"github.com/diiyw/nodis/ds"
+	"github.com/diiyw/nodis/ds/list"
+	"github.com/diiyw/nodis/redis"
 
 	"github.com/diiyw/nodis/patch"
 )
@@ -449,7 +449,7 @@ func (n *Nodis) Rename(key, dstKey string) error {
 		tx.delKey(key)
 		if !dstMeta.isOk() {
 			dstMeta.RWMutex = new(sync.RWMutex)
-			dstMeta.key = storage.NewKey(dstKey, meta.key.Expiration)
+			dstMeta.key = ds.NewKey(dstKey, meta.key.Expiration)
 			n.store.mu.Lock()
 			n.store.metadata.Set(dstKey, dstMeta)
 			n.store.mu.Unlock()
@@ -477,7 +477,7 @@ func (n *Nodis) RenameNX(key, dstKey string) error {
 		}
 		tx.delKey(key)
 		dstMeta.RWMutex = new(sync.RWMutex)
-		dstMeta.key = storage.NewKey(dstKey, meta.key.Expiration)
+		dstMeta.key = ds.NewKey(dstKey, meta.key.Expiration)
 		dstMeta.setValue(meta.value)
 		n.store.mu.Lock()
 		n.store.metadata.Set(dstKey, dstMeta)

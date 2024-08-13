@@ -1,10 +1,12 @@
 package nodis
 
 import (
-	"github.com/diiyw/nodis/storage"
 	"log"
 	"sync"
 	"time"
+
+	"github.com/diiyw/nodis/ds"
+	"github.com/diiyw/nodis/storage"
 
 	"github.com/diiyw/nodis/ds/list"
 	"github.com/diiyw/nodis/redis"
@@ -69,7 +71,6 @@ func (s *store) gc() {
 			return true
 		}
 		if m.modified() {
-			// sync to disk
 			err := s.sg.Put(m.key, m.value)
 			if err != nil {
 				log.Println("GC: ", err)
@@ -97,5 +98,5 @@ func (s *store) clear() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.metadata.Clear()
-	return s.sg.Reset()
+	return s.sg.Clear()
 }

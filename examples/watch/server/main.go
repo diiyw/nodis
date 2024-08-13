@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/diiyw/nodis"
 	"github.com/diiyw/nodis/patch"
-	"time"
 )
 
 func main() {
@@ -20,7 +21,7 @@ func main() {
 			n.Set("test", []byte(time.Now().Format("2006-01-02 15:04:05")), false)
 		}
 	}()
-	err := n.Publish("127.0.0.1:6380", []string{"*"})
+	err := n.Broadcast("127.0.0.1:6380", []string{"*"})
 	if err != nil {
 		panic(err)
 	}

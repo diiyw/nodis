@@ -2,7 +2,6 @@ package nodis
 
 import (
 	"errors"
-	"github.com/diiyw/nodis/storage"
 	"log"
 	"os"
 	"os/signal"
@@ -10,8 +9,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/diiyw/nodis/storage"
+
 	"github.com/diiyw/nodis/ds/list"
-	"github.com/diiyw/nodis/internal/notifier"
+	"github.com/diiyw/nodis/internal/listener"
 	"github.com/diiyw/nodis/patch"
 	"github.com/diiyw/nodis/redis"
 	"github.com/tidwall/btree"
@@ -23,7 +24,7 @@ var (
 
 type Nodis struct {
 	store             *store
-	notifiers         []*notifier.Notifier
+	listeners         []*listener.Listener
 	blockingKeysMutex sync.RWMutex
 	blockingKeys      btree.Map[string, *list.LinkedListG[chan string]] // blocking keys
 	options           *Options
@@ -79,11 +80,11 @@ func (n *Nodis) Clear() {
 }
 
 func (n *Nodis) notify(f func() []patch.Op) {
-	if len(n.notifiers) == 0 {
+	if len(n.listeners) == 0 {
 		return
 	}
 	go func() {
-		for _, w := range n.notifiers {
+		for _, w := range n.listeners {
 			for _, op := range f() {
 				if w.Matched(op.Data.GetKey()) {
 					w.Push(op)
@@ -94,18 +95,18 @@ func (n *Nodis) notify(f func() []patch.Op) {
 }
 
 func (n *Nodis) WatchKey(pattern []string, fn func(op patch.Op)) int {
-	w := notifier.New(pattern, fn)
-	n.notifiers = append(n.notifiers, w)
-	return len(n.notifiers) - 1
+	w := listener.New(pattern, fn)
+	n.listeners = append(n.listeners, w)
+	return len(n.listeners) - 1
 }
 
 func (n *Nodis) UnWatchKey(id int) {
-	n.notifiers = append(n.notifiers[:id], n.notifiers[id+1:]...)
+	n.listeners = append(n.listeners[:id], n.listeners[id+1:]...)
 }
 
-func (n *Nodis) Patch(ops ...patch.Op) error {
+func (n *Nodis) ApplyPatch(ops ...patch.Op) error {
 	for _, op := range ops {
-		err := n.patch(op)
+		err := n.appylyPatch(op)
 		if err != nil {
 			return err
 		}
@@ -113,7 +114,7 @@ func (n *Nodis) Patch(ops ...patch.Op) error {
 	return nil
 }
 
-func (n *Nodis) patch(p patch.Op) error {
+func (n *Nodis) appylyPatch(p patch.Op) error {
 	switch op := p.Data.(type) {
 	case *patch.OpClear:
 		n.Clear()
@@ -185,7 +186,7 @@ func (n *Nodis) patch(p patch.Op) error {
 	return nil
 }
 
-func (n *Nodis) Publish(addr string, pattern []string) error {
+func (n *Nodis) Broadcast(addr string, pattern []string) error {
 	return n.options.Synchronizer.Publish(addr, func(s SyncConn) {
 		id := n.WatchKey(pattern, func(op patch.Op) {
 			err := s.Send(op)
@@ -200,7 +201,7 @@ func (n *Nodis) Publish(addr string, pattern []string) error {
 
 func (n *Nodis) Subscribe(addr string) error {
 	return n.options.Synchronizer.Subscribe(addr, func(o patch.Op) {
-		n.Patch(o)
+		n.ApplyPatch(o)
 	})
 }
 

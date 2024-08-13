@@ -15,7 +15,7 @@ type Storage interface {
 	Get(key string) (ds.Value, error)
 	Put(key *ds.Key, value ds.Value) error
 	Delete(key string) error
-	Reset() error
+	Clear() error
 	Close() error
 	Snapshot() error
 	ScanKeys(func(*ds.Key) bool)

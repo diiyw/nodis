@@ -1,7 +1,6 @@
 package nodis
 
 import (
-	"github.com/diiyw/nodis/storage"
 	"sync"
 	"time"
 
@@ -54,7 +53,7 @@ func (tx *Tx) newKey(m *metadata, key string, newFn func() ds.Value) *metadata {
 			m.RWMutex = new(sync.RWMutex)
 		}
 		value := newFn()
-		m.key = storage.NewKey(key, 0)
+		m.key = ds.NewKey(key, 0)
 		m.setValue(value)
 		m.state |= KeyStateModified
 		tx.store.metadata.Set(key, m)
