@@ -31,8 +31,11 @@ func (p *Pebble) Get(key string) (ds.Value, error) {
 		return nil, err
 	}
 	defer closer.Close()
-	_, dv, err := parseValue(v)
-	return dv, err
+	entry, err := parseEntry(v)
+	if err != nil {
+		return nil, err
+	}
+	return parseValue(ds.ValueType(entry.Type), entry.Value)
 }
 
 // Put the value to the storage
@@ -88,7 +91,7 @@ func (p *Pebble) ScanKeys(fn func(*ds.Key) bool) {
 		if err != nil {
 			continue
 		}
-		entry, err := parseValueEntry(v)
+		entry, err := parseEntry(v)
 		if err != nil {
 			continue
 		}

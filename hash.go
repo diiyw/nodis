@@ -18,7 +18,7 @@ func (n *Nodis) HSet(key string, field string, value []byte) int64 {
 		v = meta.value.(*hash.HashMap).HSet(field, value)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeHSet, &patch.OpHSet{Key: key, Field: field, Value: value}}}
+			return []patch.Op{{Type: patch.OpTypeHSet, Data: &patch.OpHSet{Key: key, Field: field, Value: value}}}
 		})
 		return nil
 	})
@@ -51,7 +51,7 @@ func (n *Nodis) HDel(key string, fields ...string) int64 {
 		}
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeHDel, &patch.OpHDel{Key: key, Fields: fields}}}
+			return []patch.Op{{Type: patch.OpTypeHDel, Data: &patch.OpHDel{Key: key, Fields: fields}}}
 		})
 		return nil
 	})
@@ -119,7 +119,7 @@ func (n *Nodis) HIncrBy(key string, field string, value int64) (int64, error) {
 		v, err = meta.value.(*hash.HashMap).HIncrBy(field, value)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeHIncrBy, &patch.OpHIncrBy{Key: key, Field: field, IncrInt: value}}}
+			return []patch.Op{{Type: patch.OpTypeHIncrBy, Data: &patch.OpHIncrBy{Key: key, Field: field, IncrInt: value}}}
 		})
 		return nil
 	})
@@ -134,7 +134,7 @@ func (n *Nodis) HIncrByFloat(key string, field string, value float64) (float64, 
 		v, err = meta.value.(*hash.HashMap).HIncrByFloat(field, value)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeHIncrByFloat, &patch.OpHIncrByFloat{Key: key, Field: field, IncrFloat: value}}}
+			return []patch.Op{{Type: patch.OpTypeHIncrByFloat, Data: &patch.OpHIncrByFloat{Key: key, Field: field, IncrFloat: value}}}
 		})
 		return err
 	})
@@ -154,7 +154,7 @@ func (n *Nodis) HSetNX(key string, field string, value []byte) int64 {
 		v = meta.value.(*hash.HashMap).HSet(field, value)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeHSet, &patch.OpHSet{Key: key, Field: field, Value: value}}}
+			return []patch.Op{{Type: patch.OpTypeHSet, Data: &patch.OpHSet{Key: key, Field: field, Value: value}}}
 		})
 		return nil
 	})

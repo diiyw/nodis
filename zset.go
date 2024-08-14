@@ -17,7 +17,7 @@ func (n *Nodis) ZAdd(key string, member string, score float64) int64 {
 		v = meta.value.(*zset.SortedSet).ZAdd(member, score)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeZAdd, &patch.OpZAdd{Key: key, Member: member, Score: score}}}
+			return []patch.Op{{Type: patch.OpTypeZAdd, Data: &patch.OpZAdd{Key: key, Member: member, Score: score}}}
 		})
 		return nil
 	})
@@ -32,7 +32,7 @@ func (n *Nodis) ZAddXX(key string, member string, score float64) int64 {
 		v = meta.value.(*zset.SortedSet).ZAddXX(member, score)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeZAdd, &patch.OpZAdd{Key: key, Member: member, Score: score}}}
+			return []patch.Op{{Type: patch.OpTypeZAdd, Data: &patch.OpZAdd{Key: key, Member: member, Score: score}}}
 		})
 		return nil
 	})
@@ -46,7 +46,7 @@ func (n *Nodis) ZAddNX(key string, member string, score float64) int64 {
 		v = meta.value.(*zset.SortedSet).ZAddNX(member, score)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeZAdd, &patch.OpZAdd{Key: key, Member: member, Score: score}}}
+			return []patch.Op{{Type: patch.OpTypeZAdd, Data: &patch.OpZAdd{Key: key, Member: member, Score: score}}}
 		})
 		return nil
 	})
@@ -61,7 +61,7 @@ func (n *Nodis) ZAddLT(key string, member string, score float64) int64 {
 		if meta.value.(*zset.SortedSet).ZAddLT(member, score) {
 			n.signalModifiedKey(key, meta)
 			n.notify(func() []patch.Op {
-				return []patch.Op{{patch.OpTypeZAdd, &patch.OpZAdd{Key: key, Member: member, Score: score}}}
+				return []patch.Op{{Type: patch.OpTypeZAdd, Data: &patch.OpZAdd{Key: key, Member: member, Score: score}}}
 			})
 			v = 1
 		}
@@ -78,7 +78,7 @@ func (n *Nodis) ZAddGT(key string, member string, score float64) int64 {
 		if meta.value.(*zset.SortedSet).ZAddGT(member, score) {
 			n.signalModifiedKey(key, meta)
 			n.notify(func() []patch.Op {
-				return []patch.Op{{patch.OpTypeZAdd, &patch.OpZAdd{Key: key, Member: member, Score: score}}}
+				return []patch.Op{{Type: patch.OpTypeZAdd, Data: &patch.OpZAdd{Key: key, Member: member, Score: score}}}
 			})
 			v = 1
 		}
@@ -171,7 +171,7 @@ func (n *Nodis) ZIncrBy(key string, member string, score float64) float64 {
 		v = meta.value.(*zset.SortedSet).ZIncrBy(member, score)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeZIncrBy, &patch.OpZIncrBy{Key: key, Member: member, Score: score}}}
+			return []patch.Op{{Type: patch.OpTypeZIncrBy, Data: &patch.OpZIncrBy{Key: key, Member: member, Score: score}}}
 		})
 		return nil
 	})
@@ -319,7 +319,7 @@ func (n *Nodis) ZRem(key string, members ...string) int64 {
 		if v > 0 {
 			n.signalModifiedKey(key, meta)
 			n.notify(func() []patch.Op {
-				return []patch.Op{{patch.OpTypeZRem, &patch.OpZRem{Key: key, Members: members}}}
+				return []patch.Op{{Type: patch.OpTypeZRem, Data: &patch.OpZRem{Key: key, Members: members}}}
 			})
 		}
 		return nil
@@ -338,7 +338,7 @@ func (n *Nodis) ZRemRangeByRank(key string, start int64, stop int64) int64 {
 		if v > 0 {
 			n.signalModifiedKey(key, meta)
 			n.notify(func() []patch.Op {
-				return []patch.Op{{patch.OpTypeZRemRangeByRank, &patch.OpZRemRangeByRank{Key: key, Start: start, Stop: stop}}}
+				return []patch.Op{{Type: patch.OpTypeZRemRangeByRank, Data: &patch.OpZRemRangeByRank{Key: key, Start: start, Stop: stop}}}
 			})
 		}
 		return nil
@@ -357,7 +357,7 @@ func (n *Nodis) ZRemRangeByScore(key string, min float64, max float64, mode int)
 		if v > 0 {
 			n.signalModifiedKey(key, meta)
 			n.notify(func() []patch.Op {
-				return []patch.Op{{patch.OpTypeZRemRangeByScore, &patch.OpZRemRangeByScore{Key: key, Min: min, Max: max, Mode: int64(mode)}}}
+				return []patch.Op{{Type: patch.OpTypeZRemRangeByScore, Data: &patch.OpZRemRangeByScore{Key: key, Min: min, Max: max, Mode: int64(mode)}}}
 			})
 		}
 		return nil
@@ -483,7 +483,7 @@ func (n *Nodis) ZUnionStore(destination string, keys []string, weights []float64
 		}
 		n.signalModifiedKey(destination, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeZUnionStore, &patch.OpZUnionStore{Key: destination, Keys: keys, Weights: weights, Aggregate: aggregate}}}
+			return []patch.Op{{Type: patch.OpTypeZUnionStore, Data: &patch.OpZUnionStore{Key: destination, Keys: keys, Weights: weights, Aggregate: aggregate}}}
 		})
 		v = int64(len(items))
 		return nil
@@ -563,7 +563,7 @@ func (n *Nodis) ZInterStore(destination string, keys []string, weights []float64
 		}
 		n.signalModifiedKey(destination, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeZInterStore, &patch.OpZInterStore{Key: destination, Keys: keys, Weights: weights, Aggregate: aggregate}}}
+			return []patch.Op{{Type: patch.OpTypeZInterStore, Data: &patch.OpZInterStore{Key: destination, Keys: keys, Weights: weights, Aggregate: aggregate}}}
 		})
 		v = int64(len(items))
 		return nil

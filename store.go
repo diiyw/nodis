@@ -34,7 +34,7 @@ func newStore(sg storage.Storage) *store {
 	return s
 }
 
-// sync flush changed keys to disk
+// sync flush changed keys to storage
 func (s *store) sync() {
 	now := time.Now().UnixMilli()
 	s.metadata.Scan(func(key string, m *metadata) bool {

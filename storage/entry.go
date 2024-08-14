@@ -17,19 +17,19 @@ var (
 	ErrCorruptedData = errors.New("corrupted values")
 )
 
-// ValueEntry is the entry of the value
-type ValueEntry struct {
+// Entry is the entry of the value
+type Entry struct {
 	Type       uint8
 	Expiration int64
 	Value      []byte
 }
 
-func (v *ValueEntry) encode() []byte {
-	var b = make([]byte, 1+8+len(v.Value))
-	b[0] = v.Type
-	n := binary.PutVarint(b[1:], v.Expiration)
-	copy(b[n+1:], v.Value)
-	b = b[:n+1+len(v.Value)]
+func (e *Entry) encode() []byte {
+	var b = make([]byte, 1+8+len(e.Value))
+	b[0] = e.Type
+	n := binary.PutVarint(b[1:], e.Expiration)
+	copy(b[n+1:], e.Value)
+	b = b[:n+1+len(e.Value)]
 	c32 := crc32.ChecksumIEEE(b)
 	var buf = make([]byte, len(b)+4)
 	binary.LittleEndian.PutUint32(buf, c32)
@@ -37,7 +37,7 @@ func (v *ValueEntry) encode() []byte {
 	return buf
 }
 
-func (v *ValueEntry) decode(b []byte) error {
+func (e *Entry) decode(b []byte) error {
 	if len(b) < 4 {
 		return ErrCorruptedData
 	}
@@ -46,16 +46,16 @@ func (v *ValueEntry) decode(b []byte) error {
 	if c32 != crc32.ChecksumIEEE(b) {
 		return ErrCorruptedData
 	}
-	v.Type = b[0]
+	e.Type = b[0]
 	i, n := binary.Varint(b[1:])
-	v.Expiration = i
-	v.Value = b[n+1:]
+	e.Expiration = i
+	e.Value = b[n+1:]
 	return nil
 }
 
 // NewValueEntry creates a new entity
-func NewValueEntry(v ds.Value, expiration int64) *ValueEntry {
-	e := &ValueEntry{
+func NewValueEntry(v ds.Value, expiration int64) *Entry {
+	e := &Entry{
 		Expiration: expiration,
 		Type:       uint8(v.Type()),
 	}
@@ -63,43 +63,39 @@ func NewValueEntry(v ds.Value, expiration int64) *ValueEntry {
 	return e
 }
 
-func parseValueEntry(data []byte) (*ValueEntry, error) {
-	var entry = &ValueEntry{}
+func parseEntry(data []byte) (*Entry, error) {
+	var entry = &Entry{}
 	if err := entry.decode(data); err != nil {
 		return nil, err
 	}
 	return entry, nil
 }
 
-func parseValue(data []byte) (*ValueEntry, ds.Value, error) {
-	var entry, err = parseValueEntry(data)
-	if err != nil {
-		return nil, nil, err
-	}
+func parseValue(typ ds.ValueType, data []byte) (ds.Value, error) {
 	var value ds.Value
-	switch ds.ValueType(entry.Type) {
+	switch typ {
 	case ds.String:
 		v := str.NewString()
-		v.SetValue(entry.Value)
+		v.SetValue(data)
 		value = v
 	case ds.ZSet:
 		z := zset.NewSortedSet()
-		z.SetValue(entry.Value)
+		z.SetValue(data)
 		value = z
 	case ds.List:
 		l := list.NewLinkedList()
-		l.SetValue(entry.Value)
+		l.SetValue(data)
 		value = l
 	case ds.Hash:
 		h := hash.NewHashMap()
-		h.SetValue(entry.Value)
+		h.SetValue(data)
 		value = h
 	case ds.Set:
 		v := set.NewSet()
-		v.SetValue(entry.Value)
+		v.SetValue(data)
 		value = v
 	default:
 		panic("unhandled default case")
 	}
-	return entry, value, nil
+	return value, nil
 }

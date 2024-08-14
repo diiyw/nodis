@@ -1,7 +1,6 @@
 package nodis
 
 import (
-	"encoding/binary"
 	"sync"
 
 	"github.com/diiyw/nodis/ds"
@@ -10,8 +9,6 @@ import (
 const (
 	KeyStateNormal   uint8 = 1
 	KeyStateModified uint8 = 2
-
-	metadataSize = 23
 )
 
 type metadata struct {
@@ -67,19 +64,6 @@ func (m *metadata) empty() *metadata {
 		newM.RWMutex = m.RWMutex
 	}
 	return newM
-}
-
-func (m *metadata) marshal() []byte {
-	var b [metadataSize]byte
-	binary.LittleEndian.PutUint64(b[14:22], uint64(m.key.Expiration))
-	b[22] = uint8(m.valueType)
-	return b[:]
-}
-
-func (m *metadata) unmarshal(b []byte) *metadata {
-	m.key.Expiration = int64(binary.LittleEndian.Uint64(b[14:22]))
-	m.valueType = ds.ValueType(b[22])
-	return m
 }
 
 func (m *metadata) isOk() bool {

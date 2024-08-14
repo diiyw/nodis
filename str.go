@@ -1,12 +1,13 @@
 package nodis
 
 import (
-	"github.com/diiyw/nodis/ds"
-	"github.com/diiyw/nodis/ds/str"
-	"github.com/diiyw/nodis/patch"
 	"strconv"
 	"time"
 	"unsafe"
+
+	"github.com/diiyw/nodis/ds"
+	"github.com/diiyw/nodis/ds/str"
+	"github.com/diiyw/nodis/patch"
 )
 
 func (n *Nodis) newStr() ds.Value {
@@ -23,7 +24,7 @@ func (n *Nodis) Set(key string, value []byte, keepTTL bool) {
 		}
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSet, &patch.OpSet{Key: key, Value: value, KeepTTL: keepTTL}}}
+			return []patch.Op{{Type: patch.OpTypeSet, Data: &patch.OpSet{Key: key, Value: value, KeepTTL: keepTTL}}}
 		})
 		return nil
 	})
@@ -37,7 +38,7 @@ func (n *Nodis) GetSet(key string, value []byte) []byte {
 		v = meta.value.(*str.String).GetSet(value)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSet, &patch.OpSet{Key: key, Value: value}}}
+			return []patch.Op{{Type: patch.OpTypeSet, Data: &patch.OpSet{Key: key, Value: value}}}
 		})
 		return nil
 	})
@@ -53,7 +54,7 @@ func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
 		meta.value.(*str.String).Set(value)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSet, &patch.OpSet{Key: key, Value: value, Expiration: meta.key.Expiration}}}
+			return []patch.Op{{Type: patch.OpTypeSet, Data: &patch.OpSet{Key: key, Value: value, Expiration: meta.key.Expiration}}}
 		})
 		return nil
 	})
@@ -67,7 +68,7 @@ func (n *Nodis) SetPX(key string, value []byte, milliseconds int64) {
 		meta.key.Expiration += milliseconds
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSet, &patch.OpSet{Key: key, Value: value, Expiration: meta.key.Expiration}}}
+			return []patch.Op{{Type: patch.OpTypeSet, Data: &patch.OpSet{Key: key, Value: value, Expiration: meta.key.Expiration}}}
 		})
 		meta.value.(*str.String).Set(value)
 		return nil
@@ -89,7 +90,7 @@ func (n *Nodis) SetNX(key string, value []byte, keepTTL bool) bool {
 		meta.value.(*str.String).Set(value)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSet, &patch.OpSet{Key: key, Value: value, KeepTTL: keepTTL}}}
+			return []patch.Op{{Type: patch.OpTypeSet, Data: &patch.OpSet{Key: key, Value: value, KeepTTL: keepTTL}}}
 		})
 		ok = true
 		return nil
@@ -111,7 +112,7 @@ func (n *Nodis) SetXX(key string, value []byte, keepTTL bool) bool {
 		}
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSet, &patch.OpSet{Key: key, Value: value, KeepTTL: keepTTL}}}
+			return []patch.Op{{Type: patch.OpTypeSet, Data: &patch.OpSet{Key: key, Value: value, KeepTTL: keepTTL}}}
 		})
 		ok = true
 		return nil
@@ -148,7 +149,7 @@ func (n *Nodis) Incr(key string) (int64, error) {
 		m := unsafe.Slice(unsafe.StringData(vv), len(vv))
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSet, &patch.OpSet{Key: key, Value: m}}}
+			return []patch.Op{{Type: patch.OpTypeSet, Data: &patch.OpSet{Key: key, Value: m}}}
 		})
 		return nil
 	})
@@ -168,7 +169,7 @@ func (n *Nodis) IncrBy(key string, increment int64) (int64, error) {
 		m := unsafe.Slice(unsafe.StringData(vv), len(vv))
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSet, &patch.OpSet{Key: key, Value: m}}}
+			return []patch.Op{{Type: patch.OpTypeSet, Data: &patch.OpSet{Key: key, Value: m}}}
 		})
 		return nil
 	})
@@ -190,7 +191,7 @@ func (n *Nodis) Decr(key string) (int64, error) {
 		m := unsafe.Slice(unsafe.StringData(vv), len(vv))
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSet, &patch.OpSet{Key: key, Value: m}}}
+			return []patch.Op{{Type: patch.OpTypeSet, Data: &patch.OpSet{Key: key, Value: m}}}
 		})
 		return nil
 	})
@@ -211,7 +212,7 @@ func (n *Nodis) DecrBy(key string, decrement int64) (int64, error) {
 		m := unsafe.Slice(unsafe.StringData(vv), len(vv))
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSet, &patch.OpSet{Key: key, Value: m}}}
+			return []patch.Op{{Type: patch.OpTypeSet, Data: &patch.OpSet{Key: key, Value: m}}}
 		})
 		return nil
 	})
@@ -231,7 +232,7 @@ func (n *Nodis) IncrByFloat(key string, increment float64) (float64, error) {
 		m := unsafe.Slice(unsafe.StringData(vv), len(vv))
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSet, &patch.OpSet{Key: key, Value: m}}}
+			return []patch.Op{{Type: patch.OpTypeSet, Data: &patch.OpSet{Key: key, Value: m}}}
 		})
 		return nil
 	})
@@ -247,7 +248,7 @@ func (n *Nodis) SetBit(key string, offset int64, value bool) int64 {
 		v = k.SetBit(offset, value)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSet, &patch.OpSet{Key: key, Value: k.Get()}}}
+			return []patch.Op{{Type: patch.OpTypeSet, Data: &patch.OpSet{Key: key, Value: k.Get()}}}
 		})
 		return nil
 	})
@@ -295,7 +296,7 @@ func (n *Nodis) Append(key string, value []byte) int64 {
 		v = k.Append(value)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSet, &patch.OpSet{Key: key, Value: k.Get()}}}
+			return []patch.Op{{Type: patch.OpTypeSet, Data: &patch.OpSet{Key: key, Value: k.Get()}}}
 		})
 		return nil
 	})
@@ -340,7 +341,7 @@ func (n *Nodis) SetRange(key string, offset int64, value []byte) int64 {
 		v = k.SetRange(offset, value)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSet, &patch.OpSet{Key: key, Value: k.Get()}}}
+			return []patch.Op{{Type: patch.OpTypeSet, Data: &patch.OpSet{Key: key, Value: k.Get()}}}
 		})
 		return nil
 	})

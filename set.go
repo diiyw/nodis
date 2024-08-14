@@ -18,7 +18,7 @@ func (n *Nodis) SAdd(key string, members ...string) int64 {
 		v = meta.value.(*set.Set).SAdd(members...)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSAdd, &patch.OpSAdd{Key: key, Members: members}}}
+			return []patch.Op{{Type: patch.OpTypeSAdd, Data: &patch.OpSAdd{Key: key, Members: members}}}
 		})
 		return nil
 	})
@@ -180,7 +180,7 @@ func (n *Nodis) SRem(key string, members ...string) int64 {
 		v = meta.value.(*set.Set).SRem(members...)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSRem, &patch.OpSRem{Key: key, Members: members}}}
+			return []patch.Op{{Type: patch.OpTypeSRem, Data: &patch.OpSRem{Key: key, Members: members}}}
 		})
 		return nil
 	})
@@ -216,7 +216,7 @@ func (n *Nodis) SPop(key string, count int64) []string {
 		v = meta.value.(*set.Set).SPop(count)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSRem, &patch.OpSRem{Key: key, Members: v}}}
+			return []patch.Op{{Type: patch.OpTypeSRem, Data: &patch.OpSRem{Key: key, Members: v}}}
 		})
 		return nil
 	})
@@ -240,7 +240,7 @@ func (n *Nodis) SMove(source, destination, member string) bool {
 		m = meta.value.(*set.Set).SAdd(member)
 		n.signalModifiedKey(destination, meta)
 		n.notify(func() []patch.Op {
-			return []patch.Op{{patch.OpTypeSAdd, &patch.OpSAdd{Key: destination, Members: []string{member}}}}
+			return []patch.Op{{Type: patch.OpTypeSAdd, Data: &patch.OpSAdd{Key: destination, Members: []string{member}}}}
 		})
 		v = m > 0
 		return nil

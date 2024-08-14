@@ -16,7 +16,7 @@ func TestValueEntry_EncodeDecode(t *testing.T) {
 
 	encoded := entry.encode()
 
-	decoded := &ValueEntry{}
+	decoded := &Entry{}
 	err := decoded.decode(encoded)
 	if err != nil {
 		t.Errorf("decode failed: %v", err)
@@ -42,15 +42,18 @@ func TestParseValue(t *testing.T) {
 	entry := NewValueEntry(value, expiration)
 	encoded := entry.encode()
 
-	parsedEntry, parsedValue, err := parseValue(encoded)
+	parsedEntry, err := parseEntry(encoded)
 	if err != nil {
-		t.Errorf("parseValue failed: %v", err)
+		t.Errorf("parseEntry failed: %v", err)
+		return
 	}
-
 	if !reflect.DeepEqual(parsedEntry, entry) {
 		t.Errorf("parsedEntry = %v, want %v", parsedEntry, entry)
 	}
-
+	parsedValue, err := parseValue(ds.String, entry.Value)
+	if err != nil {
+		t.Errorf("parseValue failed: %v", err)
+	}
 	if parsedValue.Type() != ds.ValueType(entry.Type) {
 		t.Errorf("parsedValue.Type() = %v, want %v", parsedValue.Type(), entry.Type)
 	}
