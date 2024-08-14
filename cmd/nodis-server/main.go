@@ -9,7 +9,7 @@ import (
 
 var CLI struct {
 	Addr    string `arg:"" default:":6380" usage:"nodis server address"`
-	Storage string `arg:"" default:"memory" usage:"select storage"`
+	Storage string `arg:"" default:"memory" usage:"select storage: memory, pebble"`
 }
 
 func main() {
