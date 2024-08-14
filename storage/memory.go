@@ -21,8 +21,8 @@ func NewMemory() *Memory {
 	return &Memory{}
 }
 
-// Open initializes the storage.
-func (m *Memory) Open() error {
+// Init initializes the storage.
+func (m *Memory) Init() error {
 	return nil
 }
 

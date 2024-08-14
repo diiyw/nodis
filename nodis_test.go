@@ -15,7 +15,7 @@ func TestNodis_Open(t *testing.T) {
 	}
 	got := Open(&opt)
 	if got == nil {
-		t.Errorf("Open() = %v, want %v", got, "Nodis{}")
+		t.Errorf("Init() = %v, want %v", got, "Nodis{}")
 	}
 }
 

@@ -11,7 +11,7 @@ var (
 )
 
 type Storage interface {
-	Open() error
+	Init() error
 	Get(key string) (ds.Value, error)
 	Put(key *ds.Key, value ds.Value) error
 	Delete(key string) error

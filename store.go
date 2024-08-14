@@ -24,6 +24,10 @@ type store struct {
 
 func newStore(sg storage.Storage) *store {
 	s := &store{sg: sg}
+	err := s.sg.Init()
+	if err != nil {
+		log.Fatal(err)
+	}
 	s.sg.ScanKeys(func(key *ds.Key) bool {
 		var m = newMetadata()
 		m.key = key
