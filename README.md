@@ -110,7 +110,7 @@ func main() {
 			n.Set("test", []byte(time.Now().Format("2006-01-02 15:04:05")), false)
 		}
 	}()
-	err := n.Publish("127.0.0.1:6380", []string{"*"})
+	err := n.Broadcast("127.0.0.1:6380", []string{"*"})
 	if err != nil {
 		panic(err)
 	}
@@ -129,13 +129,11 @@ package main
 import (
 	"fmt"
 	"github.com/diiyw/nodis"
-	"github.com/diiyw/nodis/fs"
 	"github.com/diiyw/nodis/patch"
 )
 
 func main() {
 	var opt = nodis.DefaultOptions
-	opt.Filesystem = &fs.Memory{}
 	opt.Synchronizer = nodis.NewWebsocket()
 	n := nodis.Open(opt)
 	n.WatchKey([]string{"*"}, func(op patch.Op) {
