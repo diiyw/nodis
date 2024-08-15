@@ -263,6 +263,8 @@ func getCommand(name string) func(n *Nodis, conn *redis.Conn, cmd redis.Command)
 		return zInterStore
 	case "ZEXISTS":
 		return zExists
+	case "ZSCAN":
+		return zScan
 	case "GEOADD":
 		return geoAdd
 	case "GEODIST":
@@ -2604,6 +2606,40 @@ func zExists(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			r = 1
 		}
 		conn.WriteInt64(r)
+	})
+}
+
+func zScan(n *Nodis, conn *redis.Conn, cmd redis.Command) {
+	if len(cmd.Args) < 2 {
+		conn.WriteError("ZSCAN requires at least two arguments")
+	}
+	key := cmd.Args[0]
+	cursor, err := strconv.ParseInt(cmd.Args[1], 10, 64)
+	if err != nil {
+		conn.WriteError("ERR cursor value is not a valid integer")
+		return
+	}
+	var match = "*"
+	if cmd.Options.MATCH > 0 {
+		match = cmd.Args[cmd.Options.MATCH]
+	}
+	var count int64 = 10
+	if cmd.Options.COUNT > 0 {
+		count, err = strconv.ParseInt(cmd.Args[cmd.Options.COUNT], 10, 64)
+		if err != nil {
+			conn.WriteError("ERR count value is not a valid integer")
+			return
+		}
+	}
+	execCommand(conn, func() {
+		_, results := n.ZScan(key, cursor, match, count)
+		conn.WriteArray(2)
+		conn.WriteBulk(strconv.FormatInt(cursor, 10))
+		conn.WriteArray(len(results) * 2)
+		for _, v := range results {
+			conn.WriteBulk(v.Member)
+			conn.WriteBulk(strconv.FormatFloat(v.Score, 'f', -1, 64))
+		}
 	})
 }
 

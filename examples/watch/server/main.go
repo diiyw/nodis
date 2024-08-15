@@ -11,7 +11,7 @@ import (
 func main() {
 	var opt = nodis.DefaultOptions
 	n := nodis.Open(opt)
-	opt.Synchronizer = nodis.NewWebsocket()
+	opt.Channel = nodis.NewWebsocket()
 	n.WatchKey([]string{"*"}, func(op patch.Op) {
 		fmt.Println("Server:", op.Data.GetKey(), op.Data.(*patch.OpSet).Value)
 	})

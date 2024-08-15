@@ -14,7 +14,7 @@ func NewWebsocket() *Websocket {
 	return &Websocket{}
 }
 
-func (ws *Websocket) Publish(addr string, fn func(c SyncConn)) error {
+func (ws *Websocket) Publish(addr string, fn func(c ChannelConn)) error {
 	return errors.New("Websocket publish not implemented in js")
 }
 

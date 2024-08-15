@@ -106,7 +106,7 @@ func (n *Nodis) UnWatchKey(id int) {
 
 func (n *Nodis) ApplyPatch(ops ...patch.Op) error {
 	for _, op := range ops {
-		err := n.appylyPatch(op)
+		err := n.applyPatch(op)
 		if err != nil {
 			return err
 		}
@@ -114,7 +114,7 @@ func (n *Nodis) ApplyPatch(ops ...patch.Op) error {
 	return nil
 }
 
-func (n *Nodis) appylyPatch(p patch.Op) error {
+func (n *Nodis) applyPatch(p patch.Op) error {
 	switch op := p.Data.(type) {
 	case *patch.OpClear:
 		n.Clear()
@@ -187,21 +187,27 @@ func (n *Nodis) appylyPatch(p patch.Op) error {
 }
 
 func (n *Nodis) Broadcast(addr string, pattern []string) error {
-	return n.options.Synchronizer.Publish(addr, func(s SyncConn) {
+	return n.options.Channel.Publish(addr, func(c ChannelConn) {
 		id := n.WatchKey(pattern, func(op patch.Op) {
-			err := s.Send(op)
+			err := c.Send(op)
 			if err != nil {
 				log.Println("Publish: ", err)
 			}
 		})
-		s.Wait()
+		err := c.Wait()
+		if err != nil {
+			log.Println("Publish: ", err)
+		}
 		n.UnWatchKey(id)
 	})
 }
 
 func (n *Nodis) Subscribe(addr string) error {
-	return n.options.Synchronizer.Subscribe(addr, func(o patch.Op) {
-		n.ApplyPatch(o)
+	return n.options.Channel.Subscribe(addr, func(o patch.Op) {
+		err := n.ApplyPatch(o)
+		if err != nil {
+			log.Println("Subscribe: ", err)
+		}
 	})
 }
 

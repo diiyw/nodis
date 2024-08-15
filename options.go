@@ -25,8 +25,8 @@ type Options struct {
 	// Storage is the storage to use. The default is the disk storage.
 	Storage storage.Storage
 
-	// Synchronizer is the synchronizer to use. The default is nil and no synchronization is performed.
-	Synchronizer Synchronizer
+	// Channel is the Pub/Sub channel.
+	Channel Channel
 }
 
 var DefaultOptions = &Options{

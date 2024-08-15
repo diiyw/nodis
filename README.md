@@ -33,7 +33,7 @@ Nodis is a Redis implementation using the Golang programming language. This impl
 ## Supported Commands
 
 | **Client Handling** | **Configuration** | **Key Commands** | **String Commands** | **Set Commands** | **Hash Commands** | **List Commands** | **Sorted Set Commands** | **Geo Commands** |
-| ------------------- | ----------------- | ---------------- | ------------------- | ---------------- | ----------------- | ----------------- | ----------------------- | ---------------- |
+| ------------------- | ----------------- | ---------------- | ------------------- | ---------------- | ----------------- | ----------------- |-------------------------| ---------------- |
 | CLIENT              | FLUSHALL          | DEL              | GET                 | SADD             | HSET              | LPUSH             | ZADD                    | GEOADD		   |
 | PING                | FLUSHDB           | EXISTS           | SET                 | SSCAN            | HGET              | RPUSH             | ZCARD                   | GEOPOS		   |
 | QUIT                | SAVE              | EXPIRE           | INCR                | SCARD            | HDEL              | LPOP              | ZRANK                   | GEOHASH		   |
@@ -51,6 +51,7 @@ Nodis is a Redis implementation using the Golang programming language. This impl
 |                     |                   |                  | GETRANGE            |                  | HVALS             | BLPOP             | ZEXISTS                 |				   |
 |                     |                   |                  | STRLEN              |                  | HSTRLEN           | BRPOP             | ZUNIONSTORE             |				   |
 |                     |                   |                  | SETRANGE            |                  |                   |                   | ZINTERSTORE             |				   |
+|                     |                   |                  |                     |                  |                   |                   | ZSCAN                   |       |
 
 ## Get Started
 
@@ -156,7 +157,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 
 	"github.com/diiyw/nodis"
 )

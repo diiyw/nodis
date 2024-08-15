@@ -570,3 +570,18 @@ func (n *Nodis) ZInterStore(destination string, keys []string, weights []float64
 	})
 	return v
 }
+
+// ZScan cursor [MATCH pattern] [COUNT count]
+func (n *Nodis) ZScan(key string, cursor int64, match string, count int64) (int64, []*zset.Item) {
+	var c int64
+	var v []*zset.Item
+	_ = n.exec(func(tx *Tx) error {
+		meta := tx.readKey(key)
+		if !meta.isOk() {
+			return nil
+		}
+		c, v = meta.value.(*zset.SortedSet).ZScan(cursor, match, count)
+		return nil
+	})
+	return c, v
+}

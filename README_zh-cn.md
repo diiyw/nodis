@@ -51,6 +51,7 @@ Sorted Set
 |                     |                   |                  | GETRANGE            |                  | HVALS             | BLPOP             | ZEXISTS                 |
 |                     |                   |                  | STRLEN              |                  | HSTRLEN           | BRPOP             | ZUNIONSTORE             |
 |                     |                   |                  | SETRANGE            |                  |                   |                   | ZINTERSTORE             |
+|                     |                   |                  |                     |                  |                   |                   | ZSCAN                   |
 
 ## 开始
 
@@ -156,7 +157,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 
 	"github.com/diiyw/nodis"
 )
