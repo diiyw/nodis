@@ -25,8 +25,7 @@ Sorted Set
 
 - **快速和可嵌入**: Golang 实现的设计目标是快速和易于嵌入到您的应用程序中。
 - **低内存使用**: 该系统只在内存中存储热数据,将整体内存占用降到最低。
-- **快照和 WAL 用于数据存储**: 这个 Redis 实现支持快照和预写日志(WAL)机制,用于可靠的数据存储。
-- **自定义数据存储后端**: 您可以集成自定义的数据存储后端,如 Amazon S3、浏览器存储等。
+- **自定义数据存储后端**: 您可以集成自定义的数据存储后端,如 Amazon S3、浏览器存储，Mysql 等。
   使用 WebAssembly 支持浏览器: 从 1.2.0 版本开始,这个 Redis 实现可以直接在浏览器中使用 WebAssembly 运行。
 - **远程变更监控**: 从 1.2.0 版本开始,该系统支持监视来自远程源的变更。
 - **Redis 协议兼容性**: 从 1.5.0 版本开始,这个 Redis 实现完全支持原始的 Redis 协议,确保与现有的 Redis 客户端无缝集成。
@@ -53,13 +52,13 @@ Sorted Set
 |                     |                   |                  | STRLEN              |                  | HSTRLEN           | BRPOP             | ZUNIONSTORE             |
 |                     |                   |                  | SETRANGE            |                  |                   |                   | ZINTERSTORE             |
 
-## Get Started
+## 开始
 
 ```bash
- go get github.com/diiyw/nodis@v1.5.0
+ go get github.com/diiyw/nodis@latest
 ```
 
-Or use test version
+或者使用测试版本
 
 ```bash
  go get github.com/diiyw/nodis@main
@@ -76,17 +75,17 @@ func main() {
 	n := nodis.Open(opt)
 	defer n.Close()
 	// Set a key-value pair
-	n.Set("key", []byte("value"), false)
+	n.Set("key", []byte("value"),false)
 	n.LPush("list", []byte("value1"))
 }
 ```
 
-## Examples
+## 示例
 
 <details>
-	<summary> Watch changes</summary>
+	<summary> 监听key变动</summary>
 
-Server:
+服务端:
 
 ```go
 package main
@@ -95,31 +94,30 @@ import (
 	"fmt"
 	"github.com/diiyw/nodis"
 	"github.com/diiyw/nodis/patch"
-	"github.com/diiyw/nodis/sync"
 	"time"
 )
 
 func main() {
 	var opt = nodis.DefaultOptions
 	n := nodis.Open(opt)
-	opt.Synchronizer = sync.NewWebsocket()
-	n.Stick([]string{"*"}, func(op *pb.Operation) {
-		fmt.Println("Server:", op.Key, string(op.Value))
+	opt.Synchronizer = nodis.NewWebsocket()
+	n.WatchKey([]string{"*"}, func(op patch.Op) {
+		fmt.Println("Server:", op.Data.GetKey(), op.Data.(*patch.OpSet).Value)
 	})
 	go func() {
 		for {
 			time.Sleep(time.Second)
-			n.Set("test", []byte(time.Now().Format("2006-01-02 15:04:05")))
+			n.Set("test", []byte(time.Now().Format("2006-01-02 15:04:05")), false)
 		}
 	}()
-	err := n.Publish("127.0.0.1:6380", []string{"*"})
+	err := n.Broadcast("127.0.0.1:6380", []string{"*"})
 	if err != nil {
 		panic(err)
 	}
 }
 ```
 
-- Browser client built with WebAssembly
+- WebAssembly 浏览器端构建
 
 ```bash
 GOOS=js GOARCH=wasm go build -o test.wasm
@@ -131,18 +129,15 @@ package main
 import (
 	"fmt"
 	"github.com/diiyw/nodis"
-	"github.com/diiyw/nodis/fs"
 	"github.com/diiyw/nodis/patch"
-	"github.com/diiyw/nodis/sync"
 )
 
 func main() {
 	var opt = nodis.DefaultOptions
-	opt.Filesystem = &fs.Memory{}
-	opt.Synchronizer = sync.NewWebsocket()
+	opt.Synchronizer = nodis.NewWebsocket()
 	n := nodis.Open(opt)
-	n.Watch([]string{"*"}, func(op *pb.Operation) {
-		fmt.Println("Subscribe: ", op.Key)
+	n.WatchKey([]string{"*"}, func(op patch.Op) {
+		fmt.Println("Subscribe: ", op.Data.GetKey())
 	})
 	err := n.Subscribe("ws://127.0.0.1:6380")
 	if err != nil {
@@ -153,27 +148,69 @@ func main() {
 ```
 
 </details>
+<details>
+	<summary> 简单的Redis服务器</summary>
+
+```go
+package main
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/diiyw/nodis"
+)
+
+func main() {
+	opt := nodis.DefaultOptions
+	n := nodis.Open(opt)
+	if err := n.Serve(":6380"); err != nil {
+		fmt.Printf("Serve() = %v", err)
+	}
+}
+```
+
+可以使用 redis-cli 连接.
+
+```bash
+redis-cli -p 6380
+> set key value
+```
+
+</details>
 
 ## Benchmark
 
 <details>
-	<summary>Embed benchmark</summary>
+	<summary>内嵌性能测试</summary>
+
 Windows 11: 12C/32G
 
 ```bash
 goos: windows
 goarch: amd64
 pkg: github.com/diiyw/nodis/bench
-BenchmarkSet-12         	 1469863	        715.9 ns/op	     543 B/op	       7 allocs/op
-BenchmarkGet-12         	12480278	        96.47 ns/op	       7 B/op	       0 allocs/op
-BenchmarkLPush-12       	 1484466	        786.2 ns/op	     615 B/op	       9 allocs/op
-BenchmarkLPop-12        	77275986	        15.10 ns/op	       0 B/op	       0 allocs/op
-BenchmarkSAdd-12        	 1542252	        831.9 ns/op	     663 B/op	      10 allocs/op
-BenchmarkSMembers-12    	12739020	        95.18 ns/op	       8 B/op	       1 allocs/op
-BenchmarkZAdd-12        	 1000000	        1177 ns/op	     550 B/op	      10 allocs/op
-BenchmarkZRank-12       	11430135	        104.1 ns/op	       7 B/op	       0 allocs/op
-BenchmarkHSet-12        	 1341817	        863.5 ns/op	     743 B/op	      11 allocs/op
-BenchmarkHGet-12        	 9801158	        105.9 ns/op	       7 B/op	       0 allocs/op
+cpu: 12th Gen Intel(R) Core(TM) i5-12490F
+BenchmarkSet
+BenchmarkSet-12         	 2159343	       514.7 ns/op	     302 B/op	       8 allocs/op
+BenchmarkGet
+BenchmarkGet-12         	 6421864	       183.8 ns/op	     166 B/op	       3 allocs/op
+BenchmarkLPush
+BenchmarkLPush-12       	 2166828	       566.3 ns/op	     358 B/op	      10 allocs/op
+BenchmarkLPop
+BenchmarkLPop-12        	13069830	        80.41 ns/op	     159 B/op	       3 allocs/op
+BenchmarkSAdd
+BenchmarkSAdd-12        	 2007924	       592.6 ns/op	     406 B/op	      11 allocs/op
+BenchmarkSMembers
+BenchmarkSMembers-12    	 6303288	       179.8 ns/op	     166 B/op	       3 allocs/op
+BenchmarkZAdd
+BenchmarkZAdd-12        	 1580179	       832.6 ns/op	     302 B/op	      10 allocs/op
+BenchmarkZRank
+BenchmarkZRank-12       	 6011108	       186.7 ns/op	     165 B/op	       3 allocs/op
+BenchmarkHSet
+BenchmarkHSet-12        	 1997553	       654.3 ns/op	     486 B/op	      11 allocs/op
+BenchmarkHGet
+BenchmarkHGet-12        	 5895134	       193.3 ns/op	     165 B/op	       3 allocs/op
 ```
 
 Linux VM: 4C/8GB
@@ -195,7 +232,26 @@ BenchmarkHGet-4       	 4442625	       243.4 ns/op	       7 B/op	       0 allocs
 ```
 
 </details>
+<details>
+	<summary>Redis 压测工具测试</summary>
+
+Windows 11: 12C/32G
+
+```bash
+redis-benchmark -p 6380 -t set,get,lpush,lpop,sadd,smembers,zadd,zrank,hset,hget -n 100000 -q
+```
+
+```
+SET: 116144.02 requests per second
+GET: 125156.45 requests per second
+LPUSH: 121951.22 requests per second
+LPOP: 126103.41 requests per second
+SADD: 121951.22 requests per second
+HSET: 122850.12 requests per second
+```
+
+</details>
 
 ## Note
 
-如果你想持久化请保证，在你的应用退出时调用`Close()`方法。
+If you want to persist data, please make sure to call the `Close()` method when your application exits.
