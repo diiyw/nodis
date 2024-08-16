@@ -2612,6 +2612,7 @@ func zExists(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 func zScan(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	if len(cmd.Args) < 2 {
 		conn.WriteError("ZSCAN requires at least two arguments")
+		return
 	}
 	key := cmd.Args[0]
 	cursor, err := strconv.ParseInt(cmd.Args[1], 10, 64)
@@ -2647,7 +2648,7 @@ func save(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		n.store.mu.Lock()
 		defer n.store.mu.Unlock()
-		n.store.sync()
+		n.store.flush()
 		conn.WriteString("OK")
 	})
 }

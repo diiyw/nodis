@@ -70,6 +70,10 @@ func (m *metadata) isOk() bool {
 	return m.state&KeyStateNormal == KeyStateNormal
 }
 
+func (m *metadata) memoryDeleted() {
+	m.value = nil
+}
+
 func (m *metadata) commit() {
 	if m.RWMutex == nil {
 		// empty metadata

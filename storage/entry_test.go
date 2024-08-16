@@ -11,8 +11,7 @@ import (
 func TestValueEntry_EncodeDecode(t *testing.T) {
 	value := str.NewString()
 	value.Set([]byte("test value"))
-	expiration := int64(1234567890)
-	entry := NewValueEntry(value, expiration)
+	entry := NewEntry(value)
 
 	encoded := entry.encode()
 
@@ -26,10 +25,6 @@ func TestValueEntry_EncodeDecode(t *testing.T) {
 		t.Errorf("decoded Type = %v, want %v", decoded.Type, entry.Type)
 	}
 
-	if decoded.Expiration != entry.Expiration {
-		t.Errorf("decoded Expiration = %v, want %v", decoded.Expiration, entry.Expiration)
-	}
-
 	if !reflect.DeepEqual(decoded.Value, entry.Value) {
 		t.Errorf("decoded Value = %v, want %v", decoded.Value, entry.Value)
 	}
@@ -38,8 +33,7 @@ func TestValueEntry_EncodeDecode(t *testing.T) {
 func TestParseValue(t *testing.T) {
 	value := str.NewString()
 	value.Set([]byte("test value"))
-	expiration := int64(1234567890)
-	entry := NewValueEntry(value, expiration)
+	entry := NewEntry(value)
 	encoded := entry.encode()
 
 	parsedEntry, err := parseEntry(encoded)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/alecthomas/kong"
 	"github.com/diiyw/nodis"
 	"github.com/diiyw/nodis/storage"
@@ -16,7 +17,7 @@ func main() {
 	_ = kong.Parse(&CLI)
 	opt := nodis.DefaultOptions
 	if CLI.Storage == "pebble" {
-		opt.Storage = storage.NewPebble("data")
+		opt.Storage = storage.NewPebble("data", nil)
 	}
 	n := nodis.Open(opt)
 	if err := n.Serve(CLI.Addr); err != nil {

@@ -1,6 +1,7 @@
 package ds
 
 import (
+	"encoding/binary"
 	"errors"
 )
 
@@ -16,6 +17,23 @@ type Key struct {
 // NewKey returns a new key.
 func NewKey(name string, expiration int64) *Key {
 	return &Key{Name: name, Expiration: expiration}
+}
+
+// Encode encodes the key.
+func (k *Key) Encode() []byte {
+	var b = make([]byte, 8+len(k.Name))
+	n := binary.PutVarint(b, k.Expiration)
+	copy(b[n:], k.Name)
+	return b[:n+len(k.Name)]
+}
+
+// Decode decodes the key.
+func DecodeKey(b []byte) (*Key, error) {
+	if len(b) < 8 {
+		return nil, ErrCorruptedData
+	}
+	i, n := binary.Varint(b)
+	return &Key{Name: string(b[n:]), Expiration: i}, nil
 }
 
 type Value interface {

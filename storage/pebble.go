@@ -10,19 +10,21 @@ import (
 )
 
 type Pebble struct {
-	path string
-	db   *pebble.DB
+	path    string
+	options *pebble.Options
+	db      *pebble.DB
 }
 
 // NewPebble creates a new Pebble storage
-func NewPebble(path string) *Pebble {
+func NewPebble(path string, options *pebble.Options) *Pebble {
 	return &Pebble{
-		path: path,
+		path:    path,
+		options: options,
 	}
 }
 
 func (p *Pebble) Init() error {
-	db, err := pebble.Open(p.path, &pebble.Options{})
+	db, err := pebble.Open(p.path, p.options)
 	if err != nil {
 		return err
 	}
@@ -46,7 +48,7 @@ func (p *Pebble) Get(key string) (ds.Value, error) {
 
 // Put the value to the storage
 func (p *Pebble) Put(key *ds.Key, value ds.Value) error {
-	entry := NewValueEntry(value, key.Expiration)
+	entry := NewEntry(value)
 	data := entry.encode()
 	return p.db.Set([]byte(key.Name), data, pebble.Sync)
 }
@@ -66,7 +68,7 @@ func (p *Pebble) Clear() error {
 	if err != nil {
 		return err
 	}
-	db, err := pebble.Open(p.path, &pebble.Options{})
+	db, err := pebble.Open(p.path, p.options)
 	if err != nil {
 		return err
 	}
@@ -93,17 +95,9 @@ func (p *Pebble) ScanKeys(fn func(*ds.Key) bool) {
 	}
 	defer iter.Close()
 	for iter.First(); iter.Valid(); iter.Next() {
-		v, err := iter.ValueAndErr()
+		key, err := ds.DecodeKey(iter.Key())
 		if err != nil {
 			continue
-		}
-		entry, err := parseEntry(v)
-		if err != nil {
-			continue
-		}
-		key := &ds.Key{
-			Name:       string(iter.Key()),
-			Expiration: entry.Expiration,
 		}
 		if !fn(key) {
 			break

@@ -1,9 +1,7 @@
 package storage
 
 import (
-	"encoding/binary"
 	"errors"
-	"hash/crc32"
 
 	"github.com/diiyw/nodis/ds"
 	"github.com/diiyw/nodis/ds/hash"
@@ -19,45 +17,30 @@ var (
 
 // Entry is the entry of the value
 type Entry struct {
-	Type       uint8
-	Expiration int64
-	Value      []byte
+	Type  uint8
+	Value []byte
 }
 
 func (e *Entry) encode() []byte {
-	var b = make([]byte, 1+8+len(e.Value))
+	var b = make([]byte, 1+len(e.Value))
 	b[0] = e.Type
-	n := binary.PutVarint(b[1:], e.Expiration)
-	copy(b[n+1:], e.Value)
-	b = b[:n+1+len(e.Value)]
-	c32 := crc32.ChecksumIEEE(b)
-	var buf = make([]byte, len(b)+4)
-	binary.LittleEndian.PutUint32(buf, c32)
-	copy(buf[4:], b)
-	return buf
+	copy(b[1:], e.Value)
+	return b
 }
 
 func (e *Entry) decode(b []byte) error {
-	if len(b) < 4 {
-		return ErrCorruptedData
-	}
-	c32 := binary.LittleEndian.Uint32(b)
-	b = b[4:]
-	if c32 != crc32.ChecksumIEEE(b) {
+	if len(b) < 1 {
 		return ErrCorruptedData
 	}
 	e.Type = b[0]
-	i, n := binary.Varint(b[1:])
-	e.Expiration = i
-	e.Value = b[n+1:]
+	e.Value = b[1:]
 	return nil
 }
 
-// NewValueEntry creates a new entity
-func NewValueEntry(v ds.Value, expiration int64) *Entry {
+// NewEntry creates a new entity
+func NewEntry(v ds.Value) *Entry {
 	e := &Entry{
-		Expiration: expiration,
-		Type:       uint8(v.Type()),
+		Type: uint8(v.Type()),
 	}
 	e.Value = v.GetValue()
 	return e

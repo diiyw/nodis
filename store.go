@@ -38,8 +38,8 @@ func newStore(sg storage.Storage) *store {
 	return s
 }
 
-// sync flush changed keys to storage
-func (s *store) sync() {
+// flush changed keys to storage
+func (s *store) flush() {
 	now := time.Now().UnixMilli()
 	s.metadata.Scan(func(key string, m *metadata) bool {
 		m.Lock()
@@ -82,7 +82,7 @@ func (s *store) gc() {
 		}
 		m.reset()
 		if m.count < 0 {
-			s.metadata.Delete(key)
+			m.memoryDeleted()
 		}
 		return true
 	})
@@ -92,7 +92,7 @@ func (s *store) gc() {
 func (s *store) close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.sync()
+	s.flush()
 	s.closed = true
 	return s.sg.Close()
 }

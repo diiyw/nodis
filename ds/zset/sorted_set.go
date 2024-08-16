@@ -411,7 +411,7 @@ func (sortedSet *SortedSet) ZScan(cursor int64, match string, count int64) (int6
 		}
 		return true
 	})
-	return cursor + int64(len(items)), nil
+	return cursor + int64(len(items)), items
 }
 
 func (sortedSet *SortedSet) GetValue() []byte {
