@@ -353,7 +353,7 @@ func info(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			`maxmemory_policy:noeviction` + "\r\n" +
 			`# Client` + "\r\n" +
 			`maxclients:10000` + "\r\n" +
-			`connected_clients:` + strconv.FormatUint(redis.ClientNum.Load(), 64) + "\r\n" +
+			`connected_clients:` + strconv.FormatInt(redis.ClientNum.Load(), 64) + "\r\n" +
 			`# Keyspace` + "\r\n" + keyspace +
 			"\r\n")
 	})
