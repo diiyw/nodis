@@ -14,7 +14,7 @@ const (
 	MultiError   uint8 = 4
 )
 
-var ClientNum atomic.Uint64
+var ClientNum atomic.Int64
 
 type HandlerFunc func(c *Conn, cmd Command)
 
