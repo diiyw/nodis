@@ -347,10 +347,12 @@ func info(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			`process_id:` + pid + "\r\n" +
 			`# Memory` + "\r\n" +
 			`used_memory:` + usedMemory + "\r\n" +
+			`used_memory_human:` + strconv.FormatUint(memStats.HeapInuse+memStats.StackInuse/1024, 10) + "KB" + "\r\n" +
 			`maxmemory:0` + "\r\n" +
 			`maxmemory_human:0B` + "\r\n" +
 			`maxmemory_policy:noeviction` + "\r\n" +
 			`# Client` + "\r\n" +
+			`maxclients:10000` + "\r\n" +
 			`connected_clients:` + strconv.FormatUint(redis.ClientNum.Load(), 64) + "\r\n" +
 			`# Keyspace` + "\r\n" + keyspace +
 			"\r\n")
