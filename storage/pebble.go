@@ -43,7 +43,7 @@ func (p *Pebble) Get(key string) (ds.Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	return parseValue(ds.ValueType(entry.Type), entry.Value)
+	return entry.GetValue()
 }
 
 // Put the value to the storage

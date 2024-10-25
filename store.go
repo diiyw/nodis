@@ -16,19 +16,19 @@ import (
 type store struct {
 	mu          sync.RWMutex
 	metadata    btree.Map[string, *metadata]
-	sg          storage.Storage
+	ss          storage.Storage
 	closed      bool
 	watchMu     sync.RWMutex
 	watchedKeys btree.Map[string, *list.LinkedListG[*redis.Conn]]
 }
 
-func newStore(sg storage.Storage) *store {
-	s := &store{sg: sg}
-	err := s.sg.Init()
+func newStore(ss storage.Storage) *store {
+	s := &store{ss: ss}
+	err := s.ss.Init()
 	if err != nil {
 		log.Fatal(err)
 	}
-	s.sg.ScanKeys(func(key *ds.Key) bool {
+	s.ss.ScanKeys(func(key *ds.Key) bool {
 		var m = newMetadata()
 		m.key = key
 		m.state |= KeyStateNormal
@@ -40,6 +40,8 @@ func newStore(sg storage.Storage) *store {
 
 // flush changed keys to storage
 func (s *store) flush() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	now := time.Now().UnixMilli()
 	s.metadata.Scan(func(key string, m *metadata) bool {
 		m.Lock()
@@ -51,7 +53,7 @@ func (s *store) flush() {
 			return true
 		}
 		// save to storage
-		err := s.sg.Put(m.key, m.value)
+		err := s.ss.Put(m.key, m.value)
 		if err != nil {
 			log.Println("Flush changes: ", err)
 		}
@@ -75,14 +77,14 @@ func (s *store) gc() {
 			return true
 		}
 		if m.modified() {
-			err := s.sg.Put(m.key, m.value)
+			err := s.ss.Put(m.key, m.value)
 			if err != nil {
 				log.Println("GC: ", err)
 			}
 		}
 		m.reset()
 		if m.count < 0 {
-			m.memoryDeleted()
+			m.removeFromMemory()
 		}
 		return true
 	})
@@ -90,11 +92,9 @@ func (s *store) gc() {
 
 // close the store
 func (s *store) close() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.flush()
 	s.closed = true
-	return s.sg.Close()
+	s.flush()
+	return s.ss.Close()
 }
 
 // clear the store
@@ -102,5 +102,5 @@ func (s *store) clear() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.metadata.Clear()
-	return s.sg.Clear()
+	return s.ss.Clear()
 }

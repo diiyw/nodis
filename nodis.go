@@ -63,7 +63,7 @@ func Open(opt *Options) *Nodis {
 
 // Snapshot saves the data to disk
 func (n *Nodis) Snapshot() error {
-	return n.store.sg.Snapshot()
+	return n.store.ss.Snapshot()
 }
 
 // Close the store

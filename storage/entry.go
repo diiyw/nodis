@@ -28,7 +28,7 @@ func (e *Entry) encode() []byte {
 	return b
 }
 
-func (e *Entry) decode(b []byte) error {
+func (e *Entry) from(b []byte) error {
 	if len(b) < 1 {
 		return ErrCorruptedData
 	}
@@ -46,39 +46,39 @@ func NewEntry(v ds.Value) *Entry {
 	return e
 }
 
-func parseEntry(data []byte) (*Entry, error) {
-	var entry = &Entry{}
-	if err := entry.decode(data); err != nil {
-		return nil, err
-	}
-	return entry, nil
-}
-
-func parseValue(typ ds.ValueType, data []byte) (ds.Value, error) {
+func (e *Entry) GetValue() (ds.Value, error) {
 	var value ds.Value
-	switch typ {
+	switch ds.ValueType(e.Type) {
 	case ds.String:
 		v := str.NewString()
-		v.SetValue(data)
+		v.SetValue(e.Value)
 		value = v
 	case ds.ZSet:
 		z := zset.NewSortedSet()
-		z.SetValue(data)
+		z.SetValue(e.Value)
 		value = z
 	case ds.List:
 		l := list.NewLinkedList()
-		l.SetValue(data)
+		l.SetValue(e.Value)
 		value = l
 	case ds.Hash:
 		h := hash.NewHashMap()
-		h.SetValue(data)
+		h.SetValue(e.Value)
 		value = h
 	case ds.Set:
 		v := set.NewSet()
-		v.SetValue(data)
+		v.SetValue(e.Value)
 		value = v
 	default:
 		panic("unhandled default case")
 	}
 	return value, nil
+}
+
+func parseEntry(data []byte) (*Entry, error) {
+	var entry = &Entry{}
+	if err := entry.from(data); err != nil {
+		return nil, err
+	}
+	return entry, nil
 }

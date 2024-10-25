@@ -70,7 +70,7 @@ func (m *metadata) isOk() bool {
 	return m.state&KeyStateNormal == KeyStateNormal
 }
 
-func (m *metadata) memoryDeleted() {
+func (m *metadata) removeFromMemory() {
 	m.value = nil
 }
 

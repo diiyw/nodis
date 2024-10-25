@@ -353,7 +353,7 @@ func info(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			`maxmemory_policy:noeviction` + "\r\n" +
 			`# Client` + "\r\n" +
 			`maxclients:10000` + "\r\n" +
-			`connected_clients:` + strconv.FormatInt(redis.ClientNum.Load(), 64) + "\r\n" +
+			`connected_clients:` + strconv.FormatInt(redis.ClientNum.Load(), 10) + "\r\n" +
 			`# Keyspace` + "\r\n" + keyspace +
 			"\r\n")
 	})
@@ -2660,8 +2660,6 @@ func zScan(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 
 func save(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
-		n.store.mu.Lock()
-		defer n.store.mu.Unlock()
 		n.store.flush()
 		conn.WriteString("OK")
 	})

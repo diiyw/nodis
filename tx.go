@@ -80,7 +80,7 @@ func (tx *Tx) writeKey(key string, newFn func() ds.Value) *metadata {
 			return m
 		}
 		// if not found in memory, read from storage
-		v, err := tx.store.sg.Get(key)
+		v, err := tx.store.ss.Get(key)
 		if err != nil {
 			return tx.newKey(m, key, newFn)
 		}
@@ -101,7 +101,7 @@ func (tx *Tx) readKey(key string) *metadata {
 			return m
 		}
 		// if not found in memory, read from storage
-		v, err := tx.store.sg.Get(key)
+		v, err := tx.store.ss.Get(key)
 		if err != nil {
 			return m.empty()
 		}
