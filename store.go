@@ -53,7 +53,7 @@ func (s *store) flush() {
 			return true
 		}
 		// save to storage
-		err := s.ss.Put(m.key, m.value)
+		err := s.ss.Set(m.key, m.value)
 		if err != nil {
 			log.Println("Flush changes: ", err)
 		}
@@ -77,7 +77,7 @@ func (s *store) gc() {
 			return true
 		}
 		if m.modified() {
-			err := s.ss.Put(m.key, m.value)
+			err := s.ss.Set(m.key, m.value)
 			if err != nil {
 				log.Println("GC: ", err)
 			}

@@ -37,8 +37,8 @@ func (m *Memory) Get(key string) (ds.Value, error) {
 	return v.value, nil
 }
 
-// Put sets a value in the storage.
-func (m *Memory) Put(key *ds.Key, value ds.Value) error {
+// Set sets a value in the storage.
+func (m *Memory) Set(key *ds.Key, value ds.Value) error {
 	m.Lock()
 	defer m.Unlock()
 	m.data.Set(key.Name, KeyValue{

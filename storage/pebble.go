@@ -46,8 +46,8 @@ func (p *Pebble) Get(key string) (ds.Value, error) {
 	return entry.GetValue()
 }
 
-// Put the value to the storage
-func (p *Pebble) Put(key *ds.Key, value ds.Value) error {
+// Set the value to the storage
+func (p *Pebble) Set(key *ds.Key, value ds.Value) error {
 	entry := NewEntry(value)
 	data := entry.encode()
 	return p.db.Set([]byte(key.Name), data, pebble.Sync)
