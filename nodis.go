@@ -221,7 +221,7 @@ func (n *Nodis) Serve(addr string) error {
 		os.Exit(0)
 	}()
 	return redis.Serve(addr, func(conn *redis.Conn, cmd redis.Command) {
-		c := getCommand(cmd.Name)
+		c := GetCommand(cmd.Name)
 		c(n, conn, cmd)
 		if conn.HasError() && conn.State != 0 {
 			conn.State |= redis.MultiError

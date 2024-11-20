@@ -33,7 +33,7 @@ func execCommand(conn *redis.Conn, fn func()) {
 	conn.WriteString("QUEUED")
 }
 
-func getCommand(name string) func(n *Nodis, conn *redis.Conn, cmd redis.Command) {
+func GetCommand(name string) func(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	switch name {
 	case "CLIENT":
 		return client
