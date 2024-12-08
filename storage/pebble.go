@@ -33,8 +33,8 @@ func (p *Pebble) Init() error {
 }
 
 // Get the value from the storage
-func (p *Pebble) Get(key string) (ds.Value, error) {
-	v, closer, err := p.db.Get([]byte(key))
+func (p *Pebble) Get(key *ds.Key) (ds.Value, error) {
+	v, closer, err := p.db.Get(key.Encode())
 	if err != nil {
 		return nil, err
 	}
@@ -50,12 +50,12 @@ func (p *Pebble) Get(key string) (ds.Value, error) {
 func (p *Pebble) Set(key *ds.Key, value ds.Value) error {
 	entry := NewEntry(value)
 	data := entry.encode()
-	return p.db.Set([]byte(key.Name), data, pebble.Sync)
+	return p.db.Set(key.Encode(), data, pebble.Sync)
 }
 
 // Delete the value from the storage
-func (p *Pebble) Delete(key string) error {
-	return p.db.Delete([]byte(key), pebble.Sync)
+func (p *Pebble) Delete(key *ds.Key) error {
+	return p.db.Delete(key.Encode(), pebble.Sync)
 }
 
 // Clear the storage

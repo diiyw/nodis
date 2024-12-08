@@ -12,9 +12,9 @@ var (
 
 type Storage interface {
 	Init() error
-	Get(key string) (ds.Value, error)
+	Get(key *ds.Key) (ds.Value, error)
 	Set(key *ds.Key, value ds.Value) error
-	Delete(key string) error
+	Delete(key *ds.Key) error
 	Clear() error
 	Close() error
 	Snapshot() error

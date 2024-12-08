@@ -27,10 +27,10 @@ func (m *Memory) Init() error {
 }
 
 // Get returns a value from the storage.
-func (m *Memory) Get(key string) (ds.Value, error) {
+func (m *Memory) Get(key *ds.Key) (ds.Value, error) {
 	m.RLock()
 	defer m.RUnlock()
-	v, ok := m.data.Get(key)
+	v, ok := m.data.Get(string(key.Encode()))
 	if !ok {
 		return nil, ErrKeyNotFound
 	}
@@ -41,7 +41,7 @@ func (m *Memory) Get(key string) (ds.Value, error) {
 func (m *Memory) Set(key *ds.Key, value ds.Value) error {
 	m.Lock()
 	defer m.Unlock()
-	m.data.Set(key.Name, KeyValue{
+	m.data.Set(string(key.Encode()), KeyValue{
 		key:   key,
 		value: value,
 	})
@@ -49,10 +49,10 @@ func (m *Memory) Set(key *ds.Key, value ds.Value) error {
 }
 
 // Delete removes a value from the storage.
-func (m *Memory) Delete(key string) error {
+func (m *Memory) Delete(key *ds.Key) error {
 	m.Lock()
 	defer m.Unlock()
-	m.data.Delete(key)
+	m.data.Delete(string(key.Encode()))
 	return nil
 }
 
