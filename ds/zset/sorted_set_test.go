@@ -84,6 +84,9 @@ func TestSortedSet_ZRange(t *testing.T) {
 	if len(ss.ZRange(0, 2)) != 3 {
 		t.Errorf("Range error expected 2 got %d", len(ss.ZRange(0, 2)))
 	}
+	if len(ss.ZRange(0, 100)) != 3 {
+		t.Errorf("Range error expected 2 got %d", len(ss.ZRange(0, 2)))
+	}
 }
 
 func TestSortedSet_ZRangeByScore(t *testing.T) {

@@ -188,8 +188,8 @@ func (sortedSet *SortedSet) forEachByRank(start int64, stop int64, desc bool, co
 		start = size + start
 	}
 	// stop max is size
-	if stop > size {
-		stop = size
+	if stop >= size {
+		stop = size - 1
 	}
 	// find start node
 	var node *node
@@ -220,7 +220,7 @@ func (sortedSet *SortedSet) forEachByRank(start int64, stop int64, desc bool, co
 
 // rangeByRank returns members which rank within [start, stop], sort by ascending order, rank starts from 0
 func (sortedSet *SortedSet) rangeByRank(start int64, stop int64, desc bool) []*Item {
-	slice := make([]*Item, 0)
+	slice := make([]*Item, 0, stop-start+1) // allocate memory
 	sortedSet.forEachByRank(start, stop, desc, func(item *Item) bool {
 		slice = append(slice, item)
 		return true
@@ -304,9 +304,9 @@ func (sortedSet *SortedSet) forEach(min float64, max float64, offset int64, limi
 	}
 }
 
-// zRangeByScore returns members which score or member within the given border
+// rangeByScore returns members which score or member within the given border
 // param limit: <0 means no limit
-func (sortedSet *SortedSet) zRangeByScore(min float64, max float64, offset int64, limit int64, desc bool, mode int) []*Item {
+func (sortedSet *SortedSet) rangeByScore(min float64, max float64, offset int64, limit int64, desc bool, mode int) []*Item {
 	if limit == 0 || offset < 0 {
 		return make([]*Item, 0)
 	}
@@ -365,12 +365,12 @@ func (sortedSet *SortedSet) ZExists(member string) bool {
 
 // ZRangeByScore returns members which score or member within the given border
 func (sortedSet *SortedSet) ZRangeByScore(min float64, max float64, offset, count int64, mode int) []*Item {
-	return sortedSet.zRangeByScore(min, max, offset, count, false, mode)
+	return sortedSet.rangeByScore(min, max, offset, count, false, mode)
 }
 
 // ZRevRangeByScore returns members which score or member within the given border
 func (sortedSet *SortedSet) ZRevRangeByScore(min float64, max float64, offset, count int64, mode int) []*Item {
-	return sortedSet.zRangeByScore(min, max, offset, count, true, mode)
+	return sortedSet.rangeByScore(min, max, offset, count, true, mode)
 }
 
 // ZIncrBy increases the score of the given member
