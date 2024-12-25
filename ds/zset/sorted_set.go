@@ -175,14 +175,11 @@ func (sortedSet *SortedSet) ZScore(member string) (float64, error) {
 // forEachByRank visits each member which rank within [start, stop], sort by ascending order, rank starts from 0
 func (sortedSet *SortedSet) forEachByRank(start int64, stop int64, desc bool, consumer func(item *Item) bool) {
 	size := sortedSet.ZCard()
-	if start > size {
+	if start >= size {
 		return
 	}
-	if start == 0 {
-		start = 1
-	}
 	if stop < 0 {
-		stop = size + stop + 1
+		stop = size + stop
 	}
 	if stop < start {
 		return
@@ -307,9 +304,9 @@ func (sortedSet *SortedSet) forEach(min float64, max float64, offset int64, limi
 	}
 }
 
-// zRange returns members which score or member within the given border
+// zRangeByScore returns members which score or member within the given border
 // param limit: <0 means no limit
-func (sortedSet *SortedSet) zRange(min float64, max float64, offset int64, limit int64, desc bool, mode int) []*Item {
+func (sortedSet *SortedSet) zRangeByScore(min float64, max float64, offset int64, limit int64, desc bool, mode int) []*Item {
 	if limit == 0 || offset < 0 {
 		return make([]*Item, 0)
 	}
@@ -368,12 +365,12 @@ func (sortedSet *SortedSet) ZExists(member string) bool {
 
 // ZRangeByScore returns members which score or member within the given border
 func (sortedSet *SortedSet) ZRangeByScore(min float64, max float64, offset, count int64, mode int) []*Item {
-	return sortedSet.zRange(min, max, offset, count, false, mode)
+	return sortedSet.zRangeByScore(min, max, offset, count, false, mode)
 }
 
 // ZRevRangeByScore returns members which score or member within the given border
 func (sortedSet *SortedSet) ZRevRangeByScore(min float64, max float64, offset, count int64, mode int) []*Item {
-	return sortedSet.zRange(min, max, offset, count, true, mode)
+	return sortedSet.zRangeByScore(min, max, offset, count, true, mode)
 }
 
 // ZIncrBy increases the score of the given member

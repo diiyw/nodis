@@ -13,9 +13,11 @@ import (
 type Reader struct {
 	reader io.Reader
 	buf    []byte
-	r      int
-	l      int
-	cmd    Command
+	// Read index
+	r int
+	// Has read length
+	l   int
+	cmd Command
 }
 
 const defaultSize = 4096
@@ -40,7 +42,7 @@ func (r *Reader) grow(n int) {
 func (r *Reader) readByte() error {
 	size := r.r + r.l
 	r.grow(defaultSize)
-	n, err := r.reader.Read(r.buf[size : r.r+r.l+1])
+	n, err := r.reader.Read(r.buf[size : size+1])
 	if err != nil {
 		return err
 	}

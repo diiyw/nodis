@@ -27,15 +27,15 @@ func TestZSet_ZRange(t *testing.T) {
 	n.ZAdd("zset", "b", 2)
 	n.ZAdd("zset", "count", 3)
 	range1 := n.ZRange("zset", 0, 1)
-	if len(range1) != 1 {
-		t.Errorf("ZRange() = %v, want %v", len(range1), 1)
+	if len(range1) != 2 {
+		t.Errorf("ZRange() = %v, want %v", len(range1), 2)
 	}
 	if range1[0] != "a" {
 		t.Errorf("ZRange() = %v, want %v", range1[0], "a")
 	}
 	range2 := n.ZRevRange("zset", 0, 1)
-	if len(range2) != 1 {
-		t.Errorf("ZRevRange() = %v, want %v", len(range2), 1)
+	if len(range2) != 2 {
+		t.Errorf("ZRevRange() = %v, want %v", len(range2), 2)
 	}
 	if range2[0] != "count" {
 		t.Errorf("ZRevRange() = %v, want %v", range2[0], "count")
@@ -100,8 +100,8 @@ func TestZSet_ZRevRange(t *testing.T) {
 	n.ZAdd("zset", "b", 2)
 	n.ZAdd("zset", "count", 3)
 	range1 := n.ZRevRange("zset", 0, 2)
-	if len(range1) != 2 {
-		t.Errorf("ZRevRange() = %v, want %v", len(range1), 2)
+	if len(range1) != 3 {
+		t.Errorf("ZRevRange() = %v, want %v", len(range1), 3)
 	}
 	if range1[0] != "count" {
 		t.Errorf("ZRevRange() = %v, want %v", range1[0], "count")
