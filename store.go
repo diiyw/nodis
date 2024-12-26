@@ -69,7 +69,7 @@ func (s *store) gc() {
 		return
 	}
 	now := time.Now().UnixMilli()
-	s.metadata.Scan(func(key string, m *metadata) bool {
+	s.metadata.Copy().Scan(func(key string, m *metadata) bool {
 		m.Lock()
 		defer m.Unlock()
 		if m.expired(now) || !m.isOk() {
