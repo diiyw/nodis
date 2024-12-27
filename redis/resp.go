@@ -69,38 +69,27 @@ READ:
 	return nil
 }
 
-func (r *Reader) firstByte() byte {
-	return r.indexByte(0)
-}
-
-func (r *Reader) indexByte(i int) byte {
+func (r *Reader) peekByte(i int) byte {
 	if i >= 0 {
 		return r.buf[r.r+i]
 	}
 	return r.buf[r.r+r.l+i]
 }
 
-func (r *Reader) flushNoCopyString() string {
+func (r *Reader) String() string {
 	s := unsafe.String(unsafe.SliceData(r.buf[r.r:r.r+r.l]), r.l)
-	r.malloc()
-	return s
-}
-
-func (r *Reader) flushCopyString() string {
-	s := string(r.buf[r.r : r.r+r.l])
-	r.malloc()
+	r.discard()
 	return s
 }
 
 func (r *Reader) reset() {
-	r.r = 0
-	r.l = 0
+	r.discard()
 	r.cmd = Command{
 		Args: make([]string, 0),
 	}
 }
 
-func (r *Reader) malloc() {
+func (r *Reader) discard() {
 	r.r += r.l
 	r.l = 0
 }
@@ -111,7 +100,7 @@ func (r *Reader) readLine() error {
 		if err != nil {
 			return err
 		}
-		if r.l > 1 && r.indexByte(-1) == '\n' {
+		if r.l > 1 && r.peekByte(-1) == '\n' {
 			r.l -= 2
 			break
 		}
@@ -124,7 +113,7 @@ func (r *Reader) readInteger() (x int, err error) {
 	if err != nil {
 		return 0, err
 	}
-	i64, err := strconv.ParseInt(r.flushNoCopyString(), 10, 64)
+	i64, err := strconv.ParseInt(r.String(), 10, 64)
 	if err != nil {
 		return 0, err
 	}
@@ -144,10 +133,10 @@ func (r *Reader) ReadCommand() error {
 	if err != nil {
 		return err
 	}
-	if r.firstByte() != ArrayType {
+	if r.peekByte(0) != ArrayType {
 		return r.ReadInlineCommand()
 	}
-	r.malloc()
+	r.discard()
 	// Read length of array
 	l, err := r.readInteger()
 	if err != nil {
@@ -249,10 +238,10 @@ func (r *Reader) readBulk() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if r.firstByte() != BulkType {
+	if r.peekByte(0) != BulkType {
 		return "", ErrInvalidRequestExceptedBulk
 	}
-	r.malloc()
+	r.discard()
 	l, err := r.readInteger()
 	if err != nil {
 		return "", err
@@ -261,13 +250,13 @@ func (r *Reader) readBulk() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	v := r.flushCopyString()
+	v := r.String()
 	// Read the trailing CRLF
 	err = r.readLine()
 	if err != nil {
 		return "", err
 	}
-	r.malloc()
+	r.discard()
 	return v, nil
 }
 
@@ -278,16 +267,16 @@ func (r *Reader) readUtil(end byte) (bool, error) {
 		if err != nil {
 			return lineEnd, err
 		}
-		if r.indexByte(-1) == '\r' {
+		if r.peekByte(-1) == '\r' {
 			r.l--
 			continue
 		}
-		if r.indexByte(-1) == '\n' {
+		if r.peekByte(-1) == '\n' {
 			lineEnd = true
 			r.l--
 			break
 		}
-		if r.indexByte(-1) == end && r.indexByte(-2) != '\\' {
+		if r.peekByte(-1) == end && r.peekByte(-2) != '\\' {
 			r.l--
 			break
 		}
@@ -296,30 +285,22 @@ func (r *Reader) readUtil(end byte) (bool, error) {
 }
 
 func (r *Reader) ReadInlineCommand() error {
-	lineEnd, err := r.readUtil(' ')
-	if err != nil {
-		return err
-	}
-	r.cmd.Name = strings.ToUpper(r.flushNoCopyString())
-	if lineEnd {
-		return nil
-	}
-	var i = 0
+	var index = 0
+	var lineEnd = false
+	var err error
 	for {
-		err := r.readByte()
-		if err != nil {
-			if err != io.EOF {
-				return err
-			}
-			break
-		}
-		first := r.firstByte()
-		if first == ' ' || first == '\t' {
-			r.malloc()
+		first := r.peekByte(0)
+		if first == ' ' || first == '\t' || first == '\r' {
+			r.discard()
 			continue
 		}
+		if first == '\n' {
+			r.discard()
+			lineEnd = true
+			break
+		}
 		if first == '\'' || first == '"' {
-			r.malloc()
+			r.discard()
 			lineEnd, err = r.readUtil(first)
 		} else {
 			lineEnd, err = r.readUtil(' ')
@@ -327,11 +308,22 @@ func (r *Reader) ReadInlineCommand() error {
 		if err != nil {
 			return err
 		}
-		v := r.flushCopyString()
-		r.cmd.Args = append(r.cmd.Args, v)
-		i++
-		r.readOptions(v, i)
+		v := r.String()
+		if index == 0 {
+			r.cmd.Name = strings.ToUpper(v)
+		} else {
+			r.cmd.Args = append(r.cmd.Args, v)
+		}
+		index++
+		r.readOptions(v, index)
 		if lineEnd {
+			break
+		}
+		err = r.readByte()
+		if err != nil {
+			if err != io.EOF {
+				return err
+			}
 			break
 		}
 	}
