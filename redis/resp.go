@@ -25,7 +25,7 @@ const defaultSize = 4096
 func NewReader(rd io.Reader) *Reader {
 	return &Reader{
 		reader: rd,
-		buf:    make([]byte, defaultSize),
+		buf:    make([]byte, defaultSize*2),
 	}
 }
 
@@ -349,7 +349,7 @@ type Writer struct {
 func NewWriter(w io.Writer) *Writer {
 	return &Writer{
 		writer: w,
-		buf:    make([]byte, defaultSize),
+		buf:    make([]byte, defaultSize*2),
 	}
 }
 

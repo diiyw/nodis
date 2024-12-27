@@ -35,6 +35,8 @@ func execCommand(conn *redis.Conn, fn func()) {
 
 func GetCommand(name string) func(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	switch name {
+	case "HELLO":
+		return hello
 	case "CLIENT":
 		return client
 	case "CONFIG":
@@ -84,7 +86,7 @@ func GetCommand(name string) func(n *Nodis, conn *redis.Conn, cmd redis.Command)
 	case "PTTL":
 		return pTtl
 	case "PERSIST":
-		return Persist
+		return persist
 	case "RENAME":
 		return rename
 	case "RENAMENX":
@@ -283,6 +285,25 @@ func GetCommand(name string) func(n *Nodis, conn *redis.Conn, cmd redis.Command)
 
 func cmdNotFound(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	conn.WriteError("ERR unknown command '" + cmd.Name + "'")
+}
+
+func hello(n *Nodis, conn *redis.Conn, cmd redis.Command) {
+	execCommand(conn, func() {
+		conn.WriteArray(13)
+		conn.WriteBulk("server")
+		conn.WriteBulk("redis")
+		conn.WriteBulk("version")
+		conn.WriteBulk("6.0.0")
+		conn.WriteBulk("proto")
+		conn.WriteBulk("2")
+		conn.WriteBulk("id")
+		conn.WriteBulk("1")
+		conn.WriteBulk("mode")
+		conn.WriteBulk("standalone")
+		conn.WriteBulk("role")
+		conn.WriteBulk("master")
+		conn.WriteBulk("modules")
+	})
 }
 
 func client(n *Nodis, conn *redis.Conn, cmd redis.Command) {
@@ -620,7 +641,7 @@ func pTtl(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	})
 }
 
-func Persist(n *Nodis, conn *redis.Conn, cmd redis.Command) {
+func persist(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	if len(cmd.Args) == 0 {
 		conn.WriteError("PERSIST requires at least one argument")
 		return
