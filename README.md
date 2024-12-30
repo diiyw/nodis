@@ -181,6 +181,8 @@ redis-cli -p 6380
 
 ## Benchmark
 
+Memory mode.
+
 <details>
 	<summary>Embed benchmark</summary>
 
