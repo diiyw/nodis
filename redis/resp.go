@@ -69,7 +69,8 @@ READ:
 	return nil
 }
 
-func (r *Reader) peekByte(i int) byte {
+// peekBufferByte returns the byte at the specified index in the buffer.
+func (r *Reader) peekBufferByte(i int) byte {
 	if i >= 0 {
 		return r.buf[r.r+i]
 	}
@@ -100,7 +101,7 @@ func (r *Reader) readLine() error {
 		if err != nil {
 			return err
 		}
-		if r.l > 1 && r.peekByte(-1) == '\n' {
+		if r.l > 1 && r.peekBufferByte(-1) == '\n' {
 			r.l -= 2
 			break
 		}
@@ -128,13 +129,13 @@ var (
 
 func (r *Reader) ReadCommand() error {
 	r.reset()
-	if r.peekByte(0) != ArrayType {
-		return r.ReadInlineCommand()
-	}
 	// Read resp type
 	err := r.readByte()
 	if err != nil {
 		return err
+	}
+	if r.peekBufferByte(0) != ArrayType {
+		return r.ReadInlineCommand()
 	}
 	r.discard()
 	// Read length of array
@@ -238,7 +239,7 @@ func (r *Reader) readBulk() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if r.peekByte(0) != BulkType {
+	if r.peekBufferByte(0) != BulkType {
 		return "", ErrInvalidRequestExceptedBulk
 	}
 	r.discard()
@@ -267,16 +268,16 @@ func (r *Reader) readUtil(end byte) (bool, error) {
 		if err != nil {
 			return lineEnd, err
 		}
-		if r.peekByte(-1) == '\r' {
+		if r.peekBufferByte(-1) == '\r' {
 			r.l--
 			continue
 		}
-		if r.peekByte(-1) == '\n' {
+		if r.peekBufferByte(-1) == '\n' {
 			lineEnd = true
 			r.l--
 			break
 		}
-		if r.peekByte(-1) == end && r.peekByte(-2) != '\\' {
+		if r.peekBufferByte(-1) == end && r.peekBufferByte(-2) != '\\' {
 			r.l--
 			break
 		}
@@ -289,16 +290,16 @@ func (r *Reader) ReadInlineCommand() error {
 	var lineEnd = false
 	var err error
 	for {
-		err = r.readByte()
-		if err != nil {
-			if err != io.EOF {
-				return err
-			}
-			break
-		}
-		first := r.peekByte(0)
+		first := r.peekBufferByte(0)
 		if first == ' ' || first == '\t' || first == '\r' {
 			r.discard()
+			err = r.readByte()
+			if err != nil {
+				if err != io.EOF {
+					return err
+				}
+				break
+			}
 			continue
 		}
 		if first == '\n' {
@@ -324,6 +325,13 @@ func (r *Reader) ReadInlineCommand() error {
 		}
 		index++
 		if lineEnd {
+			break
+		}
+		err = r.readByte()
+		if err != nil {
+			if err != io.EOF {
+				return err
+			}
 			break
 		}
 	}
