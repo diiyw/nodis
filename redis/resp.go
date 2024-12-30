@@ -128,13 +128,13 @@ var (
 
 func (r *Reader) ReadCommand() error {
 	r.reset()
+	if r.peekByte(0) != ArrayType {
+		return r.ReadInlineCommand()
+	}
 	// Read resp type
 	err := r.readByte()
 	if err != nil {
 		return err
-	}
-	if r.peekByte(0) != ArrayType {
-		return r.ReadInlineCommand()
 	}
 	r.discard()
 	// Read length of array
@@ -289,6 +289,13 @@ func (r *Reader) ReadInlineCommand() error {
 	var lineEnd = false
 	var err error
 	for {
+		err = r.readByte()
+		if err != nil {
+			if err != io.EOF {
+				return err
+			}
+			break
+		}
 		first := r.peekByte(0)
 		if first == ' ' || first == '\t' || first == '\r' {
 			r.discard()
@@ -313,17 +320,10 @@ func (r *Reader) ReadInlineCommand() error {
 			r.cmd.Name = strings.ToUpper(v)
 		} else {
 			r.cmd.Args = append(r.cmd.Args, v)
+			r.readOptions(v, index)
 		}
 		index++
-		r.readOptions(v, index)
 		if lineEnd {
-			break
-		}
-		err = r.readByte()
-		if err != nil {
-			if err != io.EOF {
-				return err
-			}
 			break
 		}
 	}

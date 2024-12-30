@@ -121,3 +121,62 @@ func TestInlineQuotes(t *testing.T) {
 		t.Errorf("not equal '%s'", r.cmd.Args[1])
 	}
 }
+
+func TestReadCommand(t *testing.T) {
+	tests := []struct {
+		doc      string
+		expected Command
+	}{
+		{
+			doc: "ping\r\n",
+			expected: Command{
+				Name: "PING",
+				Args: []string{},
+			},
+		},
+		{
+			doc: "set foo bar\r\n",
+			expected: Command{
+				Name: "SET",
+				Args: []string{"foo", "bar"},
+			},
+		},
+		{
+			doc: "set \"foo\" \"bar\"\r\n",
+			expected: Command{
+				Name: "SET",
+				Args: []string{"foo", "bar"},
+			},
+		},
+		{
+			doc: "set foo \"bar bar2\"\r\n",
+			expected: Command{
+				Name: "SET",
+				Args: []string{"foo", "bar bar2"},
+			},
+		},
+		{
+			doc: "set foo \"bar\\\"bar3\"\r\n",
+			expected: Command{
+				Name: "SET",
+				Args: []string{"foo", "bar\\\"bar3"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		r := NewReader(strings.NewReader(tt.doc))
+		err := r.ReadCommand()
+		if err != nil {
+			t.Error(err)
+		}
+		if r.cmd.Name != tt.expected.Name {
+			t.Errorf("expected %s, got %s", tt.expected.Name, r.cmd.Name)
+		}
+		for i, arg := range tt.expected.Args {
+			if r.cmd.Args[i] != arg {
+				t.Errorf("expected %s, got %s", arg, r.cmd.Args[i])
+			}
+		}
+	}
+}
