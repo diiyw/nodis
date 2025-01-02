@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"io"
 	"net"
 	"sync/atomic"
 
@@ -53,7 +54,11 @@ func handleConn(conn net.Conn, handler HandlerFunc) {
 	}
 	for {
 		err := c.Reader.ReadCommand()
-		if err != nil {
+		if err != nil && err != io.EOF {
+			if _, ok := err.(*net.OpError); ok {
+				c.Writer.Reset()
+				break
+			}
 			c.WriteError(err.Error())
 			_ = c.Flush()
 			break

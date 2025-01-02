@@ -74,7 +74,7 @@ func TestReadInlineQuates(t *testing.T) {
 }
 
 func TestReadInlineSpace(t *testing.T) {
-	doc := "set foo \"bar bar2\"\r\nset  foo \"bar\"bar2\"\r\n"
+	doc := "set foo \"bar bar2\"\r\nset  foo \"bar\\\"bar2\"\r\n"
 	r := NewReader(strings.NewReader(doc))
 	err := r.ReadCommand()
 	if err != nil {
@@ -178,5 +178,152 @@ func TestReadCommand(t *testing.T) {
 				t.Errorf("expected %s, got %s", arg, r.cmd.Args[i])
 			}
 		}
+	}
+}
+
+func TestWriterWriteByte(t *testing.T) {
+	w := NewWriter(&strings.Builder{})
+	w.writeByte('a')
+	if string(w.Bytes()) != "a" {
+		t.Errorf("expected 'a', got %s", string(w.Bytes()))
+	}
+}
+
+func TestWriterWriteBytes(t *testing.T) {
+	w := NewWriter(&strings.Builder{})
+	w.writeBytes('a', 'b', 'c')
+	if string(w.Bytes()) != "abc" {
+		t.Errorf("expected 'abc', got %s", string(w.Bytes()))
+	}
+}
+
+func TestWriterWriteString(t *testing.T) {
+	w := NewWriter(&strings.Builder{})
+	w.WriteString("hello")
+	expected := string(StringType) + "hello\r\n"
+	if string(w.Bytes()) != expected {
+		t.Errorf("expected %s, got %s", expected, string(w.Bytes()))
+	}
+}
+
+func TestWriterWriteBulk(t *testing.T) {
+	w := NewWriter(&strings.Builder{})
+	w.WriteBulk("bulk")
+	expected := string(BulkType) + "4\r\nbulk\r\n"
+	if string(w.Bytes()) != expected {
+		t.Errorf("expected %s, got %s", expected, string(w.Bytes()))
+	}
+}
+
+func TestWriterWriteArray(t *testing.T) {
+	w := NewWriter(&strings.Builder{})
+	w.WriteArray(3)
+	expected := string(ArrayType) + "3\r\n"
+	if string(w.Bytes()) != expected {
+		t.Errorf("expected %s, got %s", expected, string(w.Bytes()))
+	}
+}
+
+func TestWriterWriteError(t *testing.T) {
+	w := NewWriter(&strings.Builder{})
+	w.WriteError("error")
+	expected := string(ErrType) + "error\r\n"
+	if string(w.Bytes()) != expected {
+		t.Errorf("expected %s, got %s", expected, string(w.Bytes()))
+	}
+	if !w.HasError() {
+		t.Errorf("expected HasError to be true")
+	}
+}
+
+func TestWriterWriteBulkNull(t *testing.T) {
+	w := NewWriter(&strings.Builder{})
+	w.WriteBulkNull()
+	expected := "$-1\r\n"
+	if string(w.Bytes()) != expected {
+		t.Errorf("expected %s, got %s", expected, string(w.Bytes()))
+	}
+}
+
+func TestWriterWriteArrayNull(t *testing.T) {
+	w := NewWriter(&strings.Builder{})
+	w.WriteArrayNull()
+	expected := "*-1\r\n"
+	if string(w.Bytes()) != expected {
+		t.Errorf("expected %s, got %s", expected, string(w.Bytes()))
+	}
+}
+
+func TestWriterWriteInt64(t *testing.T) {
+	w := NewWriter(&strings.Builder{})
+	w.WriteInt64(123)
+	expected := string(IntegerType) + "123\r\n"
+	if string(w.Bytes()) != expected {
+		t.Errorf("expected %s, got %s", expected, string(w.Bytes()))
+	}
+}
+
+func TestWriterWriteUInt64(t *testing.T) {
+	w := NewWriter(&strings.Builder{})
+	w.WriteUInt64(123)
+	expected := string(IntegerType) + "123\r\n"
+	if string(w.Bytes()) != expected {
+		t.Errorf("expected %s, got %s", expected, string(w.Bytes()))
+	}
+}
+
+func TestWriterWriteDouble(t *testing.T) {
+	w := NewWriter(&strings.Builder{})
+	w.WriteDouble(123.456)
+	expected := string(DoubleType) + "123.456\r\n"
+	if string(w.Bytes()) != expected {
+		t.Errorf("expected %s, got %s", expected, string(w.Bytes()))
+	}
+}
+
+func TestWriterWriteMap(t *testing.T) {
+	w := NewWriter(&strings.Builder{})
+	w.WriteMap(2)
+	expected := string(MapType) + "2\r\n"
+	if string(w.Bytes()) != expected {
+		t.Errorf("expected %s, got %s", expected, string(w.Bytes()))
+	}
+}
+
+func TestWriterWriteNullMap(t *testing.T) {
+	w := NewWriter(&strings.Builder{})
+	w.WriteNullMap()
+	expected := "%-1\r\n"
+	if string(w.Bytes()) != expected {
+		t.Errorf("expected %s, got %s", expected, string(w.Bytes()))
+	}
+}
+
+func TestWriterWriteOK(t *testing.T) {
+	w := NewWriter(&strings.Builder{})
+	w.WriteOK()
+	expected := "+OK\r\n"
+	if string(w.Bytes()) != expected {
+		t.Errorf("expected %s, got %s", expected, string(w.Bytes()))
+	}
+}
+
+func TestWriterFlush(t *testing.T) {
+	builder := &strings.Builder{}
+	w := NewWriter(builder)
+	w.WriteString("hello")
+	err := w.Flush()
+	if err != nil {
+		t.Error(err)
+	}
+	expected := string(StringType) + "hello\r\n"
+	if builder.String() != expected {
+		t.Errorf("expected %s, got %s", expected, builder.String())
+	}
+	if w.w != 0 {
+		t.Errorf("expected w to be 0, got %d", w.w)
+	}
+	if w.HasError() {
+		t.Errorf("expected HasError to be false")
 	}
 }

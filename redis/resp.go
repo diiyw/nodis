@@ -354,6 +354,9 @@ func NewWriter(w io.Writer) *Writer {
 }
 
 func (w *Writer) grow(n int) {
+	if w.w+n <= len(w.buf) {
+		return
+	}
 	newBuf := make([]byte, len(w.buf)+n)
 	copy(newBuf, w.buf)
 	w.buf = newBuf
@@ -361,6 +364,11 @@ func (w *Writer) grow(n int) {
 
 func (w *Writer) Bytes() []byte {
 	return w.buf[:w.w]
+}
+
+func (w *Writer) Reset() {
+	w.w = 0
+	w.err = false
 }
 
 func (w *Writer) Flush() error {
@@ -387,9 +395,7 @@ func (w *Writer) writeByte(b byte) {
 
 func (w *Writer) writeBytes(bs ...byte) {
 	n := len(bs)
-	if w.w+n >= len(w.buf) {
-		w.grow(n)
-	}
+	w.grow(n)
 	for _, v := range bs {
 		w.writeByte(v)
 	}
