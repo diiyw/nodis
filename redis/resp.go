@@ -25,16 +25,21 @@ const defaultSize = 4096
 func NewReader(rd io.Reader) *Reader {
 	return &Reader{
 		reader: rd,
-		buf:    make([]byte, defaultSize*2),
+		buf:    make([]byte, 0, defaultSize*2),
 	}
 }
 
 func (r *Reader) grow(n int) {
-	if r.r+r.l+n <= len(r.buf) {
+	c := r.r + r.l + n
+	if c <= len(r.buf) {
 		return
 	}
-	c := r.r + r.l + n
-	newBuf := make([]byte, c)
+	c = c - len(r.buf)
+	if len(r.buf)+c <= cap(r.buf) {
+		r.buf = append(r.buf, make([]byte, c)...)
+		return
+	}
+	newBuf := make([]byte, len(r.buf)+c)
 	copy(newBuf, r.buf)
 	r.buf = newBuf
 }
@@ -84,7 +89,9 @@ func (r *Reader) String() string {
 }
 
 func (r *Reader) reset() {
-	r.discard()
+	r.r = 0
+	r.l = 0
+	r.buf = r.buf[:0]
 	r.cmd = Command{
 		Args: make([]string, 0),
 	}

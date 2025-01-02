@@ -99,7 +99,7 @@ func TestReadInlineSpace(t *testing.T) {
 	if r.cmd.Args[0] != "foo" {
 		t.Errorf("not equal %s", r.cmd.Args[0])
 	}
-	if r.cmd.Args[1] != "bar" {
+	if r.cmd.Args[1] != "bar\\\"bar2" {
 		t.Errorf("not equal '%s'", r.cmd.Args[1])
 	}
 }
