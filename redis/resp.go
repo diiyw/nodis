@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"unsafe"
 
 	"github.com/diiyw/nodis/internal/strings"
 )
@@ -77,9 +78,10 @@ func (r *Reader) peekBufferByte(i int) byte {
 }
 
 func (r *Reader) String() string {
-	s := string(r.buf[r.r : r.r+r.l])
+	b := make([]byte, r.l)
+	copy(b, r.buf[r.r:r.r+r.l])
 	r.discard()
-	return s
+	return unsafe.String(unsafe.SliceData(b[:]), r.l)
 }
 
 func (r *Reader) reset() {
@@ -377,8 +379,7 @@ func (w *Writer) Flush() error {
 	if err != nil {
 		return err
 	}
-	w.w = 0
-	w.err = false
+	w.Reset()
 	return nil
 }
 
