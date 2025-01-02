@@ -5,7 +5,6 @@ import (
 	"io"
 	"net"
 	"strconv"
-	"unsafe"
 
 	"github.com/diiyw/nodis/internal/strings"
 )
@@ -25,7 +24,7 @@ const defaultSize = 4096
 func NewReader(rd io.Reader) *Reader {
 	return &Reader{
 		reader: rd,
-		buf:    make([]byte, 0, defaultSize*2),
+		buf:    make([]byte, defaultSize*2),
 	}
 }
 
@@ -34,12 +33,7 @@ func (r *Reader) grow(n int) {
 	if c <= len(r.buf) {
 		return
 	}
-	c = c - len(r.buf)
-	if len(r.buf)+c <= cap(r.buf) {
-		r.buf = append(r.buf, make([]byte, c)...)
-		return
-	}
-	newBuf := make([]byte, len(r.buf)+c)
+	newBuf := make([]byte, c)
 	copy(newBuf, r.buf)
 	r.buf = newBuf
 }
@@ -83,7 +77,7 @@ func (r *Reader) peekBufferByte(i int) byte {
 }
 
 func (r *Reader) String() string {
-	s := unsafe.String(unsafe.SliceData(r.buf[r.r:r.r+r.l]), r.l)
+	s := string(r.buf[r.r : r.r+r.l])
 	r.discard()
 	return s
 }
