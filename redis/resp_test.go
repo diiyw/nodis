@@ -17,7 +17,7 @@ func TestReadInlineSimple(t *testing.T) {
 	}
 }
 
-func TestReadInlineMutli(t *testing.T) {
+func TestReadInlineMulti(t *testing.T) {
 	doc := "ping\r\nset foo bar\r\n"
 	r := NewReader(strings.NewReader(doc))
 	err := r.ReadCommand()
@@ -42,7 +42,7 @@ func TestReadInlineMutli(t *testing.T) {
 	}
 }
 
-func TestReadInlineQuates(t *testing.T) {
+func TestReadInlineQuotes(t *testing.T) {
 	doc := "set \"foo\" bar\r\nset foo \"bar\"\r\n\r\nset foo \"bar bar2\"\r\n"
 	r := NewReader(strings.NewReader(doc))
 	err := r.ReadCommand()
@@ -105,7 +105,7 @@ func TestReadInlineSpace(t *testing.T) {
 }
 
 func TestInlineQuotes(t *testing.T) {
-	doc := "set  foo \"bar\\\"bar3\"\r\n"
+	doc := "set  foo \"bar\\\"\r\nbar3\"\r\n"
 	r := NewReader(strings.NewReader(doc))
 	err := r.ReadCommand()
 	if err != nil {
@@ -117,7 +117,7 @@ func TestInlineQuotes(t *testing.T) {
 	if r.cmd.Args[0] != "foo" {
 		t.Errorf("not equal %s", r.cmd.Args[0])
 	}
-	if r.cmd.Args[1] != "bar\\\"bar3" {
+	if r.cmd.Args[1] != "bar\\\"\r\nbar3" {
 		t.Errorf("not equal '%s'", r.cmd.Args[1])
 	}
 }

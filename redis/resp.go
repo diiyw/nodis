@@ -25,13 +25,14 @@ const defaultSize = 4096
 func NewReader(rd io.Reader) *Reader {
 	return &Reader{
 		reader: rd,
-		buf:    make([]byte, defaultSize*2),
+		buf:    make([]byte, 0, defaultSize*2),
 	}
 }
 
 func (r *Reader) grow(n int) {
 	c := r.r + r.l + n
-	if c <= len(r.buf) {
+	if c <= cap(r.buf) {
+		r.buf = append(r.buf, make([]byte, n)...)
 		return
 	}
 	newBuf := make([]byte, c)
@@ -41,7 +42,7 @@ func (r *Reader) grow(n int) {
 
 func (r *Reader) readByte() error {
 	size := r.r + r.l
-	r.grow(defaultSize)
+	r.grow(1)
 	n, err := r.reader.Read(r.buf[size : size+1])
 	if err != nil {
 		return err
@@ -81,7 +82,7 @@ func (r *Reader) String() string {
 	b := make([]byte, r.l)
 	copy(b, r.buf[r.r:r.r+r.l])
 	r.discard()
-	return unsafe.String(unsafe.SliceData(b[:]), r.l)
+	return unsafe.String(unsafe.SliceData(b[:]), len(b))
 }
 
 func (r *Reader) reset() {
@@ -271,14 +272,16 @@ func (r *Reader) readUtil(end byte) (bool, error) {
 		if err != nil {
 			return lineEnd, err
 		}
-		if r.peekBufferByte(-1) == '\r' {
-			r.l--
-			continue
-		}
-		if r.peekBufferByte(-1) == '\n' {
-			lineEnd = true
-			r.l--
-			break
+		if end == ' ' {
+			if r.peekBufferByte(-1) == '\r' {
+				r.l--
+				continue
+			}
+			if r.peekBufferByte(-1) == '\n' {
+				lineEnd = true
+				r.l--
+				break
+			}
 		}
 		if r.peekBufferByte(-1) == end && r.peekBufferByte(-2) != '\\' {
 			r.l--
