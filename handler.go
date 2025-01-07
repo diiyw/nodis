@@ -289,7 +289,7 @@ func cmdNotFound(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 
 func hello(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
-		conn.WriteArray(13)
+		conn.WriteArray(14)
 		conn.WriteBulk("server")
 		conn.WriteBulk("redis")
 		conn.WriteBulk("version")
@@ -303,6 +303,7 @@ func hello(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		conn.WriteBulk("role")
 		conn.WriteBulk("master")
 		conn.WriteBulk("modules")
+		conn.WriteArray(0)
 	})
 }
 
