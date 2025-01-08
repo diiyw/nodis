@@ -317,6 +317,8 @@ func client(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			conn.WriteString("id=1 addr=" + conn.Network.RemoteAddr().String() + " fd=5 name= age=0 idle=0 flags=N db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=0 obl=0 oll=0 omem=0 events=r cmd=client")
 		case "SETNAME":
 			conn.WriteString("OK")
+		case "SETINFO":
+			conn.WriteString("OK")
 		default:
 			conn.WriteError("CLIENT subcommand must be provided")
 		}

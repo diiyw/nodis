@@ -20,7 +20,7 @@ type Reader struct {
 	cmd Command
 }
 
-const defaultSize = 4096
+const defaultSize = 2048
 
 func NewReader(rd io.Reader) *Reader {
 	return &Reader{
