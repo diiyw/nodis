@@ -3,7 +3,7 @@ package redis
 import (
 	"io"
 	"net"
-	"sync/atomic"
+	"sync"
 
 	"github.com/tidwall/btree"
 )
@@ -15,14 +15,19 @@ const (
 	MultiError   uint8 = 4
 )
 
-var ClientNum atomic.Int64
+var (
+	clientLocker sync.Locker
+	Clients      = make(map[int]*Conn)
+)
 
 type HandlerFunc func(c *Conn, cmd Command)
 
 type Conn struct {
+	Fd   int
+	Name string
 	*Reader
 	*Writer
-	Network   net.Conn
+	Client    net.Conn
 	Commands  []func()
 	State     uint8
 	WatchKeys btree.Map[string, bool]
@@ -45,13 +50,16 @@ func Serve(addr string, handler HandlerFunc) error {
 }
 
 func handleConn(conn net.Conn, handler HandlerFunc) {
-	ClientNum.Add(1)
+	clientLocker.Lock()
 	c := &Conn{
+		Fd:       len(Clients) + 1,
 		Reader:   NewReader(conn),
 		Writer:   NewWriter(conn),
-		Network:  conn,
+		Client:   conn,
 		Commands: make([]func(), 0),
 	}
+	Clients[c.Fd] = c
+	clientLocker.Unlock()
 	for {
 		err := c.Reader.ReadCommand()
 		if err != nil {
@@ -60,11 +68,14 @@ func handleConn(conn net.Conn, handler HandlerFunc) {
 				break
 			}
 			c.WriteError(err.Error())
-			_ = c.Flush()
+			_ = c.Push()
 			break
 		}
 		handler(c, c.cmd)
-		_ = c.Flush()
+		_ = c.Push()
 	}
-	ClientNum.Add(-1)
+	_ = conn.Close()
+	clientLocker.Lock()
+	delete(Clients, c.Fd)
+	clientLocker.Unlock()
 }

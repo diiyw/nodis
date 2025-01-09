@@ -315,8 +315,11 @@ func client(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		switch strings.ToUpper(cmd.Args[0]) {
 		case "LIST":
-			conn.WriteString("id=1 addr=" + conn.Network.RemoteAddr().String() + " fd=5 name= age=0 idle=0 flags=N db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=0 obl=0 oll=0 omem=0 events=r cmd=client")
+			conn.WriteString("id=1 addr=" + conn.Client.RemoteAddr().String() +
+				" fd=" + strconv.Itoa(conn.Fd) +
+				" name=" + conn.Name + " age=0 idle=0 flags=N db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=0 obl=0 oll=0 omem=0 events=r cmd=client ")
 		case "SETNAME":
+			conn.Name = cmd.Args[1]
 			conn.WriteString("OK")
 		case "SETINFO":
 			conn.WriteString("OK")
@@ -377,7 +380,7 @@ func info(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 			`maxmemory_policy:noeviction` + "\r\n" +
 			`# Client` + "\r\n" +
 			`maxclients:10000` + "\r\n" +
-			`connected_clients:` + strconv.FormatInt(redis.ClientNum.Load(), 10) + "\r\n" +
+			`connected_clients:` + strconv.Itoa(len(redis.Clients)) + "\r\n" +
 			`# Keyspace` + "\r\n" + keyspace +
 			"\r\n")
 	})
@@ -406,7 +409,7 @@ func echo(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 func quit(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		conn.WriteOK()
-		conn.Network.Close()
+		conn.Client.Close()
 	})
 }
 

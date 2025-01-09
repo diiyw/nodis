@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"io"
 	"strings"
 	"testing"
 )
@@ -312,7 +313,7 @@ func TestWriterFlush(t *testing.T) {
 	builder := &strings.Builder{}
 	w := NewWriter(builder)
 	w.WriteString("hello")
-	err := w.Flush()
+	err := w.Push()
 	if err != nil {
 		t.Error(err)
 	}
@@ -325,5 +326,59 @@ func TestWriterFlush(t *testing.T) {
 	}
 	if w.HasError() {
 		t.Errorf("expected HasError to be false")
+	}
+}
+
+func TestReadByteN(t *testing.T) {
+	tests := []struct {
+		doc      string
+		n        int
+		expected string
+		err      error
+		preRead  int
+	}{
+		{
+			doc:      "hello",
+			n:        5,
+			expected: "hello",
+			err:      nil,
+		},
+		{
+			doc:      "world",
+			n:        3,
+			expected: "wor",
+			err:      nil,
+		},
+		{
+			doc:      "short",
+			n:        10,
+			expected: "",
+			err:      io.EOF,
+		},
+		{
+			doc:      "xxworld",
+			n:        3,
+			expected: "wor",
+			err:      nil,
+			preRead:  2,
+		},
+	}
+
+	for _, tt := range tests {
+		r := NewReader(strings.NewReader(tt.doc))
+		for i := 0; i < tt.preRead; i++ {
+			_ = r.readByte()
+		}
+		r.discard()
+		err := r.readByteN(tt.n)
+		if err != tt.err {
+			t.Errorf("expected error %v, got %v", tt.err, err)
+		}
+		if err == nil {
+			result := string(r.buf[r.r : r.r+r.l])
+			if result != tt.expected {
+				t.Errorf("expected %s, got %s", tt.expected, result)
+			}
+		}
 	}
 }

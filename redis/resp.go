@@ -32,7 +32,6 @@ func NewReader(rd io.Reader) *Reader {
 func (r *Reader) grow(n int) {
 	c := r.r + r.l + n
 	if c <= cap(r.buf) {
-		r.buf = append(r.buf, make([]byte, n)...)
 		return
 	}
 	newBuf := make([]byte, c)
@@ -58,9 +57,10 @@ func (r *Reader) readByteN(n int) error {
 	r.grow(n)
 READ:
 	start := r.r + r.l
-	end := start + (n - r.l)
+	end := start + n
 	rn, err := r.reader.Read(r.buf[start:end])
 	if err != nil {
+		r.discard()
 		return err
 	}
 	r.l += rn
@@ -72,10 +72,8 @@ READ:
 
 // peekBufferByte returns the byte at the specified index in the buffer.
 func (r *Reader) peekBufferByte(i int) byte {
-	if i >= 0 {
-		return r.buf[r.r+i]
-	}
-	return r.buf[r.r+r.l+i]
+	var b = r.buf[r.r : r.r+r.l]
+	return b[len(b)+i-1]
 }
 
 func (r *Reader) String() string {
@@ -103,9 +101,10 @@ func (r *Reader) readLine() error {
 	for {
 		err := r.readByte()
 		if err != nil {
+			r.discard()
 			return err
 		}
-		if r.l > 1 && r.peekBufferByte(-1) == '\n' {
+		if r.l > 1 && r.peekBufferByte(0) == '\n' {
 			r.l -= 2
 			break
 		}
@@ -270,20 +269,21 @@ func (r *Reader) readUtil(end byte) (bool, error) {
 	for {
 		err := r.readByte()
 		if err != nil {
+			r.discard()
 			return lineEnd, err
 		}
 		if end == ' ' {
-			if r.peekBufferByte(-1) == '\r' {
+			if r.peekBufferByte(0) == '\r' {
 				r.l--
 				continue
 			}
-			if r.peekBufferByte(-1) == '\n' {
+			if r.peekBufferByte(0) == '\n' {
 				lineEnd = true
 				r.l--
 				break
 			}
 		}
-		if r.peekBufferByte(-1) == end && r.peekBufferByte(-2) != '\\' {
+		if r.peekBufferByte(0) == end && (r.l > 1 && r.peekBufferByte(-1) != '\\') {
 			r.l--
 			break
 		}
@@ -301,10 +301,7 @@ func (r *Reader) ReadInlineCommand() error {
 			r.discard()
 			err = r.readByte()
 			if err != nil {
-				if err != io.EOF {
-					return err
-				}
-				break
+				return err
 			}
 			continue
 		}
@@ -335,10 +332,7 @@ func (r *Reader) ReadInlineCommand() error {
 		}
 		err = r.readByte()
 		if err != nil {
-			if err != io.EOF {
-				return err
-			}
-			break
+			return err
 		}
 	}
 	return nil
@@ -377,12 +371,12 @@ func (w *Writer) Reset() {
 	w.err = false
 }
 
-func (w *Writer) Flush() error {
+func (w *Writer) Push() error {
 	_, err := w.writer.Write(w.buf[:w.w])
+	w.Reset()
 	if err != nil {
 		return err
 	}
-	w.Reset()
 	return nil
 }
 
