@@ -11,7 +11,7 @@ func TestClient_SetName(t *testing.T) {
 	n := &Nodis{}
 	w := redis.NewWriter(&bytes.Buffer{})
 	cmd := redis.Command{
-		Args: []string{"SETNAME"},
+		Args: []string{"SETNAME", "test"},
 	}
 
 	client(n, &redis.Conn{Writer: w}, cmd)

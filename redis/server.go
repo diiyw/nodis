@@ -16,7 +16,7 @@ const (
 )
 
 var (
-	clientLocker sync.Locker
+	clientLocker sync.RWMutex
 	Clients      = make(map[int]*Conn)
 )
 
