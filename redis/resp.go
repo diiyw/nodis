@@ -64,14 +64,15 @@ READ:
 		return err
 	}
 	r.l += rn
-	if r.l < n {
+	if rn < n {
+		n -= rn
 		goto READ
 	}
 	return nil
 }
 
-// peekBufferByte returns the byte at the specified index in the buffer.
-func (r *Reader) peekBufferByte(i int) byte {
+// peekByte returns the byte at the specified index in the buffer.
+func (r *Reader) peekByte(i int) byte {
 	var b = r.buf[r.r : r.r+r.l]
 	return b[len(b)+i-1]
 }
@@ -104,7 +105,7 @@ func (r *Reader) readLine() error {
 			r.discard()
 			return err
 		}
-		if r.l > 1 && r.peekBufferByte(0) == '\n' {
+		if r.l > 1 && r.peekByte(0) == '\n' {
 			r.l -= 2
 			break
 		}
@@ -137,7 +138,7 @@ func (r *Reader) ReadCommand() error {
 	if err != nil {
 		return err
 	}
-	if r.peekBufferByte(0) != ArrayType {
+	if r.peekByte(0) != ArrayType {
 		return r.ReadInlineCommand()
 	}
 	r.discard()
@@ -242,7 +243,7 @@ func (r *Reader) readBulk() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if r.peekBufferByte(0) != BulkType {
+	if r.peekByte(0) != BulkType {
 		return "", ErrInvalidRequestExceptedBulk
 	}
 	r.discard()
@@ -273,17 +274,17 @@ func (r *Reader) readUtil(end byte) (bool, error) {
 			return lineEnd, err
 		}
 		if end == ' ' {
-			if r.peekBufferByte(0) == '\r' {
+			if r.peekByte(0) == '\r' {
 				r.l--
 				continue
 			}
-			if r.peekBufferByte(0) == '\n' {
+			if r.peekByte(0) == '\n' {
 				lineEnd = true
 				r.l--
 				break
 			}
 		}
-		if r.peekBufferByte(0) == end && (r.l > 1 && r.peekBufferByte(-1) != '\\') {
+		if r.peekByte(0) == end && (r.l > 1 && r.peekByte(-1) != '\\') {
 			r.l--
 			break
 		}
@@ -296,7 +297,7 @@ func (r *Reader) ReadInlineCommand() error {
 	var lineEnd = false
 	var err error
 	for {
-		first := r.peekBufferByte(0)
+		first := r.peekByte(0)
 		if first == ' ' || first == '\t' || first == '\r' {
 			r.discard()
 			err = r.readByte()

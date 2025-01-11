@@ -16,7 +16,7 @@ const (
 )
 
 var (
-	clientLocker sync.RWMutex
+	ClientLocker sync.RWMutex
 	Clients      = make(map[int]*Conn)
 )
 
@@ -50,7 +50,7 @@ func Serve(addr string, handler HandlerFunc) error {
 }
 
 func handleConn(conn net.Conn, handler HandlerFunc) {
-	clientLocker.Lock()
+	ClientLocker.Lock()
 	c := &Conn{
 		Fd:       len(Clients) + 1,
 		Reader:   NewReader(conn),
@@ -59,7 +59,7 @@ func handleConn(conn net.Conn, handler HandlerFunc) {
 		Commands: make([]func(), 0),
 	}
 	Clients[c.Fd] = c
-	clientLocker.Unlock()
+	ClientLocker.Unlock()
 	for {
 		err := c.Reader.ReadCommand()
 		if err != nil {
@@ -75,7 +75,7 @@ func handleConn(conn net.Conn, handler HandlerFunc) {
 		_ = c.Push()
 	}
 	_ = conn.Close()
-	clientLocker.Lock()
+	ClientLocker.Lock()
 	delete(Clients, c.Fd)
-	clientLocker.Unlock()
+	ClientLocker.Unlock()
 }

@@ -382,3 +382,16 @@ func TestReadByteN(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkReadCommand(b *testing.B) {
+	doc := "set foo bar\r\n"
+	for i := 0; i < 1000; i++ {
+		doc += "set foo bar\r\n"
+	}
+	r := NewReader(strings.NewReader(doc))
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = r.ReadCommand()
+	}
+}

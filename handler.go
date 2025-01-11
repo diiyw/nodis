@@ -315,9 +315,14 @@ func client(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		switch strings.ToUpper(cmd.Args[0]) {
 		case "LIST":
-			conn.WriteString("id=1 addr=" + conn.Client.RemoteAddr().String() +
-				" fd=" + strconv.Itoa(conn.Fd) +
-				" name=" + conn.Name + " age=0 idle=0 flags=N db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=0 obl=0 oll=0 omem=0 events=r cmd=client ")
+			redis.ClientLocker.RLock()
+			conn.WriteArray(len(redis.Clients))
+			for _, c := range redis.Clients {
+				conn.WriteString("id=" + strconv.Itoa(c.Fd) + " addr=" + c.Client.RemoteAddr().String() +
+					" fd=" + strconv.Itoa(c.Fd) +
+					" name=" + c.Name + " age=0 idle=0 flags=N db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=0 obl=0 oll=0 omem=0 events=r cmd=client")
+			}
+			redis.ClientLocker.RUnlock()
 		case "SETNAME":
 			conn.Name = cmd.Args[1]
 			conn.WriteString("OK")
