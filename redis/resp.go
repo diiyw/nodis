@@ -241,6 +241,7 @@ func (r *Reader) readOptions(v string, i int) {
 func (r *Reader) readBulk() (string, error) {
 	err := r.readByte()
 	if err != nil {
+		r.discard()
 		return "", err
 	}
 	if r.peekByte(0) != BulkType {

@@ -2,6 +2,7 @@ package nodis
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/diiyw/nodis/ds"
 )
@@ -15,7 +16,7 @@ type metadata struct {
 	*sync.RWMutex
 	key       *ds.Key
 	value     ds.Value
-	count     int64
+	count     atomic.Int64
 	valueType ds.ValueType
 	state     uint8
 	writeable bool
@@ -24,7 +25,6 @@ type metadata struct {
 func newMetadata() *metadata {
 	return &metadata{
 		RWMutex:   new(sync.RWMutex),
-		count:     0,
 		value:     nil,
 		writeable: false,
 	}
@@ -48,7 +48,7 @@ func (m *metadata) modified() bool {
 // reset the key state
 func (m *metadata) reset() {
 	m.state = KeyStateNormal
-	m.count--
+	m.count.Add(-1)
 }
 
 func (m *metadata) setValue(value ds.Value) {

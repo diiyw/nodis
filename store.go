@@ -83,7 +83,7 @@ func (s *store) gc() {
 			}
 		}
 		m.reset()
-		if m.count < 0 {
+		if m.count.Load() < 0 {
 			m.removeFromMemory()
 		}
 		return true
