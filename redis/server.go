@@ -63,8 +63,8 @@ func handleConn(conn net.Conn, handler HandlerFunc) {
 	for {
 		err := c.Reader.ReadCommand()
 		if err != nil {
+			c.Writer.Reset()
 			if _, ok := err.(*net.OpError); ok || err == io.EOF {
-				c.Writer.Reset()
 				break
 			}
 			c.WriteError(err.Error())

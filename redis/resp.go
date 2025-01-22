@@ -44,9 +44,11 @@ func (r *Reader) readByte() error {
 	r.grow(1)
 	n, err := r.reader.Read(r.buf[size : size+1])
 	if err != nil {
+		r.discard()
 		return err
 	}
 	if n == 0 {
+		r.discard()
 		return io.EOF
 	}
 	r.l++
@@ -102,7 +104,6 @@ func (r *Reader) readLine() error {
 	for {
 		err := r.readByte()
 		if err != nil {
-			r.discard()
 			return err
 		}
 		if r.l > 1 && r.peekByte(0) == '\n' {
@@ -241,7 +242,6 @@ func (r *Reader) readOptions(v string, i int) {
 func (r *Reader) readBulk() (string, error) {
 	err := r.readByte()
 	if err != nil {
-		r.discard()
 		return "", err
 	}
 	if r.peekByte(0) != BulkType {
@@ -271,7 +271,6 @@ func (r *Reader) readUtil(end byte) (bool, error) {
 	for {
 		err := r.readByte()
 		if err != nil {
-			r.discard()
 			return lineEnd, err
 		}
 		if end == ' ' {
