@@ -49,8 +49,7 @@ func (n *Nodis) GetSet(key string, value []byte) []byte {
 func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newStr)
-		meta.key.Expiration = time.Now().UnixMilli()
-		meta.key.Expiration += seconds * 1000
+		meta.key.Expiration = time.Now().UnixMilli() + seconds*1000
 		meta.value.(*str.String).Set(value)
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
@@ -64,8 +63,7 @@ func (n *Nodis) SetEX(key string, value []byte, seconds int64) {
 func (n *Nodis) SetPX(key string, value []byte, milliseconds int64) {
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(key, n.newStr)
-		meta.key.Expiration = time.Now().UnixMilli()
-		meta.key.Expiration += milliseconds
+		meta.key.Expiration = time.Now().UnixMilli() + milliseconds
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
 			return []patch.Op{{Type: patch.OpTypeSet, Data: &patch.OpSet{Key: key, Value: value, Expiration: meta.key.Expiration}}}
@@ -83,7 +81,7 @@ func (n *Nodis) SetNX(key string, value []byte, keepTTL bool) bool {
 		if meta.isOk() {
 			return nil
 		}
-		meta = tx.newKey(meta, key, n.newStr)
+		meta = tx.newStoredMetadata(meta, n.newStr)
 		if !keepTTL {
 			meta.key.Expiration = 0
 		}

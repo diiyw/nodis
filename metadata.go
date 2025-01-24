@@ -22,11 +22,12 @@ type metadata struct {
 	writeable bool
 }
 
-func newMetadata() *metadata {
+func newMetadata(key *ds.Key, writeable bool) *metadata {
 	return &metadata{
 		RWMutex:   new(sync.RWMutex),
+		key:       key,
 		value:     nil,
-		writeable: false,
+		writeable: writeable,
 	}
 }
 
@@ -55,15 +56,6 @@ func (m *metadata) setValue(value ds.Value) {
 	m.value = value
 	m.state |= KeyStateNormal
 	m.valueType = value.Type()
-}
-
-// empty copy the metadata to empty
-func (m *metadata) empty() *metadata {
-	newM := &metadata{}
-	if m != nil {
-		newM.RWMutex = m.RWMutex
-	}
-	return newM
 }
 
 func (m *metadata) isOk() bool {

@@ -125,7 +125,6 @@ func TestKey_TTL(t *testing.T) {
 func TestKey_Rename(t *testing.T) {
 	_ = os.RemoveAll("testdata")
 	n := Open(&Options{
-
 		GCDuration: 60 * time.Second,
 	})
 	n.Set("test", []byte("test1"), false)

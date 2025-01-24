@@ -29,8 +29,7 @@ func newStore(ss storage.Storage) *store {
 		log.Fatal(err)
 	}
 	s.ss.ScanKeys(func(key *ds.Key) bool {
-		var m = newMetadata()
-		m.key = key
+		var m = newMetadata(key, false)
 		m.state |= KeyStateNormal
 		s.metadata.Set(key.Name, m)
 		return true

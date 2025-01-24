@@ -316,16 +316,19 @@ func client(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 		switch strings.ToUpper(cmd.Args[0]) {
 		case "LIST":
 			redis.ClientLocker.RLock()
-			conn.WriteArray(len(redis.Clients))
+			var s string
 			for _, c := range redis.Clients {
-				conn.WriteString("id=" + strconv.Itoa(c.Fd) + " addr=" + c.Client.RemoteAddr().String() +
+				s += "id=" + strconv.Itoa(c.Fd) + " addr=" + c.Client.RemoteAddr().String() +
 					" fd=" + strconv.Itoa(c.Fd) +
-					" name=" + c.Name + " age=0 idle=0 flags=N db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=0 obl=0 oll=0 omem=0 events=r cmd=client")
+					" name=" + c.Name + " age=0 idle=0 flags=N db=0 sub=0 psub=0 multi=-1 qbuf=0 qbuf-free=0 obl=0 oll=0 omem=0 events=r cmd=client\r\n"
 			}
+			conn.WriteBulk(s)
 			redis.ClientLocker.RUnlock()
 		case "SETNAME":
 			conn.Name = cmd.Args[1]
 			conn.WriteString("OK")
+		case "GETNAME":
+			conn.WriteBulk(conn.Name)
 		case "SETINFO":
 			conn.WriteString("OK")
 		default:
@@ -394,7 +397,7 @@ func info(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 func ping(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		if len(cmd.Args) == 0 {
-			conn.WriteBulk("PONG")
+			conn.WriteOK()
 			return
 		}
 		conn.WriteBulk(cmd.Args[0])

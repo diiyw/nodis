@@ -108,11 +108,12 @@ func TestClient_Ping_NoArgs(t *testing.T) {
 
 	ping(n, &redis.Conn{Writer: w}, cmd)
 
-	expected := []byte("$4\r\nPONG\r\n")
+	expected := []byte("+OK\r\n")
 	if string(w.Bytes()) != string(expected) {
 		t.Errorf("Expected %q, but got %q", expected, w.Bytes())
 	}
 }
+
 func TestClient_Echo(t *testing.T) {
 	n := &Nodis{}
 	w := redis.NewWriter(&bytes.Buffer{})
