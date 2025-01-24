@@ -63,8 +63,7 @@ func (n *Nodis) Expire(key string, seconds int64) int64 {
 			v = 0
 			return nil
 		}
-		meta.key.Expiration = time.Now().UnixMilli()
-		meta.key.Expiration += seconds * 1000
+		meta.key.Expiration = time.Now().UnixMilli() + seconds*1000
 		n.signalModifiedKey(key, meta)
 		n.notify(func() []patch.Op {
 			return []patch.Op{{Type: patch.OpTypeExpire, Data: &patch.OpExpire{Key: key, Expiration: meta.key.Expiration}}}

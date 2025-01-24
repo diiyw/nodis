@@ -22,18 +22,18 @@ func NewKey(name string, expiration int64) *Key {
 // Encode encodes the key.
 func (k *Key) Encode() []byte {
 	var b = make([]byte, 8+len(k.Name))
-	n := binary.PutVarint(b, k.Expiration)
-	copy(b[n:], k.Name)
-	return b[:n+len(k.Name)]
+	binary.LittleEndian.PutUint64(b, uint64(k.Expiration))
+	copy(b[8:], k.Name)
+	return b
 }
 
-// Decode decodes the key.
+// DecodeKey decodes the key.
 func DecodeKey(b []byte) (*Key, error) {
 	if len(b) < 8 {
 		return nil, ErrCorruptedData
 	}
-	i, n := binary.Varint(b)
-	return &Key{Name: string(b[n:]), Expiration: i}, nil
+	i := int64(binary.LittleEndian.Uint64(b))
+	return &Key{Name: string(b[8:]), Expiration: i}, nil
 }
 
 type Value interface {
