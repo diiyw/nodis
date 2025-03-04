@@ -317,13 +317,12 @@ func (n *Nodis) Keys(pattern string) []string {
 	var keys []string
 	now := time.Now().UnixMilli()
 	n.store.mu.RLock()
-	n.store.metadata.Scan(func(key string, m *metadata) bool {
+	for key, m := range n.store.metadata {
 		matched, _ := filepath.Match(pattern, key)
 		if matched && !m.expired(now) {
 			keys = append(keys, key)
 		}
-		return true
-	})
+	}
 	n.store.mu.RUnlock()
 	return keys
 }
@@ -331,14 +330,14 @@ func (n *Nodis) Keys(pattern string) []string {
 func (n *Nodis) Watch(rn *redis.Conn, keys ...string) {
 	n.store.watchMu.Lock()
 	for _, key := range keys {
-		if _, ok := rn.WatchKeys.Get(key); !ok {
-			rn.WatchKeys.Set(key, false)
+		if _, ok := rn.WatchKeys[key]; !ok {
+			rn.WatchKeys[key] = false
 		}
-		clients, ok := n.store.watchedKeys.Get(key)
+		clients, ok := n.store.watchedKeys[key]
 		if !ok {
 			l := list.NewLinkedListG[*redis.Conn]()
 			l.LPush(rn)
-			n.store.watchedKeys.Set(key, l)
+			n.store.watchedKeys[key] = l
 			continue
 		}
 		var found bool
@@ -359,7 +358,7 @@ func (n *Nodis) Watch(rn *redis.Conn, keys ...string) {
 func (n *Nodis) UnWatch(rn *redis.Conn, keys ...string) {
 	n.store.watchMu.Lock()
 	for _, key := range keys {
-		clients, ok := n.store.watchedKeys.Get(key)
+		clients, ok := n.store.watchedKeys[key]
 		if !ok {
 			continue
 		}
@@ -371,7 +370,7 @@ func (n *Nodis) UnWatch(rn *redis.Conn, keys ...string) {
 			return true
 		})
 	}
-	rn.WatchKeys.Clear()
+	clear(rn.WatchKeys)
 	n.store.watchMu.Unlock()
 }
 
@@ -379,7 +378,7 @@ func (n *Nodis) UnWatch(rn *redis.Conn, keys ...string) {
 func (n *Nodis) Keyspace() (keys int64, expires int64, avgTTL int64) {
 	n.store.mu.Lock()
 	now := time.Now().UnixMilli()
-	n.store.metadata.Scan(func(key string, m *metadata) bool {
+	for _, m := range n.store.metadata {
 		if m.expired(now) {
 			expires++
 		}
@@ -387,8 +386,7 @@ func (n *Nodis) Keyspace() (keys int64, expires int64, avgTTL int64) {
 			avgTTL += m.key.Expiration - now
 		}
 		keys++
-		return true
-	})
+	}
 	if keys > 0 {
 		avgTTL = avgTTL / keys / 1000
 	}
@@ -504,7 +502,7 @@ func (n *Nodis) Type(key string) string {
 
 // Scan the keys
 func (n *Nodis) Scan(cursor int64, match string, count int64, typ ds.ValueType) (int64, []string) {
-	keyLen := int64(n.store.metadata.Len())
+	keyLen := int64(len(n.store.metadata))
 	if keyLen == 0 {
 		return 0, nil
 	}
@@ -515,17 +513,17 @@ func (n *Nodis) Scan(cursor int64, match string, count int64, typ ds.ValueType) 
 	now := time.Now().UnixMilli()
 	tx := newTx(n.store)
 	var iterCursor int64 = 0
-	n.store.metadata.Scan(func(key string, m *metadata) bool {
+	for key, m := range n.store.metadata {
 		iterCursor++
 		if cursor--; cursor > 0 {
-			return true
+			continue
 		}
 		if iterCursor > keyLen {
 			iterCursor = 0
-			return false
+			break
 		}
 		if count == 0 {
-			return false
+			break
 		}
 		count--
 		meta := tx.rLockKey(key)
@@ -533,12 +531,11 @@ func (n *Nodis) Scan(cursor int64, match string, count int64, typ ds.ValueType) 
 		matched, _ := filepath.Match(match, key)
 		if matched && !m.expired(now) {
 			if typ != 0 && m.valueType != typ {
-				return true
+				continue
 			}
 			keys = append(keys, key)
 		}
-		return true
-	})
+	}
 	return iterCursor, keys
 }
 
@@ -547,12 +544,11 @@ func (n *Nodis) RandomKey() string {
 	now := time.Now().UnixMilli()
 	var keys []string
 	n.store.mu.RLock()
-	n.store.metadata.Scan(func(key string, m *metadata) bool {
+	for key, m := range n.store.metadata {
 		if !m.expired(now) {
 			keys = append(keys, key)
 		}
-		return true
-	})
+	}
 	n.store.mu.RUnlock()
 	if len(keys) == 0 {
 		return ""
@@ -585,10 +581,10 @@ func (n *Nodis) Persist(key string) int64 {
 func (n *Nodis) signalModifiedKey(key string, meta *metadata) {
 	meta.state |= KeyStateModified
 	n.store.watchMu.RLock()
-	clients, ok := n.store.watchedKeys.Get(key)
+	clients, ok := n.store.watchedKeys[key]
 	if ok {
 		clients.ForRange(func(c *redis.Conn) bool {
-			c.WatchKeys.Set(key, true)
+			c.WatchKeys[key] = true
 			return true
 		})
 	}

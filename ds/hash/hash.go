@@ -8,11 +8,10 @@ import (
 	"unsafe"
 
 	"github.com/diiyw/nodis/ds"
-	"github.com/tidwall/btree"
 )
 
 type HashMap struct {
-	data btree.Map[string, []byte]
+	data map[string][]byte
 }
 
 type keyValuePair struct {
@@ -42,7 +41,9 @@ func decodeKeyValuePair(b []byte) *keyValuePair {
 
 // NewHashMap creates a new hash
 func NewHashMap() *HashMap {
-	return &HashMap{}
+	return &HashMap{
+		data: make(map[string][]byte),
+	}
 }
 
 // Type returns the type of the data structure
@@ -52,7 +53,8 @@ func (s *HashMap) Type() ds.ValueType {
 
 // HSet sets the value of a hash
 func (s *HashMap) HSet(key string, value []byte) int64 {
-	_, replaced := s.data.Set(key, value)
+	_, replaced := s.data[key]
+	s.data[key] = value
 	if replaced {
 		return 0
 	}
@@ -61,7 +63,7 @@ func (s *HashMap) HSet(key string, value []byte) int64 {
 
 // HGet gets the value of a hash
 func (s *HashMap) HGet(key string) []byte {
-	v, ok := s.data.Get(key)
+	v, ok := s.data[key]
 	if !ok {
 		return nil
 	}
@@ -72,8 +74,9 @@ func (s *HashMap) HGet(key string) []byte {
 func (s *HashMap) HDel(key ...string) int64 {
 	var v int64 = 0
 	for _, k := range key {
-		_, deleted := s.data.Delete(k)
+		_, deleted := s.data[k]
 		if deleted {
+			delete(s.data, k)
 			v++
 		}
 	}
@@ -82,35 +85,38 @@ func (s *HashMap) HDel(key ...string) int64 {
 
 // HLen gets the length of a hash
 func (s *HashMap) HLen() int64 {
-	return int64(s.data.Len())
+	return int64(len(s.data))
 }
 
 // HKeys gets the keys of a hash
 func (s *HashMap) HKeys() []string {
-	return s.data.Keys()
+	keys := make([]string, 0, len(s.data))
+	for k := range s.data {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // HExists checks if a key exists in a hash
 func (s *HashMap) HExists(key string) bool {
-	_, ok := s.data.Get(key)
+	_, ok := s.data[key]
 	return ok
 }
 
 // HGetAll gets all the values of a hash
 func (s *HashMap) HGetAll() map[string][]byte {
-	values := make(map[string][]byte, s.data.Len())
-	s.data.Scan(func(key string, value []byte) bool {
-		values[key] = value
-		return true
-	})
+	values := make(map[string][]byte, len(s.data))
+	for k, v := range s.data {
+		values[k] = v
+	}
 	return values
 }
 
 // HIncrBy increments the value of a hash
 func (s *HashMap) HIncrBy(key string, value int64) (int64, error) {
-	v, ok := s.data.Get(key)
+	v, ok := s.data[key]
 	if !ok {
-		s.data.Set(key, []byte(strconv.FormatInt(value, 10)))
+		s.data[key] = []byte(strconv.FormatInt(value, 10))
 		return value, nil
 	}
 	vi, err := strconv.ParseInt(*(*string)(unsafe.Pointer(&v)), 10, 64)
@@ -118,15 +124,15 @@ func (s *HashMap) HIncrBy(key string, value int64) (int64, error) {
 		return 0, errors.New("ERR hash value is not an integer")
 	}
 	i := vi + value
-	s.data.Set(key, []byte(strconv.FormatInt(i, 10)))
+	s.data[key] = []byte(strconv.FormatInt(i, 10))
 	return i, nil
 }
 
 // HIncrByFloat increments the value of a hash
 func (s *HashMap) HIncrByFloat(key string, value float64) (float64, error) {
-	v, ok := s.data.Get(key)
+	v, ok := s.data[key]
 	if !ok {
-		s.data.Set(key, []byte(strconv.FormatFloat(value, 'f', -1, 64)))
+		s.data[key] = []byte(strconv.FormatFloat(value, 'f', -1, 64))
 		return value, nil
 	}
 	vf, err := strconv.ParseFloat(*(*string)(unsafe.Pointer(&v)), 64)
@@ -134,14 +140,14 @@ func (s *HashMap) HIncrByFloat(key string, value float64) (float64, error) {
 		return 0, errors.New("ERR hash value is not an integer")
 	}
 	f := vf + value
-	s.data.Set(key, []byte(strconv.FormatFloat(f, 'f', -1, 64)))
+	s.data[key] = []byte(strconv.FormatFloat(f, 'f', -1, 64))
 	return f, nil
 }
 
 // HMSet sets the values of a hash
 func (s *HashMap) HMSet(values map[string][]byte) {
 	for key, value := range values {
-		s.data.Set(key, value)
+		s.data[key] = value
 	}
 }
 
@@ -149,7 +155,7 @@ func (s *HashMap) HMSet(values map[string][]byte) {
 func (s *HashMap) HMGet(fields ...string) [][]byte {
 	values := make([][]byte, len(fields))
 	for i, key := range fields {
-		value, ok := s.data.Get(key)
+		value, ok := s.data[key]
 		if ok {
 			values[i] = value
 		} else {
@@ -161,37 +167,43 @@ func (s *HashMap) HMGet(fields ...string) [][]byte {
 
 // HSetNX sets the value of a hash if it does not exist
 func (s *HashMap) HSetNX(key string, value []byte) bool {
-	_, ok := s.data.Get(key)
+	_, ok := s.data[key]
 	if ok {
 		return false
 	}
-	s.data.Set(key, value)
+	s.data[key] = value
 	return true
 }
 
 // HVals gets the values of a hash
 func (s *HashMap) HVals() [][]byte {
-	return s.data.Values()
+	values := make([][]byte, 0, len(s.data))
+	for _, v := range s.data {
+		values = append(values, v)
+	}
+	return values
 }
 
 // HScan scans the values of a hash
 func (s *HashMap) HScan(cursor int64, match string, count int64) (int64, map[string][]byte) {
-	values := make(map[string][]byte, s.data.Len())
+	values := make(map[string][]byte, len(s.data))
 	var i int64 = 0
-	s.data.Scan(func(key string, value []byte) bool {
-		matched, _ := filepath.Match(match, key)
+	for k, v := range s.data {
+		matched, _ := filepath.Match(match, k)
 		if matched && i >= cursor {
-			values[key] = value
+			values[k] = v
 		}
 		i++
-		return i < cursor+count
-	})
+		if i >= cursor+count {
+			break
+		}
+	}
 	return i, values
 }
 
 // HStrLen gets the length of a hash
 func (s *HashMap) HStrLen(field string) int64 {
-	v, ok := s.data.Get(field)
+	v, ok := s.data[field]
 	if !ok {
 		return 0
 	}
@@ -199,8 +211,8 @@ func (s *HashMap) HStrLen(field string) int64 {
 }
 
 func (s *HashMap) GetValue() []byte {
-	values := make([]byte, 0, s.data.Len())
-	s.data.Scan(func(key string, value []byte) bool {
+	values := make([]byte, 0, 1024*100)
+	for key, value := range s.data {
 		kvPair := &keyValuePair{
 			key:   key,
 			value: value,
@@ -211,8 +223,7 @@ func (s *HashMap) GetValue() []byte {
 		n := binary.PutVarint(b, int64(dataLen))
 		copy(b[n:], data)
 		values = append(values, b[:n+dataLen]...)
-		return true
-	})
+	}
 	return values
 }
 

@@ -1,12 +1,11 @@
 module github.com/diiyw/nodis
 
-go 1.21
+go 1.24
 
 require (
 	github.com/alecthomas/kong v0.9.0
 	github.com/cockroachdb/pebble v1.1.2
 	github.com/gorilla/websocket v1.5.3
-	github.com/tidwall/btree v1.7.0
 	google.golang.org/protobuf v1.34.2
 )
 

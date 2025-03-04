@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/diiyw/nodis/ds"
-	"github.com/tidwall/btree"
 )
 
 const (
@@ -16,13 +15,14 @@ const (
 
 // SortedSet is a set which keys sorted by bound score
 type SortedSet struct {
-	dict     btree.Map[string, *Item]
+	dict     map[string]*Item
 	skiplist *skiplist
 }
 
 // NewSortedSet makes a new SortedSet
 func NewSortedSet() *SortedSet {
 	return &SortedSet{
+		dict:     make(map[string]*Item),
 		skiplist: makeSkiplist(),
 	}
 }
@@ -39,7 +39,7 @@ func (sortedSet *SortedSet) ZAdd(member string, score float64) int64 {
 
 // ZAddXX Only update elements that already exist. Don't add new elements.
 func (sortedSet *SortedSet) ZAddXX(member string, score float64) int64 {
-	_, ok := sortedSet.dict.Get(member)
+	_, ok := sortedSet.dict[member]
 	if ok {
 		return sortedSet.zAdd(member, score)
 	}
@@ -48,7 +48,7 @@ func (sortedSet *SortedSet) ZAddXX(member string, score float64) int64 {
 
 // ZAddNX Only add new elements. Don't update already existing elements.
 func (sortedSet *SortedSet) ZAddNX(member string, score float64) int64 {
-	_, ok := sortedSet.dict.Get(member)
+	_, ok := sortedSet.dict[member]
 	if !ok {
 		return sortedSet.zAdd(member, score)
 	}
@@ -57,7 +57,7 @@ func (sortedSet *SortedSet) ZAddNX(member string, score float64) int64 {
 
 // ZAddLT add member if score less than the current score
 func (sortedSet *SortedSet) ZAddLT(member string, score float64) bool {
-	element, ok := sortedSet.dict.Get(member)
+	element, ok := sortedSet.dict[member]
 	if ok && element.Score > score {
 		sortedSet.zAdd(member, score)
 		return true
@@ -67,7 +67,7 @@ func (sortedSet *SortedSet) ZAddLT(member string, score float64) bool {
 
 // ZAddGT add member if score greater than the current score
 func (sortedSet *SortedSet) ZAddGT(member string, score float64) bool {
-	element, ok := sortedSet.dict.Get(member)
+	element, ok := sortedSet.dict[member]
 	if ok && element.Score < score {
 		sortedSet.zAdd(member, score)
 		return true
@@ -77,11 +77,11 @@ func (sortedSet *SortedSet) ZAddGT(member string, score float64) bool {
 
 // zAdd puts member into set,  and returns whether it has inserted new node
 func (sortedSet *SortedSet) zAdd(member string, score float64) int64 {
-	element, ok := sortedSet.dict.Get(member)
-	sortedSet.dict.Set(member, &Item{
+	element, ok := sortedSet.dict[member]
+	sortedSet.dict[member] = &Item{
 		Member: member,
 		Score:  score,
-	})
+	}
 	if ok {
 		if score != element.Score {
 			sortedSet.skiplist.remove(member, element.Score)
@@ -95,17 +95,17 @@ func (sortedSet *SortedSet) zAdd(member string, score float64) int64 {
 
 // ZCard returns number of members in set
 func (sortedSet *SortedSet) ZCard() int64 {
-	return int64(sortedSet.dict.Len())
+	return int64(len(sortedSet.dict))
 }
 
 // ZRem removes the given member from set
 func (sortedSet *SortedSet) ZRem(members ...string) int64 {
 	var count int64
 	for _, member := range members {
-		v, ok := sortedSet.dict.Get(member)
+		v, ok := sortedSet.dict[member]
 		if ok {
 			sortedSet.skiplist.remove(member, v.Score)
-			sortedSet.dict.Delete(member)
+			delete(sortedSet.dict, member)
 			count++
 		}
 	}
@@ -114,7 +114,7 @@ func (sortedSet *SortedSet) ZRem(members ...string) int64 {
 
 // getRank returns the rank of the given member, sort by ascending order, rank starts from 0
 func (sortedSet *SortedSet) getRank(member string, desc bool) (rank int64) {
-	item, ok := sortedSet.dict.Get(member)
+	item, ok := sortedSet.dict[member]
 	if !ok {
 		return -1
 	}
@@ -129,7 +129,7 @@ func (sortedSet *SortedSet) getRank(member string, desc bool) (rank int64) {
 
 // ZRank returns the rank of the given member, sort by ascending order, rank starts from 0
 func (sortedSet *SortedSet) ZRank(member string) (int64, error) {
-	_, ok := sortedSet.dict.Get(member)
+	_, ok := sortedSet.dict[member]
 	if !ok {
 		return 0, errors.New("member not found")
 	}
@@ -138,7 +138,7 @@ func (sortedSet *SortedSet) ZRank(member string) (int64, error) {
 
 // ZRankWithScore returns the rank of the given member, sort by ascending order, rank starts from 0
 func (sortedSet *SortedSet) ZRankWithScore(member string) (int64, *Item) {
-	element, ok := sortedSet.dict.Get(member)
+	element, ok := sortedSet.dict[member]
 	if !ok {
 		return 0, nil
 	}
@@ -147,7 +147,7 @@ func (sortedSet *SortedSet) ZRankWithScore(member string) (int64, *Item) {
 
 // ZRevRank returns the rank of the given member, sort by descending order, rank starts from 0
 func (sortedSet *SortedSet) ZRevRank(member string) (int64, error) {
-	_, ok := sortedSet.dict.Get(member)
+	_, ok := sortedSet.dict[member]
 	if !ok {
 		return 0, errors.New("member not found")
 	}
@@ -156,7 +156,7 @@ func (sortedSet *SortedSet) ZRevRank(member string) (int64, error) {
 
 // ZRevRankWithScore returns the rank of the given member, sort by descending order, rank starts from 0
 func (sortedSet *SortedSet) ZRevRankWithScore(member string) (int64, *Item) {
-	element, ok := sortedSet.dict.Get(member)
+	element, ok := sortedSet.dict[member]
 	if !ok {
 		return 0, nil
 	}
@@ -165,7 +165,7 @@ func (sortedSet *SortedSet) ZRevRankWithScore(member string) (int64, *Item) {
 
 // ZScore returns the score of the given member
 func (sortedSet *SortedSet) ZScore(member string) (float64, error) {
-	element, ok := sortedSet.dict.Get(member)
+	element, ok := sortedSet.dict[member]
 	if !ok {
 		return 0, errors.New("member not found")
 	}
@@ -328,7 +328,7 @@ func (sortedSet *SortedSet) rangeByScore(min float64, max float64, offset int64,
 func (sortedSet *SortedSet) removeRange(min float64, max float64, mode int) int64 {
 	removed := sortedSet.skiplist.removeRange(min, max, 0, mode)
 	for _, element := range removed {
-		sortedSet.dict.Delete(element.Member)
+		delete(sortedSet.dict, element.Member)
 	}
 	return int64(len(removed))
 }
@@ -352,14 +352,14 @@ func (sortedSet *SortedSet) ZRemRangeByRank(start int64, stop int64) int64 {
 	}
 	removed := sortedSet.skiplist.removeRangeByRank(start, stop)
 	for _, element := range removed {
-		sortedSet.dict.Delete(element.Member)
+		delete(sortedSet.dict, element.Member)
 	}
 	return int64(len(removed))
 }
 
 // ZExists returns whether the given member exists in set
 func (sortedSet *SortedSet) ZExists(member string) bool {
-	_, ok := sortedSet.dict.Get(member)
+	_, ok := sortedSet.dict[member]
 	return ok
 }
 
@@ -375,7 +375,7 @@ func (sortedSet *SortedSet) ZRevRangeByScore(min float64, max float64, offset, c
 
 // ZIncrBy increases the score of the given member
 func (sortedSet *SortedSet) ZIncrBy(member string, score float64) float64 {
-	element, ok := sortedSet.dict.Get(member)
+	element, ok := sortedSet.dict[member]
 	if ok {
 		score += element.Score
 	}
@@ -412,16 +412,15 @@ func (sortedSet *SortedSet) ZScan(cursor int64, match string, count int64) (int6
 }
 
 func (sortedSet *SortedSet) GetValue() []byte {
-	var keyScores = make([]byte, 0, sortedSet.dict.Len())
-	sortedSet.dict.Scan(func(_ string, v *Item) bool {
+	var keyScores = make([]byte, 0, len(sortedSet.dict))
+	for _, v := range sortedSet.dict {
 		data := v.encode()
 		dataLen := len(data)
 		var b = make([]byte, 8+dataLen)
 		n := binary.PutVarint(b, int64(dataLen))
 		copy(b[n:], data)
 		keyScores = append(keyScores, b[:n+dataLen]...)
-		return true
-	})
+	}
 	return keyScores
 }
 

@@ -10,20 +10,23 @@ import (
 
 	"github.com/diiyw/nodis/ds/list"
 	"github.com/diiyw/nodis/redis"
-	"github.com/tidwall/btree"
 )
 
 type store struct {
 	mu          sync.RWMutex
-	metadata    btree.Map[string, *metadata]
+	metadata    map[string]*metadata
 	ss          storage.Storage
 	closed      bool
 	watchMu     sync.RWMutex
-	watchedKeys btree.Map[string, *list.LinkedListG[*redis.Conn]]
+	watchedKeys map[string]*list.LinkedListG[*redis.Conn]
 }
 
 func newStore(ss storage.Storage) *store {
-	s := &store{ss: ss}
+	s := &store{
+		ss:          ss,
+		metadata:    make(map[string]*metadata),
+		watchedKeys: make(map[string]*list.LinkedListG[*redis.Conn]),
+	}
 	err := s.ss.Init()
 	if err != nil {
 		log.Fatal(err)
@@ -31,7 +34,7 @@ func newStore(ss storage.Storage) *store {
 	s.ss.ScanKeys(func(key *ds.Key) bool {
 		var m = newMetadata(key, false)
 		m.state |= KeyStateNormal
-		s.metadata.Set(key.Name, m)
+		s.metadata[key.Name] = m
 		return true
 	})
 	return s
@@ -42,22 +45,21 @@ func (s *store) flush() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now().UnixMilli()
-	s.metadata.Scan(func(key string, m *metadata) bool {
+	for _, m := range s.metadata {
 		m.Lock()
 		defer m.Unlock()
 		if !m.modified() || m.expired(now) || !m.isOk() {
-			return true
+			continue
 		}
 		if m.value == nil {
-			return true
+			continue
 		}
 		// save to storage
 		err := s.ss.Set(m.key, m.value)
 		if err != nil {
 			log.Println("Flush changes: ", err)
 		}
-		return true
-	})
+	}
 }
 
 // gc removes expired and unused keys
@@ -68,12 +70,12 @@ func (s *store) gc() {
 		return
 	}
 	now := time.Now().UnixMilli()
-	s.metadata.Copy().Scan(func(key string, m *metadata) bool {
+	for key, m := range s.metadata {
 		m.Lock()
 		defer m.Unlock()
 		if m.expired(now) || !m.isOk() {
-			s.metadata.Delete(key)
-			return true
+			delete(s.metadata, key)
+			continue
 		}
 		if m.modified() {
 			err := s.ss.Set(m.key, m.value)
@@ -85,8 +87,7 @@ func (s *store) gc() {
 		if m.count.Load() < 0 {
 			m.removeFromMemory()
 		}
-		return true
-	})
+	}
 }
 
 // close the store
@@ -100,6 +101,6 @@ func (s *store) close() error {
 func (s *store) clear() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.metadata.Clear()
+	clear(s.metadata)
 	return s.ss.Clear()
 }

@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	"github.com/diiyw/nodis/ds"
-	"github.com/tidwall/btree"
 )
 
 type KeyValue struct {
@@ -14,11 +13,13 @@ type KeyValue struct {
 
 type Memory struct {
 	sync.RWMutex
-	data btree.Map[string, KeyValue]
+	data map[string]KeyValue
 }
 
 func NewMemory() *Memory {
-	return &Memory{}
+	return &Memory{
+		data: make(map[string]KeyValue),
+	}
 }
 
 // Init initializes the storage.
@@ -30,7 +31,7 @@ func (m *Memory) Init() error {
 func (m *Memory) Get(key *ds.Key) (ds.Value, error) {
 	m.RLock()
 	defer m.RUnlock()
-	v, ok := m.data.Get(string(key.Encode()))
+	v, ok := m.data[string(key.Encode())]
 	if !ok {
 		return nil, ErrKeyNotFound
 	}
@@ -41,10 +42,10 @@ func (m *Memory) Get(key *ds.Key) (ds.Value, error) {
 func (m *Memory) Set(key *ds.Key, value ds.Value) error {
 	m.Lock()
 	defer m.Unlock()
-	m.data.Set(string(key.Encode()), KeyValue{
+	m.data[string(key.Encode())] = KeyValue{
 		key:   key,
 		value: value,
-	})
+	}
 	return nil
 }
 
@@ -52,7 +53,7 @@ func (m *Memory) Set(key *ds.Key, value ds.Value) error {
 func (m *Memory) Delete(key *ds.Key) error {
 	m.Lock()
 	defer m.Unlock()
-	m.data.Delete(string(key.Encode()))
+	delete(m.data, string(key.Encode()))
 	return nil
 }
 
@@ -70,15 +71,17 @@ func (m *Memory) Snapshot() error {
 func (m *Memory) ScanKeys(f func(*ds.Key) bool) {
 	m.RLock()
 	defer m.RUnlock()
-	m.data.Scan(func(_ string, kv KeyValue) bool {
-		return f(kv.key)
-	})
+	for _, kv := range m.data {
+		if !f(kv.key) {
+			break
+		}
+	}
 }
 
 // Clear the storage.
 func (m *Memory) Clear() error {
 	m.Lock()
 	defer m.Unlock()
-	m.data.Clear()
+	m.data = make(map[string]KeyValue)
 	return nil
 }

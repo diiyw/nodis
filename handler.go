@@ -361,7 +361,7 @@ func config(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 
 func dbSize(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
-		conn.WriteInt64(int64(n.store.metadata.Len()))
+		conn.WriteInt64(int64(len(n.store.metadata)))
 	})
 }
 
@@ -453,7 +453,7 @@ func multi(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 func discard(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	conn.State = redis.MultiNone
 	conn.Commands = nil
-	conn.WatchKeys.Clear()
+	clear(conn.WatchKeys)
 	conn.WriteOK()
 }
 
@@ -461,7 +461,7 @@ func exec(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	defer func() {
 		conn.State = redis.MultiNone
 		conn.Commands = nil
-		conn.WatchKeys.Clear()
+		clear(conn.WatchKeys)
 	}()
 	if conn.State&redis.MultiPrepare != redis.MultiPrepare {
 		conn.WriteError("ERR EXEC without MULTI")
@@ -478,13 +478,12 @@ func exec(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	var watchKeysNoChanged = true
 	tx := newTx(n.store)
 	defer tx.commit()
-	conn.WatchKeys.Scan(func(key string, modified bool) bool {
+	for _, modified := range conn.WatchKeys {
 		if modified {
 			watchKeysNoChanged = false
-			return false
+			break
 		}
-		return true
-	})
+	}
 	if !watchKeysNoChanged {
 		conn.WriteBulkNull()
 		return

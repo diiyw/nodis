@@ -290,11 +290,11 @@ func (n *Nodis) RPopLPush(source, destination string) []byte {
 
 func (n *Nodis) addBlockKey(key string, c chan string) {
 	n.blockingKeysMutex.Lock()
-	cList, ok := n.blockingKeys.Get(key)
+	cList, ok := n.blockingKeys[key]
 	if !ok {
 		cList = list.NewLinkedListG[chan string]()
 		cList.LPush(c)
-		n.blockingKeys.Set(key, cList)
+		n.blockingKeys[key] = cList
 	} else {
 		cList.LPush(c)
 	}
@@ -303,7 +303,7 @@ func (n *Nodis) addBlockKey(key string, c chan string) {
 
 func (n *Nodis) notifyBlockingKey(key string) {
 	n.blockingKeysMutex.RLock()
-	cList, ok := n.blockingKeys.Get(key)
+	cList, ok := n.blockingKeys[key]
 	n.blockingKeysMutex.RUnlock()
 	if !ok {
 		return
@@ -317,7 +317,7 @@ func (n *Nodis) notifyBlockingKey(key string) {
 func (n *Nodis) removeBlockingKeys(rc chan string, keys ...string) {
 	n.blockingKeysMutex.Lock()
 	for _, key := range keys {
-		cList, ok := n.blockingKeys.Get(key)
+		cList, ok := n.blockingKeys[key]
 		if !ok {
 			n.blockingKeysMutex.Unlock()
 			return

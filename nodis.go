@@ -15,7 +15,6 @@ import (
 	"github.com/diiyw/nodis/internal/listener"
 	"github.com/diiyw/nodis/patch"
 	"github.com/diiyw/nodis/redis"
-	"github.com/tidwall/btree"
 )
 
 var (
@@ -26,16 +25,17 @@ type Nodis struct {
 	store             *store
 	listeners         []*listener.Listener
 	blockingKeysMutex sync.RWMutex
-	blockingKeys      btree.Map[string, *list.LinkedListG[chan string]] // blocking keys
+	blockingKeys      map[string]*list.LinkedListG[chan string] // blocking keys
 	options           *Options
 }
 
 func Open(opt *Options) *Nodis {
 	if opt.Storage == nil {
-		opt.Storage = &storage.Memory{}
+		opt.Storage = storage.NewMemory()
 	}
 	n := &Nodis{
-		options: opt,
+		options:      opt,
+		blockingKeys: make(map[string]*list.LinkedListG[chan string]), // initialize blockingKeys
 	}
 	n.store = newStore(opt.Storage)
 	go func() {

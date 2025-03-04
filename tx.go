@@ -20,7 +20,7 @@ func newTx(store *store) *Tx {
 
 func (tx *Tx) lockKey(key string) *metadata {
 	tx.store.mu.RLock()
-	m, ok := tx.store.metadata.Get(key)
+	m, ok := tx.store.metadata[key]
 	tx.store.mu.RUnlock()
 	if ok {
 		tx.lockMeta(m)
@@ -31,7 +31,7 @@ func (tx *Tx) lockKey(key string) *metadata {
 
 func (tx *Tx) rLockKey(key string) *metadata {
 	tx.store.mu.RLock()
-	m, ok := tx.store.metadata.Get(key)
+	m, ok := tx.store.metadata[key]
 	tx.store.mu.RUnlock()
 	if ok {
 		tx.rLockMeta(m)
@@ -55,7 +55,7 @@ func (tx *Tx) rLockMeta(m *metadata) {
 
 func (tx *Tx) storeMeta(m *metadata) {
 	tx.store.mu.Lock()
-	tx.store.metadata.Set(m.key.Name, m)
+	tx.store.metadata[m.key.Name] = m
 	tx.store.mu.Unlock()
 }
 
@@ -74,14 +74,14 @@ func (tx *Tx) newStoredMetadata(m *metadata, newFn func() ds.Value) *metadata {
 	m.setValue(value)
 	m.state |= KeyStateModified
 	tx.lockMeta(m)
-	tx.store.metadata.Set(m.key.Name, m)
+	tx.store.metadata[m.key.Name] = m
 	tx.store.mu.Unlock()
 	return m
 }
 
 func (tx *Tx) delKey(key string) {
 	tx.store.mu.Lock()
-	tx.store.metadata.Delete(key)
+	delete(tx.store.metadata, key)
 	tx.store.mu.Unlock()
 }
 
