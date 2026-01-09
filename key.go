@@ -247,7 +247,7 @@ func (n *Nodis) ExpireAtXX(key string, timestamp time.Time) int64 {
 			v = 0
 			return nil
 		}
-		if meta.key.Expiration != 0 {
+		if meta.key.Expiration == 0 {
 			v = 0
 			return nil
 		}
@@ -270,17 +270,19 @@ func (n *Nodis) ExpireAtLT(key string, timestamp time.Time) int64 {
 			v = 0
 			return nil
 		}
-		if meta.key.Expiration != 0 {
+		if meta.key.Expiration == 0 {
 			v = 0
 			return nil
 		}
 		unix := timestamp.UnixMilli()
-		if meta.key.Expiration > unix {
+		if unix < meta.key.Expiration {
 			meta.key.Expiration = unix
 			n.signalModifiedKey(key, meta)
 			n.notify(func() []patch.Op {
 				return []patch.Op{{Type: patch.OpTypeExpire, Data: &patch.OpExpire{Key: key, Expiration: meta.key.Expiration}}}
 			})
+		} else {
+			v = 0
 		}
 		return nil
 	})
@@ -512,6 +514,7 @@ func (n *Nodis) Scan(cursor int64, match string, count int64, typ ds.ValueType) 
 	keys := make([]string, 0)
 	now := time.Now().UnixMilli()
 	tx := newTx(n.store)
+	defer tx.commit()
 	var iterCursor int64 = 0
 	for key, m := range n.store.metadata {
 		iterCursor++
@@ -526,8 +529,7 @@ func (n *Nodis) Scan(cursor int64, match string, count int64, typ ds.ValueType) 
 			break
 		}
 		count--
-		meta := tx.rLockKey(key)
-		defer meta.commit()
+		_ = tx.rLockKey(key)
 		matched, _ := filepath.Match(match, key)
 		if matched && !m.expired(now) {
 			if typ != 0 && m.valueType != typ {

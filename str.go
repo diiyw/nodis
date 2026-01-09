@@ -161,7 +161,7 @@ func (n *Nodis) IncrBy(key string, increment int64) (int64, error) {
 		meta := tx.writeKey(key, n.newStr)
 		v, err = meta.value.(*str.String).Incr(increment)
 		if err != nil {
-			return nil
+			return err
 		}
 		vv := strconv.FormatInt(v, 10)
 		m := unsafe.Slice(unsafe.StringData(vv), len(vv))

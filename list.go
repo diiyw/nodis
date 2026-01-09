@@ -258,11 +258,14 @@ func (n *Nodis) LPopRPush(source, destination string) []byte {
 		})
 		return nil
 	})
+	if len(v) == 0 {
+		return nil
+	}
 	return v[0]
 }
 
 func (n *Nodis) RPopLPush(source, destination string) []byte {
-	var v = make([][]byte, 0)
+	var v [][]byte
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.writeKey(source, nil)
 		if !meta.isOk() {
@@ -285,6 +288,9 @@ func (n *Nodis) RPopLPush(source, destination string) []byte {
 		})
 		return nil
 	})
+	if len(v) == 0 {
+		return nil
+	}
 	return v[0]
 }
 
@@ -377,10 +383,10 @@ func (n *Nodis) BRPop(timeout time.Duration, keys ...string) (string, []byte) {
 	}
 	select {
 	case key := <-c:
-		results := n.LPop(key, 1)
+		results := n.RPop(key, 1)
 		if results != nil {
 			n.notify(func() []patch.Op {
-				return []patch.Op{{Type: patch.OpTypeLPop, Data: &patch.OpLPop{Key: key}}}
+				return []patch.Op{{Type: patch.OpTypeRPop, Data: &patch.OpRPop{Key: key}}}
 			})
 			return key, results[0]
 		}

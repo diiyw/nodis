@@ -50,13 +50,13 @@ func (n *Nodis) SDiff(keys ...string) []string {
 		if !meta.isOk() {
 			return nil
 		}
-		otherSets := make([]*set.Set, len(keys)-1)
-		for i, s := range keys[1:] {
+		otherSets := make([]*set.Set, 0, len(keys)-1)
+		for _, s := range keys[1:] {
 			metaX := tx.readKey(s)
-			if !meta.isOk() {
+			if !metaX.isOk() {
 				continue
 			}
-			otherSets[i] = metaX.value.(*set.Set)
+			otherSets = append(otherSets, metaX.value.(*set.Set))
 		}
 		v = meta.value.(*set.Set).SDiff(otherSets...)
 		return nil
@@ -85,6 +85,9 @@ func (n *Nodis) SInter(keys ...string) []string {
 	var v []string
 	_ = n.exec(func(tx *Tx) error {
 		meta := tx.readKey(keys[0])
+		if !meta.isOk() {
+			return nil
+		}
 		otherSets := make([]*set.Set, 0, len(keys)-1)
 		for _, s := range keys[1:] {
 			setDs := tx.readKey(s)
@@ -125,6 +128,9 @@ func (n *Nodis) SUnion(keys ...string) []string {
 				continue
 			}
 			otherSets = append(otherSets, setDs.value.(*set.Set))
+		}
+		if len(otherSets) == 0 {
+			return nil
 		}
 		v = otherSets[0].SUnion(otherSets[1:]...)
 		return nil
