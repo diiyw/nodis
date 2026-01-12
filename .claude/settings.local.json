@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go test:*)",
+      "WebSearch",
+      "Bash(go build:*)"
+    ]
+  }
+}

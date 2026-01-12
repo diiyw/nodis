@@ -213,22 +213,23 @@ BenchmarkHGet
 BenchmarkHGet-12        	 5895134	       193.3 ns/op	     165 B/op	       3 allocs/op
 ```
 
-Linux VM: 4C/8GB
+Linux: Intel(R) Core(TM) i5-1038NG7 CPU @ 2.00GHz
 
 ```bash
 goos: linux
 goarch: amd64
 pkg: github.com/diiyw/nodis/bench
-BenchmarkSet-4        	  806912	      1658 ns/op	     543 B/op	       7 allocs/op
-BenchmarkGet-4        	 5941904	       190.6 ns/op	       7 B/op	       0 allocs/op
-BenchmarkLPush-4      	  852932	      1757 ns/op	     615 B/op	       9 allocs/op
-BenchmarkLPop-4       	40668902	        27.22 ns/op	       0 B/op	       0 allocs/op
-BenchmarkSAdd-4       	  706376	      1913 ns/op	     662 B/op	      10 allocs/op
-BenchmarkSMembers-4   	 4819993	       208.1 ns/op	       8 B/op	       1 allocs/op
-BenchmarkZAdd-4       	  729039	      2013 ns/op	     550 B/op	      10 allocs/op
-BenchmarkZRank-4      	 4959448	       246.4 ns/op	       7 B/op	       0 allocs/op
-BenchmarkHSet-4       	  735676	      1971 ns/op	     742 B/op	      11 allocs/op
-BenchmarkHGet-4       	 4442625	       243.4 ns/op	       7 B/op	       0 allocs/op
+cpu: Intel(R) Core(TM) i5-1038NG7 CPU @ 2.00GHz
+BenchmarkSet-4        	  547957	      3330 ns/op	     349 B/op	       9 allocs/op
+BenchmarkGet-4        	 1000000	      1061 ns/op	     191 B/op	       6 allocs/op
+BenchmarkLPush-4      	  480404	      6103 ns/op	     414 B/op	      11 allocs/op
+BenchmarkLPop-4       	 3412002	       358.6 ns/op	     127 B/op	       4 allocs/op
+BenchmarkSAdd-4       	  672626	      8479 ns/op	     569 B/op	      12 allocs/op
+BenchmarkSMembers-4   	  919846	      1125 ns/op	     192 B/op	       6 allocs/op
+BenchmarkZAdd-4       	  362701	     12805 ns/op	     323 B/op	      10 allocs/op
+BenchmarkZRank-4      	  641536	      1598 ns/op	     182 B/op	       6 allocs/op
+BenchmarkHSet-4       	  432188	      3198 ns/op	     712 B/op	      12 allocs/op
+BenchmarkHGet-4       	 1310274	       984.8 ns/op	     195 B/op	       6 allocs/op
 ```
 
 </details>

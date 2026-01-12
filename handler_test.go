@@ -108,7 +108,7 @@ func TestClient_Ping_NoArgs(t *testing.T) {
 
 	ping(n, &redis.Conn{Writer: w}, cmd)
 
-	expected := []byte("+OK\r\n")
+	expected := []byte("+PONG\r\n")
 	if string(w.Bytes()) != string(expected) {
 		t.Errorf("Expected %q, but got %q", expected, w.Bytes())
 	}

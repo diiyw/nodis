@@ -3,13 +3,15 @@ package storage
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/diiyw/nodis/ds"
 )
 
 type Pebble struct {
+	sync.RWMutex
 	path    string
 	options *pebble.Options
 	db      *pebble.DB
@@ -34,6 +36,8 @@ func (p *Pebble) Init() error {
 
 // Get the value from the storage
 func (p *Pebble) Get(key *ds.Key) (ds.Value, error) {
+	p.RLock()
+	defer p.RUnlock()
 	v, closer, err := p.db.Get(key.Encode())
 	if err != nil {
 		return nil, err
@@ -48,6 +52,8 @@ func (p *Pebble) Get(key *ds.Key) (ds.Value, error) {
 
 // Set the value to the storage
 func (p *Pebble) Set(key *ds.Key, value ds.Value) error {
+	p.RLock()
+	defer p.RUnlock()
 	entry := NewEntry(value)
 	data := entry.encode()
 	return p.db.Set(key.Encode(), data, pebble.Sync)
@@ -55,11 +61,15 @@ func (p *Pebble) Set(key *ds.Key, value ds.Value) error {
 
 // Delete the value from the storage
 func (p *Pebble) Delete(key *ds.Key) error {
+	p.RLock()
+	defer p.RUnlock()
 	return p.db.Delete(key.Encode(), pebble.Sync)
 }
 
 // Clear the storage
 func (p *Pebble) Clear() error {
+	p.Lock()
+	defer p.Unlock()
 	err := p.db.Close()
 	if err != nil {
 		return err
@@ -78,17 +88,23 @@ func (p *Pebble) Clear() error {
 
 // Close the storage
 func (p *Pebble) Close() error {
+	p.Lock()
+	defer p.Unlock()
 	return p.db.Close()
 }
 
 // Snapshot the storage
 func (p *Pebble) Snapshot() error {
+	p.RLock()
+	defer p.RUnlock()
 	dstDir := time.Now().Format("20060102150405")
 	return p.db.Checkpoint(filepath.Join(p.path, dstDir))
 }
 
 // ScanKeys returns the keys in the storage
 func (p *Pebble) ScanKeys(fn func(*ds.Key) bool) {
+	p.RLock()
+	defer p.RUnlock()
 	iter, err := p.db.NewIter(nil)
 	if err != nil {
 		return

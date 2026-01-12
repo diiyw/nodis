@@ -397,7 +397,7 @@ func info(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 func ping(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	execCommand(conn, func() {
 		if len(cmd.Args) == 0 {
-			conn.WriteOK()
+			conn.WriteString("PONG")
 			return
 		}
 		conn.WriteBulk(cmd.Args[0])
@@ -623,15 +623,17 @@ func ttl(n *Nodis, conn *redis.Conn, cmd redis.Command) {
 	}
 	execCommand(conn, func() {
 		v := n.TTL(cmd.Args[0])
-		if v == -1 {
-			conn.WriteInt64(-1)
-			return
-		}
-		if v == -2 {
+		// TTL returns -2 (as time.Duration, i.e., -2 nanoseconds) if key doesn't exist
+		// TTL returns -1 (as time.Duration, i.e., -1 nanoseconds) if key has no expiration
+		if v == time.Duration(-2) {
 			conn.WriteInt64(-2)
 			return
 		}
-		conn.WriteInt64(int64(v.Seconds()))
+		if v == time.Duration(-1) {
+			conn.WriteInt64(-1)
+			return
+		}
+		conn.WriteInt64(int64(v / time.Second))
 	})
 }
 
