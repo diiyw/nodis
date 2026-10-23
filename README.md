@@ -12,4 +12,4 @@ Clients invalidate their cache on detected synchronization failure and publish r
 
 Generic storage and network frames reuse buffers. Regression tests enforce zero allocations for prepared scalar/cache lookups, sync status reads, protocol encoding, warmed frame reads/writes (including real TCP), and WAL appends; connection setup and full CRUD operations may allocate.
 
-The Redis protocol, Redis data structures, and Pebble dependency have been removed. See [README_zh-cn.md](README_zh-cn.md) and [DESIGN.md](DESIGN.md).
+See [README_zh-cn.md](README_zh-cn.md) and [DESIGN.md](DESIGN.md).

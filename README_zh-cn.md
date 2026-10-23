@@ -10,7 +10,7 @@ Nodis 是一个嵌入式优先、可采用客户端/服务端部署的文档型�
 - WAL、对象编码和同步事件都使用 Nodis 自有字节格式。
 - 客户端可将有权限的数据同步成本地物化视图。
 
-当前内核已实现持久化快照、WAL 回收、定时检查点和 TLS 1.3 / 双向 TLS。旧 Redis 协议、Redis 数据结构和 Pebble 存储均已移除。
+当前内核已实现持久化快照、WAL 回收、定时检查点和 TLS 1.3 / 双向 TLS。
 
 ```go
 db, _ := nodis.Open(nodis.Options{Dir: "./data"})
