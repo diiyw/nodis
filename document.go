@@ -12,6 +12,7 @@ type Document struct {
 	nextField       FieldID
 	defaultPipeline PipelineID
 	objectIDs       orderedIDs[ObjectID]
+	indexes         map[FieldID]*orderedIndex[scalarKey]
 }
 
 func (d *Document) ID() DocumentID {

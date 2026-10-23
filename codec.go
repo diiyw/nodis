@@ -137,6 +137,7 @@ func (db *DB) applyDocumentDelete(id DocumentID) error {
 	}
 	delete(db.documents, id)
 	delete(db.documentsByName, doc.name)
+	doc.indexes, doc.objectIDs = nil, nil
 	for key := range db.objects {
 		if key.document == id {
 			delete(db.objects, key)

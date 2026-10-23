@@ -156,6 +156,7 @@ type QueryBuffer struct {
 	conditions []preparedCondition
 	selected   []FieldID
 	listeners  []uint64
+	candidates []ObjectID
 }
 
 func (db *DB) Find(ctx context.Context, actor Principal, query Query) (QueryPage, error) {
@@ -170,6 +171,7 @@ func (db *DB) FindInto(ctx context.Context, actor Principal, query Query, buffer
 	clear(buffer.objects)
 	clear(buffer.conditions)
 	buffer.objects, buffer.data, buffer.conditions, buffer.selected, buffer.listeners = buffer.objects[:0], buffer.data[:0], buffer.conditions[:0], buffer.selected[:0], buffer.listeners[:0]
+	buffer.candidates = buffer.candidates[:0]
 	if err := query.Validate(); err != nil {
 		return QueryPage{}, err
 	}
@@ -222,7 +224,11 @@ func (db *DB) findLocked(ctx context.Context, actor Principal, query Query, buff
 		limit = DefaultQueryLimit
 	}
 	page := QueryPage{Sequence: db.sequence, PermissionRevision: db.permissionRevision}
-	for _, id := range doc.objectIDs.after(query.After) {
+	ids, err := doc.queryIDs(ctx, query.After, buffer.conditions, buffer)
+	if err != nil {
+		return QueryPage{}, err
+	}
+	for _, id := range ids {
 		if err := ctx.Err(); err != nil {
 			return QueryPage{}, err
 		}

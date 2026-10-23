@@ -14,6 +14,8 @@ import (
 type queryClient interface {
 	Find(context.Context, nodis.Query) (nodis.QueryPage, error)
 	FindAsync(context.Context, nodis.Query) Future[nodis.QueryPage]
+	Update(context.Context, nodis.DocumentID, nodis.ObjectID, uint64, map[string]any) error
+	Delete(context.Context, nodis.DocumentID, nodis.ObjectID, uint64) error
 	Close()
 }
 
@@ -47,7 +49,7 @@ func TestAuthoritativeQueryClientsAndAsyncInputOwnership(t *testing.T) {
 				}
 				ids = append(ids, id)
 			}
-			if err := db.Grant(admin, nodis.Rule{SubjectKind: nodis.SubjectUser, Subject: user.ID, Resource: nodis.Resource{Scope: nodis.ScopeDocument, Document: doc.ID()}, Actions: nodis.ActionRead | nodis.ActionDiscover | nodis.ActionSync}); err != nil {
+			if err := db.Grant(admin, nodis.Rule{SubjectKind: nodis.SubjectUser, Subject: user.ID, Resource: nodis.Resource{Scope: nodis.ScopeDocument, Document: doc.ID()}, Actions: nodis.ActionRead | nodis.ActionDiscover | nodis.ActionSync | nodis.ActionUpdate | nodis.ActionDelete}); err != nil {
 				t.Fatal(err)
 			}
 			secret, _ := doc.FieldID("secret")
@@ -113,6 +115,27 @@ func TestAuthoritativeQueryClientsAndAsyncInputOwnership(t *testing.T) {
 			}
 			if name, _ := result.Objects[0].String("name"); name != "Ada" {
 				t.Fatal("async projection borrowed mutable input")
+			}
+			if err := connected.Update(ctx, doc.ID(), ids[1], 1, map[string]any{"age": int64(99)}); err != nil {
+				t.Fatal(err)
+			}
+			for _, age := range []int64{1, 99} {
+				predicate, _ := nodis.Filter("age", nodis.Equal, age)
+				page, err := connected.FindAsync(ctx, nodis.Query{Document: doc.ID(), Where: []nodis.Condition{predicate}}).Wait(ctx)
+				if err != nil || page.HasMore {
+					t.Fatal("query after update failed", err)
+				}
+				if age == 1 && len(page.Objects) != 0 || age == 99 && (len(page.Objects) != 1 || page.Objects[0].ID() != ids[1] || page.Objects[0].Revision() != 2) {
+					t.Fatal("secondary index did not follow authoritative update")
+				}
+			}
+			if err := connected.Delete(ctx, doc.ID(), ids[1], 2); err != nil {
+				t.Fatal(err)
+			}
+			deletedFilter, _ := nodis.Filter("age", nodis.Equal, int64(99))
+			deleted, err := connected.Find(ctx, nodis.Query{Document: doc.ID(), Where: []nodis.Condition{deletedFilter}})
+			if err != nil || len(deleted.Objects) != 0 || deleted.HasMore {
+				t.Fatal("secondary index retained deleted object", err)
 			}
 			// Invalid container operands are rejected before cloning async inputs.
 			cycle := make([]nodis.Value, 1)

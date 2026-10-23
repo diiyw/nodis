@@ -3,6 +3,7 @@ package nodis
 import (
 	"context"
 	"encoding/binary"
+	"math"
 	"sort"
 )
 
@@ -265,6 +266,13 @@ func (tx *Tx) Commit() error {
 				return err
 			}
 		}
+		// The compact object header stores a uint16 field count. Reject an
+		// oversized pipeline result before WAL append or any index mutation.
+		if !draft.deleted && len(draft.fields) > math.MaxUint16 {
+			db.mu.Unlock()
+			tx.state = txRolledBack
+			return ErrInvalidValue
+		}
 	}
 	prospective := make(map[DocumentID]map[string]FieldID)
 	nextFields := make(map[DocumentID]FieldID)
@@ -370,6 +378,11 @@ func (db *DB) installDrafts(drafts []*Draft, sequence uint64, events *[]Event) e
 	for _, draft := range drafts {
 		key := objectKey{document: draft.document.id, object: draft.id}
 		if draft.deleted {
+			if previous, exists := db.objects[key]; exists {
+				if err := draft.document.indexObject(previous, indexRemove); err != nil {
+					return err
+				}
+			}
 			delete(db.objects, key)
 			draft.document.objectIDs.remove(draft.id)
 			*events = append(*events, Event{Type: EventObjectDeleted, Sequence: sequence, PermissionRevision: db.permissionRevision, Document: key.document, Object: key.object, Revision: draft.expectedRevision + 1})
@@ -389,6 +402,14 @@ func (db *DB) installDrafts(drafts []*Draft, sequence uint64, events *[]Event) e
 			fields = append(fields, fieldValue{id: id, value: draft.fields[name]})
 		}
 		data := encodeObject(nil, draft.id, draft.expectedRevision+1, draft.pipeline, fields)
+		if previous, exists := db.objects[key]; exists {
+			if err := draft.document.indexObject(previous, indexRemove); err != nil {
+				return err
+			}
+		}
+		if err := draft.document.indexObject(data, indexAdd); err != nil {
+			return err
+		}
 		db.objects[key] = data
 		draft.document.objectIDs.add(draft.id)
 		typeOfEvent := EventObjectUpdated

@@ -88,6 +88,10 @@ func Open(options Options) (*DB, error) {
 		_ = log.Close()
 		return nil, err
 	}
+	if err := db.rebuildIndexes(); err != nil {
+		_ = log.Close()
+		return nil, err
+	}
 	if options.CheckpointInterval > 0 {
 		db.checkpointStop, db.checkpointDone = make(chan struct{}), make(chan struct{})
 		go db.checkpointLoop(options.CheckpointInterval)
@@ -159,7 +163,7 @@ func (db *DB) CreateDocument(actor Principal, name string) (*Document, error) {
 }
 
 func newDocument(db *DB, id DocumentID, name string) *Document {
-	return &Document{db: db, id: id, name: name, fieldsByName: make(map[string]FieldID), fieldNames: make(map[FieldID]string)}
+	return &Document{db: db, id: id, name: name, fieldsByName: make(map[string]FieldID), fieldNames: make(map[FieldID]string), indexes: make(map[FieldID]*orderedIndex[scalarKey])}
 }
 
 func (db *DB) Document(actor Principal, name string) (*Document, error) {
@@ -303,6 +307,7 @@ func (db *DB) DeleteDocument(actor Principal, id DocumentID) error {
 	}
 	delete(db.documents, id)
 	delete(db.documentsByName, doc.name)
+	doc.indexes, doc.objectIDs = nil, nil
 	for key := range db.objects {
 		if key.document == id {
 			delete(db.objects, key)
