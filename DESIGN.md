@@ -1,0 +1,71 @@
+# Nodis architecture
+
+## Data model
+
+The resource tree is `database / document / object / field`. Document and object IDs are stable unsigned 64-bit identifiers. A document owns a field dictionary, so encoded objects store integer field IDs instead of repeated field names. Objects in one document may contain different fields and different inferred value kinds.
+
+## Authorization
+
+Policies target database, document, object, or field resources. Rules match a user, role, or every authenticated principal. A decision evaluates the most specific matching resource first; an explicit deny wins at equal specificity and the default is deny. The bootstrap principal configured in `Options.Admin` and the built-in `admin` role have full access.
+
+The actions are discover, read, create, update, delete, subscribe, sync, manage-policy, and execute. Read responses and synchronization frames are filtered on the server before encoding. A policy change increments the permission revision and emits a reset; synchronizers invalidate their view and rebuild an authorized snapshot.
+
+## Transactions and pipelines
+
+A transaction takes a consistent write lock, checks authorization, creates drafts, invokes the selected object pipeline, rechecks every field produced by the pipeline, appends one atomic WAL transaction, installs the new object revisions, and then publishes events. Pipeline errors discard every draft in the transaction.
+
+Pipelines receive a transaction-local mutable draft. Reads through the draft and previous ObjectView are filtered using the caller's field permissions. Every field produced or removed by a pipeline is authorized again before commit.
+
+## Queries
+
+`DB.Find` and `DB.FindInto` provide AND filters, readable-field projections, and keyset pagination in ascending ObjectID order. Generic `Filter[T Scalar]` infers comparison values without defining a field schema. Operators are equal, not-equal, less/less-equal, greater/greater-equal, exists, missing, and string/byte prefix. Comparisons require the same stored value kind, including not-equal; missing fields never satisfy value comparisons. All signed integer input widths share KindInt, but signed, unsigned, and float kinds remain distinct. Null and missing are distinct; NaN comparison operands and container operands are rejected. Existence predicates do not need a value.
+
+Scanning a document requires discover and read permission on the document, and each returned object must also allow discover and read. Every predicate checks field read permission before inspecting its value or presence. A hidden field therefore cannot influence matches through existence, missing, or not-equal tests. Projection only emits readable selected fields. Pagination metadata only considers authorized matching objects; no total count or hidden-row cursor is exposed. Successful queries publish a document-read event and one object-read event per returned object.
+
+Each document has a derived `orderedIDs[K cmp.Ordered]` primary index. Transaction installation maintains membership under the commit lock, and snapshot/WAL recovery rebuilds it. Normal object creation appends, updates retain membership, and deletes remove IDs. A stale draft referencing a deleted document is rejected before WAL append. Binary search locates the cursor without sorting or scanning other documents. Field predicates still scan candidates; secondary field indexes and custom sorting are not implemented.
+
+A query holds the database read lock through filtering and projection, so each page represents one committed state and reports its sequence and permission revision. Pages do not retain an MVCC snapshot across requests: intervening writes and ACL changes are reflected on subsequent pages. `After` is an exclusive ObjectID cursor and still works if that object has been deleted. `Next` is the last returned ID when `HasMore`, otherwise zero. Late commits with IDs below a previously returned cursor are outside subsequent pages.
+
+The default limit is 100, the maximum is 1024, with at most 64 predicates and 128 selected fields. A page contains at most 8 MiB of projected portable object bytes. The byte budget can shorten a page independently of its row limit. A single oversized projected object returns `ErrQueryTooLarge`; choosing a narrower projection can make it readable through this API. Query results use PortableObject values with owned buffers in `Find`, or borrowed buffers in `FindInto`. A QueryBuffer belongs to one concurrent caller, and its results expire on the next use.
+
+The NDC1 `OpFind` extension carries NDQ1 query payloads and NQP1 pages; `StatusTooLarge` preserves oversized-result errors. The wire decoders bound counts and lengths before slicing or allocating and accept only scalar predicate operands. Reusable QueryDecoder/QueryPageDecoder results borrow their input bytes. `Query.Clone()` owns predicate bytes and strings for asynchronous use. Embedded and remote clients expose `Find` / `FindAsync`; embedded clients additionally expose `FindInto`. These methods query the authoritative database even when local synchronization is disabled; they do not query the materialized cache.
+
+## Storage
+
+Nodis owns its append-only WAL and does not use an external key/value engine. Every transaction is stored as a length-delimited NDW1 frame with magic, sequence, payload, and CRC32C. Recovery truncates an incomplete tail and rejects checksum corruption or non-increasing sequences. Set `Options.Durable` to sync the WAL before reporting a successful commit.
+
+`DB.Checkpoint()` compacts committed state into `nodis.snapshot`. NDS2 snapshots contain counters, complete document field dictionaries, ACLs, pipeline bindings, and unchanged compact object bytes. Keeping dictionary entries for deleted fields prevents field ACLs from changing meaning after recovery. Pipeline executable code must still be registered by the application after reopening the database.
+
+Snapshot records have individual checksums, a mandatory terminator, and a footer with a record count and cumulative checksum. Recovery rejects incomplete, corrupt, or trailing data. Publication syncs a temporary file, atomically renames it, and syncs the directory before truncating and syncing the WAL. Recovery loads the snapshot first and skips overlapping WAL sequences, covering a crash between snapshot publication and WAL recycling. Failure before publication retains the previous snapshot and WAL.
+
+If WAL rollback cannot restore the file position/length, or checkpoint recycling fails, the log latches the failure and rejects subsequent writes until reopening. This prevents further appends at an uncertain offset; the published snapshot and retained WAL are recovered on reopen.
+
+`Options.CheckpointInterval` enables periodic checkpoints; zero disables them. `DB.CheckpointError()` returns the most recent manual or periodic checkpoint result. Checkpointing requires a persistent directory. The embedded API disables the timer by default; the server CLI defaults to five minutes. Checkpoints hold the database write lock through publication and WAL recycling, blocking both writes and operations needing the read lock. All live objects still reside in memory; on-demand disk reads, mmap, and background segment compaction remain future work.
+
+Objects use a canonical binary representation. Fields are sorted by FieldID and encoded as `field-id / value-kind / value-length / value`. `ObjectView` reads scalars directly from this immutable byte slice. Callers that retain borrowed byte or string views must retain the ObjectView and must not mutate returned bytes.
+
+## Synchronization
+
+A synchronization session starts behind the database commit lock, records a sequence and permission revision, emits a filtered snapshot, and then consumes ordered commit events. The client applies these frames to a local materialized store. A normal client operation only succeeds after the server has authorized and committed it. Async operations return a future whose completion has the same meaning.
+
+The first implementation includes in-process and TCP clients. NDC1 command frames multiplex authenticated CRUD requests and NDE1 event frames. Authentication maps credentials to a Principal; authorization, pipelines, and commits always execute in the server database.
+
+`server.ServeTLS` / `ListenAndServeTLS` and `client.DialTLS` encrypt both request and synchronization connections with a minimum of TLS 1.3. Server configurations may require verified client certificates using `ClientAuth` and `ClientCAs`. Tokens still map each connection to its authorization principal, including when mutual TLS is enabled. TLS configuration is cloned before enforcing the minimum version. TLS handshakes and initial authentication share a ten-second server timeout.
+
+`client.Dial` enables synchronization by default. `DialWithOptions` accepts `DisableSync: true` for authoritative requests without a subscription; `Cached` then remains empty. A completed write confirms the server commit, while the materialized cache catches up through the separate synchronization connection.
+
+Both embedded and remote clients stage a replacement snapshot separately. On a detected disconnect, invalid event, queue overflow, or permission reset, the visible cache is invalidated immediately. Snapshot objects are not exposed until a completion marker with the same sequence and permission revision arrives. Failed snapshots are discarded; replacement snapshots remove objects deleted or hidden while offline. Cache objects own their bytes so network frame buffer reuse cannot mutate previously returned results. Closing a client clears its cache and rejects new operations; previously returned object references remain valid historical values.
+
+`Client.SyncStatus()` and `Remote.SyncStatus()` report whether synchronization is enabled and ready, the received-event sequence watermark, permission revision, and the latest synchronization error. Ready means the initial/replacement snapshot is complete, not that an independently committed request has reached the cache. Filtered subscriptions can skip database sequences, so this watermark is not a global commit barrier. Reconnects use bounded exponential backoff and rebuild a full snapshot, including after temporary authorization failure. There is no heartbeat or persisted resume cursor yet; a silent network partition is noticed when the transport reports failure.
+
+Remote requests wait on a context-aware serialization gate; cancellation while waiting sends nothing. Cancellation or transport/protocol failure during a request discards its command connection. The next independent request establishes and authenticates a fresh connection. Reconnection never automatically resends a failed request. An interrupted mutation returns an `OutcomeUnknownError` matching `client.ErrOutcomeUnknown` and its underlying context/transport error, since the server may still commit after the client loses its response. Applications must reconcile an uncertain result before choosing to submit another mutation. This is not an exactly-once or distributed cancellation protocol. Client shutdown interrupts active sockets and cancels in-progress reconnect authentication without acquiring the request gate.
+
+## Allocation contract
+
+Hot scalar field lookup on an existing `ObjectView`, permission checks with prepared principals, and encoding into sufficiently sized caller buffers are required to allocate zero heap objects. Storage uses `FrameWriter[W io.Writer]` and `FrameReader[R io.Reader]`; readers borrow a reusable payload buffer until the next read. Tests measure zero allocations for warmed frame reads/writes and file WAL appends, in addition to existing scalar lookup and protocol encoding checks. Snapshot key ordering uses a generic helper over ordered map keys and retained scratch buffers.
+
+Transport uses generic `protocol.CommandReader[R]` / `CommandWriter[W]` with reusable framing storage on both server and client connections. The NDC1 wire representation is unchanged. Readers validate magic and bounded frame lengths before allocating a payload buffer, and validate CRC32C before returning a borrowed command. Writers handle partial writes and reject oversized payloads. Tests measure zero allocations for warmed frame operations over buffers and real TCP connections, cached scalar lookup/status reads, and empty snapshot publication with prepared maps. Materialized object updates allocate owned object bytes; network CRUD and TLS are not covered by a whole-operation zero-allocation guarantee.
+
+Creating documents, objects, strings, variable-size arrays, snapshots, TLS sessions, network messages, and caller-owned results may allocate. The zero-allocation guarantee applies to tested hot paths after capacity preparation, not entire transactions or connection setup.
+
+Query allocation regression tests cover warmed `FindInto` (including read-event publication), primary-index operations with prepared capacity, reusable query/page codecs, and server query execution through response encoding. Convenience `Find`, client-owned response pages, filter/query setup, and async futures may allocate.

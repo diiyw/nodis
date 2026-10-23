@@ -1,267 +1,205 @@
 # Nodis
 
-![GitHub top language](https://img.shields.io/github/languages/top/diiyw/nodis) ![GitHub Release](https://img.shields.io/github/v/release/diiyw/nodis)
+Nodis 是一个嵌入式优先、可采用客户端/服务端部署的文档型数据库。
 
-<div class="column" align="left">
-  <a href="https://godoc.org/github.com/diiyw/nodis"><img src="https://godoc.org/github.com/diiyw/nodis?status.svg" /></a>
-  <a href="https://goreportcard.com/report/github.com/diiyw/nodis"><img src="https://goreportcard.com/badge/github.com/diiyw/nodis" /></a>
-  <a href="https://codecov.io/gh/diiyw/nodis"><img src="https://codecov.io/gh/diiyw/nodis/branch/main/graph/badge.svg?token=CupujOXpbe"/></a>
-</div>
+- Document 是命名的数据容器。
+- Object 是 Document 中由动态字段组成的记录。
+- 字段类型在写入时推断，无需预先声明 Schema。
+- Database、Document、Object、Field 均可配置访问策略。
+- Object 可绑定事务型执行管线；任何阶段失败都会回滚。
+- WAL、对象编码和同步事件都使用 Nodis 自有字节格式。
+- 客户端可将有权限的数据同步成本地物化视图。
 
-English | [简体中文](https://github.com/diiyw/nodis/blob/main/README_zh-cn.md)
-
-Nodis 是一个使用 Golang 编程语言实现的 Redis。这个实现提供了一种将 Redis 功能直接嵌入到应用程序中或作为独立服务器运行的简单方法。支持的命令与原始 Redis 协议兼容,允许您使用现有的 Redis 客户端(如 goredis)进行测试和集成。
-
-## 支持的数据类型
-
-Bitmap
-String
-List
-Hash
-Set
-Sorted Set
-
-## 主要特性
-
-- **快速和可嵌入**: Golang 实现的设计目标是快速和易于嵌入到您的应用程序中。
-- **低内存使用**: 该系统只在内存中存储热数据,将整体内存占用降到最低。
-- **自定义数据存储后端**: 您可以集成自定义的数据存储后端,如 Amazon S3、浏览器存储，Mysql 等。
-  使用 WebAssembly 支持浏览器: 从 1.2.0 版本开始,这个 Redis 实现可以直接在浏览器中使用 WebAssembly 运行。
-- **远程变更监控**: 从 1.2.0 版本开始,该系统支持监视来自远程源的变更。
-- **Redis 协议兼容性**: 从 1.5.0 版本开始,这个 Redis 实现完全支持原始的 Redis 协议,确保与现有的 Redis 客户端无缝集成。
-
-## 支持的 Redis 命令
-
-| **Client Handling** | **Configuration** | **Key Commands** | **String Commands** | **Set Commands** | **Hash Commands** | **List Commands** | **Sorted Set Commands** |
-| ------------------- | ----------------- | ---------------- | ------------------- | ---------------- | ----------------- | ----------------- | ----------------------- |
-| CLIENT              | FLUSHALL          | DEL              | GET                 | SADD             | HSET              | LPUSH             | ZADD                    |
-| PING                | FLUSHDB           | EXISTS           | SET                 | SSCAN            | HGET              | RPUSH             | ZCARD                   |
-| QUIT                | SAVE              | EXPIRE           | INCR                | SCARD            | HDEL              | LPOP              | ZRANK                   |
-| ECHO                | INFO              | EXPIREAT         | DECR                | SPOP             | HLEN              | RPOP              | ZREVRANK                |
-| DBSIZE              |                   | KEYS             | SETBIT              | SDIFF            | HKEYS             | LLEN              | ZSCORE                  |
-| MULTI               |                   | TTL              | GETBIT              | SINTER           | HEXISTS           | LINDEX            | ZINCRBY                 |
-| DISCARD             |                   | RENAME           | INCR                | SISMEMBER        | HGETALL           | LINSERT           | ZRANGE                  |
-| EXEC                |                   | TYPE             | DESR                | SMEMBERS         | HINCRBY           | LPUSHX            | ZREVRANGE               |
-|                     |                   | SCAN             | SETEX               | SREM             | HICRBYFLOAT       | RPUSHX            | ZRANGEBYSCORE           |
-|                     |                   | RANDOMKEY        | INCRBY              | SMOVE            | HSETNX            | LREM              | ZREVRANGEBYSCORE        |
-|                     |                   | RENAMEEX         | DECRBY              | SRANDMEMBER      | HMGET             | LSET              | ZREM                    |
-|                     |                   | PERSIST          | SETNX               | SINTERSTORE      | HMSET             | LRANGE            | ZREMRANGEBYRANK         |
-|                     |                   |                  | INCRBYFLOAT         | SUNIONSTORE      | HCLEAR            | LPOPRPUSH         | ZREMRANGEBYSCORE        |
-|                     |                   |                  | APPEND              |                  | HSCAN             | RPOPLPUSH         | ZCLEAR                  |
-|                     |                   |                  | GETRANGE            |                  | HVALS             | BLPOP             | ZEXISTS                 |
-|                     |                   |                  | STRLEN              |                  | HSTRLEN           | BRPOP             | ZUNIONSTORE             |
-|                     |                   |                  | SETRANGE            |                  |                   |                   | ZINTERSTORE             |
-|                     |                   |                  |                     |                  |                   |                   | ZSCAN                   |
-
-## 开始
-
-需要 Go 1.26 或更高版本。
-
-```bash
- go get github.com/diiyw/nodis@latest
-```
-
-或者使用测试版本
-
-```bash
- go get github.com/diiyw/nodis@main
-```
+当前内核已实现持久化快照、WAL 回收、定时检查点和 TLS 1.3 / 双向 TLS。旧 Redis 协议、Redis 数据结构和 Pebble 存储均已移除。
 
 ```go
-package main
+db, _ := nodis.Open(nodis.Options{Dir: "./data"})
+defer db.Close()
 
-import "github.com/diiyw/nodis"
+admin := nodis.Principal{ID: "admin", Roles: []string{"admin"}}
+doc, _ := db.CreateDocument(admin, "users")
 
-func main() {
-	// Create a new Nodis instance
-	opt := nodis.DefaultOptions
-	n := nodis.Open(opt)
-	defer n.Close()
-	// Set a key-value pair
-	n.Set("key", []byte("value"),false)
-	n.LPush("list", []byte("value1"))
+tx := db.Begin(admin)
+draft, _ := tx.Create(doc.ID())
+_ = draft.Set("name", "Ada")
+_ = draft.Set("age", int64(37))
+id, _ := draft.Save()
+_ = tx.Commit()
+
+object, _ := db.Get(admin, doc.ID(), id)
+name, _ := object.String("name")
+_ = name
+```
+
+详细设计见 [DESIGN.md](DESIGN.md)。
+
+## 条件查询、投影与分页
+
+```go
+adult, err := nodis.Filter("age", nodis.GreaterEqual, int64(18))
+query := nodis.Query{
+    Document: doc.ID(),
+    Where: []nodis.Condition{adult},
+    Select: []string{"name", "age"},
+    Limit: 50,
+}
+page, err := db.Find(ctx, admin, query)
+for i := range page.Objects {
+    name, _ := page.Objects[i].String("name")
+    _ = name
+}
+if page.HasMore {
+    query.After = page.Next
+    // 下一次 Find 从这个 Object ID 之后继续。
 }
 ```
 
-## 示例
+`Where` 中所有条件必须同时成立。支持 `Equal`、`NotEqual`、`Less`、`LessEqual`、`Greater`、`GreaterEqual`、`Exists`、`Missing`、`Prefix`。`Prefix` 用于字符串和字节；存在性条件可直接写 `nodis.Condition{Field: "email", Op: nodis.Exists}`。`Select` 为空时返回所有可读字段；指定不存在的字段会被忽略。
 
-<details>
-	<summary> 监听key变动</summary>
+比较要求值类型一致，不同类型的 `NotEqual` 也不匹配。各种有符号整数宽度均推断为 KindInt，但有符号整数、无符号整数与浮点数彼此区分。缺少字段不会满足普通值比较；Null 与缺失不同。查询条件不接受数组、嵌套对象或 NaN，布尔值与 Null 只支持相等性比较。
 
-服务端:
+查询需要 Document 和每个结果 Object 的 Discover / Read 权限。条件涉及的字段必须可读，无权读取时该对象不匹配该条件，包括 `Exists`、`Missing` 和 `NotEqual`；投影也会继续裁剪隐藏字段。隐藏对象不会影响 `HasMore`，查询不返回全库总数。成功查询会产生 DocumentRead 和各结果的 ObjectRead 事件。
+
+分页按 Object ID 升序，`After` 为排他的 ID 游标，即使该对象被删除仍可继续。只有 `HasMore` 为真时 `Next` 才为最后一个结果的 ID，否则为 0。默认每页 100 条，最多 1024 条；最多 64 个条件、128 个投影字段。单页还限制为 8 MiB 的投影对象字节，可能提前结束一页；单个投影对象超过限制时返回 `ErrQueryTooLarge`，可缩小投影后再查询。
+
+每页提供 `Sequence` 和 `PermissionRevision`，代表该页读取时的已提交状态。跨页不保留 MVCC 快照，中途修改与权限变化会在下一页体现；晚提交且 ID 小于已返回游标的对象不会出现在后续页中。
+
+需要复用结果内存时：
 
 ```go
-package main
+var buffer nodis.QueryBuffer
+page, err := db.FindInto(ctx, admin, query, &buffer)
+```
 
-import (
-	"fmt"
-	"github.com/diiyw/nodis"
-	"github.com/diiyw/nodis/patch"
-	"time"
-)
+预热后的 `FindInto` 实测 **0 allocs**，包含条件过滤、投影和读取事件发布。返回的对象字节借用缓冲区，有效期到该缓冲区下一次使用；并发查询须各用一个缓冲区。普通 `Find` 返回可独立持有的结果。
 
-func main() {
-	var opt = nodis.DefaultOptions
-	opt.Channel = nodis.NewWebsocket()
-	n := nodis.Open(opt)
-	n.WatchKey([]string{"*"}, func(op patch.Op) {
-		fmt.Println("Server:", op.Data.GetKey(), op.Data.GetKey())
-	})
-	go func() {
-		for {
-			time.Sleep(time.Second)
-			n.Set("test", []byte(time.Now().Format("2006-01-02 15:04:05")), false)
-		}
-	}()
-	err := n.Broadcast("127.0.0.1:6380", []string{"*"})
-	if err != nil {
-		panic(err)
-	}
+每个 Document 维护泛型有序主索引，提交时更新，快照和 WAL 恢复时重建。它避免查询时对全部对象重新排序；字段条件当前仍扫描候选对象，查询期间持有读锁，尚未实现字段二级索引和自定义排序。
+
+## 客户端/服务端
+
+服务端使用 NDC1 原生字节协议。认证器只负责把凭据转换为 Principal，所有权限仍由数据库在服务端判断：
+
+```go
+listener, _ := net.Listen("tcp", "127.0.0.1:6380")
+s := server.New(db, server.StaticTokens{
+    "token": {ID: "ada", Roles: []string{"writer"}},
+})
+go s.Serve(listener)
+
+remote, _ := client.Dial(ctx, listener.Addr().String(), []byte("token"), nodis.SyncScope{
+    Documents: []nodis.DocumentID{doc.ID()},
+})
+defer remote.Close()
+
+id, err := remote.Create(ctx, doc.ID(), map[string]any{"name": "Ada"})
+cached, ok := remote.Cached(doc.ID(), id)
+```
+
+`Create`、`Update` 和 `Delete` 成功时，服务端已经完成鉴权、对象管线和 WAL 提交。异步 API 返回泛型 `Future[T]`，完成语义相同。`Cached` 只读取经过字段权限裁剪的本地物化视图，通过独立连接最终更新；写入返回成功时缓存可能尚未追上。
+
+仅需请求服务端、无需自动同步时：
+
+```go
+remote, err := client.DialWithOptions(ctx, address, credential, client.DialOptions{
+    DisableSync: true,
+})
+```
+
+此模式不创建订阅，`Cached` 保持为空；无需同步权限即可执行已获授权的普通操作。
+
+进程内与远程客户端均支持服务端权威查询：
+
+```go
+page, err := remote.Find(ctx, query)
+future := remote.FindAsync(ctx, query)
+page, err = future.Wait(waitCtx)
+```
+
+查询通过 NDC1 的 `OpFind` 操作传输 NDQ1 条件和 NQP1 结果页，TLS 连接同样适用。`Find` 不依赖同步缓存；异步查询会复制条件及投影输入，返回后调用方可以复用原始切片。进程内客户端还提供 `FindInto`。
+
+## 可靠同步与请求取消
+
+进程内客户端和 TCP 客户端都提供 `SyncStatus()`：
+
+```go
+status := remote.SyncStatus()
+// Enabled：是否开启自动同步。
+// Ready：是否已完整接收并发布初始或重建快照。
+// Sequence / PermissionRevision：已接收事件的序号水位与权限版本。
+// Err：最近的同步错误；重建成功后清除。
+```
+
+检测到同步连接断开、事件损坏、订阅队列溢出或权限变更后，客户端立即清空可见缓存。重连快照先暂存，只有匹配序号和权限版本的结束标记到达后才整体发布。半途失败的快照不会暴露部分数据；离线期间删除的对象或失去权限的字段也不会残留。临时失去订阅权限后会退避重试，重新授权后可自行恢复。
+
+`Ready` 表示快照完整，不能用作某次写入已同步到本地的确认。权限裁剪会跳过部分数据库事件，`Sequence` 也不是全库提交屏障。当前重连使用完整快照，尚无持久化续传游标或心跳探测；静默网络故障需要等待传输层报告错误。已返回给调用方的对象仍是可持有的历史值，权限撤销不会修改这些引用。
+
+普通请求在排队等待连接时也响应 Context 取消，取消后不会发送请求。已发送请求遇到取消、传输错误或协议损坏时，客户端丢弃命令连接，下一次独立请求重新连接并认证。客户端不会自动重发失败的操作。
+
+```go
+id, err := remote.Create(ctx, document, fields)
+if errors.Is(err, client.ErrOutcomeUnknown) {
+    // 服务端可能已经提交。先核对业务状态，再决定是否提交新操作。
 }
 ```
 
-- WebAssembly 浏览器端构建
+`OutcomeUnknownError` 同时保留底层错误，可用 `errors.Is(err, context.Canceled)` 等判断原因。取消客户端等待不等于取消服务端事务。异步操作的 Future 也保留这一语义；如果只取消 `Future.Wait` 的等待 Context，后台操作仍可能继续。关闭客户端会解除网络等待、取消重连并清空缓存，关闭后拒绝新的操作。
 
-```bash
-GOOS=js GOARCH=wasm go build -o test.wasm
-```
+## 快照与恢复
 
 ```go
-package main
-
-import (
-	"fmt"
-	"github.com/diiyw/nodis"
-	"github.com/diiyw/nodis/patch"
-)
-
-func main() {
-	var opt = nodis.DefaultOptions
-	opt.Channel = nodis.NewWebsocket()
-	n := nodis.Open(opt)
-	n.WatchKey([]string{"*"}, func(op patch.Op) {
-		fmt.Println("Subscribe: ", op.Data.GetKey())
-	})
-	err := n.Subscribe("ws://127.0.0.1:6380")
-	if err != nil {
-		panic(err)
-	}
-	select {}
-}
+db, err := nodis.Open(nodis.Options{
+    Dir: "./data",
+    Durable: true,
+    CheckpointInterval: 5 * time.Minute,
+})
+// 也可以手动执行；错误应由调用方处理。
+err = db.Checkpoint()
+// 获取最近一次手动或定时检查点的结果。
+err = db.CheckpointError()
 ```
 
-</details>
-<details>
-	<summary> 简单的Redis服务器</summary>
+`Durable: true` 在返回提交成功前同步 WAL。`CheckpointInterval: 0` 禁用定时检查点，嵌入式 API 默认禁用；手动快照仍可使用。纯内存数据库不支持检查点。
+
+快照保留完整字段字典、ACL、权限版本、对象原始字节、管线绑定和 ID 计数器，包含已删除字段的字典项，避免权限引用发生偏移。应用需在重新打开后重新注册管线执行代码。
+
+快照临时文件同步并原子发布、目录同步完成后，才截断 WAL。重启先恢复快照，再重放较新的 WAL；快照发布后、WAL 回收前发生中断也可恢复。记录校验和、终止标记及包含记录数与累计校验和的尾部共同检测不完整或损坏快照。
+
+当前检查点持有数据库写锁，会阻塞写入及需要读锁的查询。活跃对象仍全部驻留内存，尚未实现磁盘按需读取、mmap 和后台分段压缩。
+
+## TLS 部署
 
 ```go
-package main
+cert, err := tls.LoadX509KeyPair("server.crt", "server.key")
+go s.ServeTLS(listener, &tls.Config{Certificates: []tls.Certificate{cert}})
 
-import (
-	"fmt"
-
-	"github.com/diiyw/nodis"
-)
-
-func main() {
-	opt := nodis.DefaultOptions
-	n := nodis.Open(opt)
-	if err := n.Serve(":6380"); err != nil {
-		fmt.Printf("Serve() = %v", err)
-	}
-}
+remote, err := client.DialTLS(ctx, address, credential, scope, &tls.Config{
+    RootCAs: trustedRoots,
+    ServerName: "db.example.com",
+})
 ```
 
-可以使用 redis-cli 连接.
+请求连接和同步连接均使用至少 TLS 1.3，并验证服务端证书。双向 TLS 在服务端设置 `ClientAuth: tls.RequireAndVerifyClientCert` 与 `ClientCAs`，客户端设置 `Certificates`。双向 TLS 启用后仍需凭据认证，凭据由认证器映射为权限主体。
 
-```bash
-redis-cli -p 6380
-> set key value
+命令行示例（`NODIS_TOKEN` 为必需的凭据环境变量）：
+
+```sh
+go run ./cmd/nodis-server -listen 127.0.0.1:6380 -data ./data \
+  -durable=true -checkpoint-interval=5m \
+  -tls-cert=server.crt -tls-key=server.key
 ```
 
-</details>
+加上 `-tls-client-ca=clients-ca.crt` 可强制双向证书验证。服务端 CLI 默认每五分钟执行检查点，`-checkpoint-interval=0` 禁用。未配置 TLS 证书时使用普通 TCP。
 
-## Benchmark
+## 泛型与分配约束
 
-<details>
-	<summary>内嵌性能测试</summary>
+存储帧通过 `FrameWriter[W]` / `FrameReader[R]` 泛型实现；网络帧通过 `protocol.CommandWriter[W]` / `CommandReader[R]` 泛型实现。两者均复用缓冲区，读取结果借用底层缓冲区，有效期到下一次读取。NDC1 字节格式保持兼容，客户端将缓存对象复制为独立字节，避免帧缓冲区复用影响已返回结果。
 
-Windows 11: 12C/32G
+回归测试验证已有对象的标量字段查找、缓存查询、同步状态读取、预分配协议编码、预热后的帧读写及文件 WAL 追加为 **0 allocs**，包括真实 TCP 连接上的帧往返。完整 CRUD、缓存对象更新、快照构建、TLS 建连和调用方持有的网络结果仍会分配内存。
 
-```bash
-goos: windows
-goarch: amd64
-pkg: github.com/diiyw/nodis/bench
-cpu: 12th Gen Intel(R) Core(TM) i5-12490F
-BenchmarkSet
-BenchmarkSet-12         	 2159343	       514.7 ns/op	     302 B/op	       8 allocs/op
-BenchmarkGet
-BenchmarkGet-12         	 6421864	       183.8 ns/op	     166 B/op	       3 allocs/op
-BenchmarkLPush
-BenchmarkLPush-12       	 2166828	       566.3 ns/op	     358 B/op	      10 allocs/op
-BenchmarkLPop
-BenchmarkLPop-12        	13069830	        80.41 ns/op	     159 B/op	       3 allocs/op
-BenchmarkSAdd
-BenchmarkSAdd-12        	 2007924	       592.6 ns/op	     406 B/op	      11 allocs/op
-BenchmarkSMembers
-BenchmarkSMembers-12    	 6303288	       179.8 ns/op	     166 B/op	       3 allocs/op
-BenchmarkZAdd
-BenchmarkZAdd-12        	 1580179	       832.6 ns/op	     302 B/op	      10 allocs/op
-BenchmarkZRank
-BenchmarkZRank-12       	 6011108	       186.7 ns/op	     165 B/op	       3 allocs/op
-BenchmarkHSet
-BenchmarkHSet-12        	 1997553	       654.3 ns/op	     486 B/op	      11 allocs/op
-BenchmarkHGet
-BenchmarkHGet-12        	 5895134	       193.3 ns/op	     165 B/op	       3 allocs/op
+查询新增的零分配检查覆盖：复用缓冲区的内核查询、预留容量的泛型主索引操作、查询/结果页编解码，以及服务端查询处理与响应编码。普通 `Find`、远程客户端持有的结果页、条件构建和异步 Future 仍允许分配。
+
+```sh
+go test ./...
+go test -race ./...
+go vet ./...
 ```
-
-Linux: Intel(R) Core(TM) i5-1038NG7 CPU @ 2.00GHz
-
-```bash
-goos: linux
-goarch: amd64
-pkg: github.com/diiyw/nodis/bench
-cpu: Intel(R) Core(TM) i5-1038NG7 CPU @ 2.00GHz
-BenchmarkSet-4        	  547957	      3330 ns/op	     349 B/op	       9 allocs/op
-BenchmarkGet-4        	 1000000	      1061 ns/op	     191 B/op	       6 allocs/op
-BenchmarkLPush-4      	  480404	      6103 ns/op	     414 B/op	      11 allocs/op
-BenchmarkLPop-4       	 3412002	       358.6 ns/op	     127 B/op	       4 allocs/op
-BenchmarkSAdd-4       	  672626	      8479 ns/op	     569 B/op	      12 allocs/op
-BenchmarkSMembers-4   	  919846	      1125 ns/op	     192 B/op	       6 allocs/op
-BenchmarkZAdd-4       	  362701	     12805 ns/op	     323 B/op	      10 allocs/op
-BenchmarkZRank-4      	  641536	      1598 ns/op	     182 B/op	       6 allocs/op
-BenchmarkHSet-4       	  432188	      3198 ns/op	     712 B/op	      12 allocs/op
-BenchmarkHGet-4       	 1310274	       984.8 ns/op	     195 B/op	       6 allocs/op
-```
-
-</details>
-<details>
-	<summary>Redis 压测工具测试</summary>
-
-Windows 11: 12C/32G
-
-```bash
-redis-benchmark -p 6380 -t set,get,lpush,lpop,sadd,smembers,zadd,zrank,hset,hget -n 100000 -q
-```
-
-```
-SET: 116144.02 requests per second
-GET: 125156.45 requests per second
-LPUSH: 121951.22 requests per second
-LPOP: 126103.41 requests per second
-SADD: 121951.22 requests per second
-HSET: 122850.12 requests per second
-```
-
-</details>
-
-## Note
-
-If you want to persist data, please make sure to call the `Close()` method when your application exits.
-
-## 执行、持久化与同步
-
-参见 [ARCHITECTURE.md](ARCHITECTURE.md)：命令在统一执行锁下完成，`EXEC` 中的
-命令共享同一个事务上下文。写操作先提交到内存；`Flush()`、`Snapshot()` 和成功的
-`Close()` 确认持久化。同步默认使用 TCP 承载自定义 NDS1 协议，也支持 WebSocket。
-新协议与旧 protobuf 协议不兼容，两端需同时升级。Pebble 只支持当前数据格式，旧目录不能直接复用。

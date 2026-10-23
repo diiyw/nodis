@@ -1,63 +1,68 @@
-//go:build !wasm
-
 package main
 
 import (
-	"context"
-	"errors"
-	"fmt"
-	"github.com/alecthomas/kong"
-	"github.com/diiyw/nodis"
-	"github.com/diiyw/nodis/storage"
-	"net"
+	"crypto/tls"
+	"crypto/x509"
+	"flag"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	"github.com/diiyw/nodis"
+	"github.com/diiyw/nodis/server"
 )
 
-var CLI struct {
-	Addr    string `arg:"" default:":6380" usage:"nodis server address"`
-	Storage string `arg:"" default:"memory" usage:"select storage: memory, pebble"`
-}
-
 func main() {
-	_ = kong.Parse(&CLI)
-	if err := run(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	address := flag.String("listen", "127.0.0.1:6380", "TCP listen address")
+	dir := flag.String("data", "./data", "database directory")
+	adminID := flag.String("admin", "admin", "bootstrap administrator ID")
+	durable := flag.Bool("durable", true, "fsync every committed transaction")
+	checkpoint := flag.Duration("checkpoint-interval", 5*time.Minute, "checkpoint interval; 0 disables automatic compaction")
+	certPath := flag.String("tls-cert", "", "server TLS certificate PEM")
+	keyPath := flag.String("tls-key", "", "server TLS private key PEM")
+	clientCA := flag.String("tls-client-ca", "", "require client certificates signed by this PEM CA")
+	flag.Parse()
+	token := os.Getenv("NODIS_TOKEN")
+	if token == "" {
+		log.Fatal("NODIS_TOKEN must be set")
 	}
-}
-func run() error {
-	opts := *nodis.DefaultOptions
-	switch CLI.Storage {
-	case "pebble":
-		opts.Storage = storage.NewPebble("data", nil)
-	case "memory":
-	default:
-		return fmt.Errorf("unknown storage: %s", CLI.Storage)
-	}
-	n, err := nodis.OpenWithError(&opts)
-	if err != nil {
-		return err
-	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	servingDone := make(chan struct{})
-	go func() {
-		select {
-		case <-ctx.Done():
-			_ = n.Close()
-		case <-servingDone:
+	var secure *tls.Config
+	if *certPath != "" || *keyPath != "" || *clientCA != "" {
+		certificate, err := tls.LoadX509KeyPair(*certPath, *keyPath)
+		if err != nil {
+			log.Fatal(err)
 		}
-	}()
-	err = n.Serve(CLI.Addr)
-	close(servingDone)
-	closeErr := n.Close()
-	if closeErr != nil {
-		return closeErr
+		secure = &tls.Config{MinVersion: tls.VersionTLS13, Certificates: []tls.Certificate{certificate}}
+		if *clientCA != "" {
+			pem, err := os.ReadFile(*clientCA)
+			if err != nil {
+				log.Fatal(err)
+			}
+			roots := x509.NewCertPool()
+			if !roots.AppendCertsFromPEM(pem) {
+				log.Fatal("tls-client-ca contains no certificates")
+			}
+			secure.ClientAuth, secure.ClientCAs = tls.RequireAndVerifyClientCert, roots
+		}
 	}
-	if errors.Is(err, net.ErrClosed) {
-		return nil
+	db, err := nodis.Open(nodis.Options{Dir: *dir, Admin: *adminID, Durable: *durable, CheckpointInterval: *checkpoint})
+	if err != nil {
+		log.Fatal(err)
 	}
-	return err
+	defer db.Close()
+	principal := nodis.Principal{ID: *adminID, Roles: []string{"admin"}}
+	s := server.New(db, server.StaticTokens{token: principal})
+	stopped := make(chan os.Signal, 1)
+	signal.Notify(stopped, os.Interrupt, syscall.SIGTERM)
+	go func() { <-stopped; _ = s.Close() }()
+	if secure != nil {
+		err = s.ListenAndServeTLS(*address, secure)
+	} else {
+		err = s.ListenAndServe(*address)
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
 }
