@@ -83,17 +83,9 @@ func Checkpoint[S SnapshotSource](l *Log, sequence uint64, source S) error {
 	}
 	// A crash before this directory sync may leave the old snapshot, so retain
 	// the WAL until both the file and its directory entry are durable.
-	directory, err := os.Open(l.dir)
-	if err != nil {
-		return err
-	}
-	err = directory.Sync()
-	closeErr := directory.Close()
-	if err != nil {
-		return err
-	}
-	if closeErr != nil {
-		return closeErr
+	if err := syncDirectory(l.dir); err != nil {
+		l.failure = err
+		return l.failure
 	}
 	if err := l.file.Truncate(0); err != nil {
 		l.failure = err

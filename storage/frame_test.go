@@ -3,6 +3,7 @@ package storage
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -38,20 +39,24 @@ func TestGenericFramesZeroAllocations(t *testing.T) {
 }
 
 func TestWALAppendZeroAllocations(t *testing.T) {
-	log, err := Open(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer log.Close()
-	payload := []byte("small record")
-	var sequence uint64
-	if allocs := testing.AllocsPerRun(100, func() {
-		sequence++
-		if err := log.Append(sequence, payload, false); err != nil {
-			panic(err)
-		}
-	}); allocs != 0 {
-		t.Fatalf("Log.Append: %g allocs", allocs)
+	for _, durable := range []bool{false, true} {
+		t.Run(fmt.Sprint(durable), func(t *testing.T) {
+			log, err := Open(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer log.Close()
+			payload := []byte("small record")
+			var sequence uint64
+			if allocs := testing.AllocsPerRun(100, func() {
+				sequence++
+				if err := log.Append(sequence, payload, durable); err != nil {
+					panic(err)
+				}
+			}); allocs != 0 {
+				t.Fatalf("Log.Append: %g allocs", allocs)
+			}
+		})
 	}
 }
 
@@ -175,7 +180,7 @@ func TestGenericFrameShortWrites(t *testing.T) {
 }
 
 func TestStorageFailureStopsFurtherWrites(t *testing.T) {
-	for _, operation := range []string{"append-rollback", "checkpoint-recycle"} {
+	for _, operation := range []string{"append-write", "flush", "checkpoint-recycle"} {
 		t.Run(operation, func(t *testing.T) {
 			dir := t.TempDir()
 			log, err := Open(dir)
@@ -189,7 +194,7 @@ func TestStorageFailureStopsFurtherWrites(t *testing.T) {
 			if err := log.file.Close(); err != nil {
 				t.Fatal(err)
 			}
-			// Force write/truncate failures while preserving the committed bytes.
+			// Force write/sync/truncate failures while preserving committed bytes.
 			readOnly, err := os.Open(filepath.Join(dir, "nodis.wal"))
 			if err != nil {
 				t.Fatal(err)
@@ -199,15 +204,21 @@ func TestStorageFailureStopsFurtherWrites(t *testing.T) {
 				t.Fatal(err)
 			}
 			var failure error
-			if operation == "append-rollback" {
+			if operation == "append-write" {
 				failure = log.Append(2, []byte("uncommitted"), true)
+			} else if operation == "flush" {
+				// A closed descriptor reliably fails fsync on all supported OSes.
+				if err := readOnly.Close(); err != nil {
+					t.Fatal(err)
+				}
+				failure = log.Sync()
 			} else {
 				failure = Checkpoint(log, 1, checkpointRecords{records: [][]byte{[]byte("committed")}})
 			}
 			if failure == nil || log.failure == nil {
 				t.Fatal("storage failure was not latched")
 			}
-			if err := readOnly.Close(); err != nil {
+			if err := readOnly.Close(); err != nil && operation != "flush" {
 				t.Fatal(err)
 			}
 			writable, err := os.OpenFile(filepath.Join(dir, "nodis.wal"), os.O_RDWR, 0)
@@ -224,8 +235,8 @@ func TestStorageFailureStopsFurtherWrites(t *testing.T) {
 			if err := Checkpoint(log, 1, checkpointRecords{}); err != failure {
 				t.Fatal("checkpoint ignored storage failure", err)
 			}
-			if err := log.Close(); err != nil {
-				t.Fatal(err)
+			if err := log.Close(); !errors.Is(err, failure) {
+				t.Fatal("close hid storage failure", err)
 			}
 			reopened, err := Open(dir)
 			if err != nil {

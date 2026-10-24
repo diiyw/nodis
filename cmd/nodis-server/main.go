@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"flag"
 	"log"
 	"os"
@@ -15,6 +16,12 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() (runErr error) {
 	address := flag.String("listen", "127.0.0.1:6380", "TCP listen address")
 	dir := flag.String("data", "./data", "database directory")
 	adminID := flag.String("admin", "admin", "bootstrap administrator ID")
@@ -26,32 +33,32 @@ func main() {
 	flag.Parse()
 	token := os.Getenv("NODIS_TOKEN")
 	if token == "" {
-		log.Fatal("NODIS_TOKEN must be set")
+		return errors.New("NODIS_TOKEN must be set")
 	}
 	var secure *tls.Config
 	if *certPath != "" || *keyPath != "" || *clientCA != "" {
 		certificate, err := tls.LoadX509KeyPair(*certPath, *keyPath)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		secure = &tls.Config{MinVersion: tls.VersionTLS13, Certificates: []tls.Certificate{certificate}}
 		if *clientCA != "" {
 			pem, err := os.ReadFile(*clientCA)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 			roots := x509.NewCertPool()
 			if !roots.AppendCertsFromPEM(pem) {
-				log.Fatal("tls-client-ca contains no certificates")
+				return errors.New("tls-client-ca contains no certificates")
 			}
 			secure.ClientAuth, secure.ClientCAs = tls.RequireAndVerifyClientCert, roots
 		}
 	}
-	db, err := nodis.Open(nodis.Options{Dir: *dir, Admin: *adminID, Durable: *durable, CheckpointInterval: *checkpoint})
+	db, err := nodis.Open(nodis.Options{Dir: *dir, Admin: *adminID, UnsafeNoSync: !*durable, CheckpointInterval: *checkpoint})
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	defer db.Close()
+	defer func() { runErr = errors.Join(runErr, db.Close()) }()
 	principal := nodis.Principal{ID: *adminID, Roles: []string{"admin"}}
 	s := server.New(db, server.StaticTokens{token: principal})
 	stopped := make(chan os.Signal, 1)
@@ -62,7 +69,5 @@ func main() {
 	} else {
 		err = s.ListenAndServe(*address)
 	}
-	if err != nil {
-		log.Fatal(err)
-	}
+	return err
 }

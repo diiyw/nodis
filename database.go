@@ -10,10 +10,14 @@ import (
 )
 
 type Options struct {
-	Dir        string
-	Admin      string
-	Durable    bool
-	EventQueue int
+	Dir   string
+	Admin string
+	// Deprecated: persistent databases now sync every commit by default.
+	Durable bool
+	// UnsafeNoSync skips commit-time WAL syncs. A machine crash can lose commits.
+	// Flush and Close still sync. Cannot be combined with Durable.
+	UnsafeNoSync bool
+	EventQueue   int
 	// CheckpointInterval compacts storage periodically; zero disables it.
 	CheckpointInterval time.Duration
 }
@@ -45,6 +49,9 @@ type DB struct {
 }
 
 func Open(options Options) (*DB, error) {
+	if options.Durable && options.UnsafeNoSync {
+		return nil, ErrInvalidValue
+	}
 	if options.CheckpointInterval < 0 {
 		return nil, ErrInvalidValue
 	}
@@ -62,7 +69,7 @@ func Open(options Options) (*DB, error) {
 		options.EventQueue = 256
 	}
 	db := &DB{
-		log: log, durable: options.Durable, admin: options.Admin,
+		log: log, durable: !options.UnsafeNoSync, admin: options.Admin,
 		documents: make(map[DocumentID]*Document), documentsByName: make(map[string]DocumentID),
 		objects: make(map[objectKey][]byte), pipelines: make(map[PipelineID]Pipeline),
 		listeners: make(map[uint64]*listener), eventQueue: options.EventQueue,
